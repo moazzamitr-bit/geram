@@ -1,0 +1,25 @@
+{
+  "name": "گرم",
+  "short_name": "گرم",
+  "description": "پلتفرم خرید و نگهداری طلای واقعی",
+  "start_url": "/app/dashboard",
+  "display": "standalone",
+  "background_color": "#080B0D",
+  "theme_color": "#080B0D",
+  "lang": "fa",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
