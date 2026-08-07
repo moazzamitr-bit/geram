@@ -19,6 +19,13 @@ export const metadata: Metadata = {
     "پلتفرم خرید و فروش آنلاین طلا با پشتوانه واقعی، شفافیت کامل و تجربه‌ای مدرن برای مدیریت دارایی.",
   applicationName: "گرم",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/logo.png", sizes: "528x525", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -30,6 +37,7 @@ export const metadata: Metadata = {
       "پلتفرم خرید و فروش آنلاین طلا با پشتوانه واقعی، شفافیت کامل و تجربه‌ای مدرن برای مدیریت دارایی.",
     locale: "fa_IR",
     type: "website",
+    images: [{ url: "/brand/logo.png", width: 528, height: 525, alt: "گرم" }],
   },
 };
 

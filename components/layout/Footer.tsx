@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { contactInfo, footerGroups } from "@/lib/data";
 import { Instagram, Linkedin, Mail, MapPin, Phone, Send } from "lucide-react";
 import Link from "next/link";
@@ -16,10 +17,7 @@ export function Footer() {
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-5 lg:gap-8">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
-            <Link href="#home" className="inline-flex items-center gap-2.5">
-              <FooterLogo />
-              <span className="text-[26px] font-extrabold text-text">گرم</span>
-            </Link>
+            <BrandLogo href="#home" size="md" />
             <p className="mt-4 max-w-xs text-[14px] leading-7 text-text-secondary">
               پلتفرم خرید و فروش آنلاین طلا با پشتوانه واقعی، شفافیت کامل و
               تجربه‌ای مدرن برای مدیریت دارایی.
@@ -86,20 +84,6 @@ export function Footer() {
         </div>
       </div>
     </footer>
-  );
-}
-
-function FooterLogo() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 34 34" fill="none" aria-hidden>
-      <circle cx="17" cy="17" r="15.2" stroke="#D6A84B" strokeWidth="1.4" />
-      <path
-        d="M17 7.5L19.6 14.1L26.5 14.8L21.2 19.2L22.7 26L17 22.4L11.3 26L12.8 19.2L7.5 14.8L14.4 14.1L17 7.5Z"
-        stroke="#F0C568"
-        strokeWidth="1.15"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 

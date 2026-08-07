@@ -1,5 +1,6 @@
 "use client";
 
+import { LogoMark } from "@/components/brand/BrandLogo";
 import { PriceChart } from "@/components/ui/PriceChart";
 import { cn, formatFaNumber } from "@/lib/utils";
 import { Bell, ChevronLeft, Cuboid } from "lucide-react";
@@ -77,7 +78,7 @@ function PortfolioScreen() {
         </button>
         <div className="flex items-center gap-2">
           <span className="text-[12px] text-text">سلام، مهدی</span>
-          <LogoMark className="h-6 w-6" />
+          <LogoMark size={24} />
         </div>
       </div>
 
@@ -219,25 +220,6 @@ function BuyScreen() {
         تایید و پرداخت
       </button>
     </div>
-  );
-}
-
-function LogoMark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 32 32"
-      className={cn("text-gold", className)}
-      fill="none"
-      aria-hidden
-    >
-      <circle cx="16" cy="16" r="14" stroke="currentColor" strokeWidth="1.2" />
-      <path
-        d="M16 6.5 L19.2 12.8 L26 13.6 L20.8 18.2 L22.2 25 L16 21.6 L9.8 25 L11.2 18.2 L6 13.6 L12.8 12.8 Z"
-        stroke="currentColor"
-        strokeWidth="1.1"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 
