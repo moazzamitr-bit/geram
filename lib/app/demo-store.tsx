@@ -442,7 +442,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       setState((s) => ({
         ...s,
         marketPriceRial: data.priceToman!,
-        marketSource: data.source ?? "TGJU",
+        marketSource: data.source ?? "بازار آزاد",
         marketUpdatedAt: data.updatedAt ?? new Date().toISOString(),
         marketStale: Boolean(data.stale),
         marketHighToman: data.highToman ?? null,

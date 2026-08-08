@@ -26,7 +26,7 @@ export async function GET(request: Request) {
         high_toman: quote.highToman ?? null,
         low_toman: quote.lowToman ?? null,
         change_percent: quote.changePercent ?? null,
-        source: quote.source ?? "TGJU",
+        source: quote.source ?? "بازار آزاد",
         observed_at: quote.updatedAt ?? new Date().toISOString(),
       });
     } catch {
