@@ -6,7 +6,7 @@ import { isSupabaseConfigured } from "@/lib/db/types";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (!isSupabaseConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!isSupabaseConfigured()) {
     return NextResponse.json(
       { ok: false, error: "supabase_not_configured" },
       { status: 503 }

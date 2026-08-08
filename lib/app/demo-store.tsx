@@ -158,6 +158,13 @@ function uid(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+function newId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return uid("id");
+}
+
 const initialTransactions: DemoTransaction[] = [
   {
     id: "tx-buy-1",
@@ -666,15 +673,22 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       deposit,
       withdraw,
       addGoal: (goal) => {
-        const id = uid("goal");
+        const id = newId();
+        const next = { ...goal, id, currentRial: 0 };
         setState((s) => ({
           ...s,
-          goals: [...s.goals, { ...goal, id, currentRial: 0 }],
+          goals: [...s.goals, next],
         }));
+        if (liveDb) {
+          void import("@/lib/db/platform-sync").then(({ persistGoal }) =>
+            persistGoal(next)
+          );
+        }
         return id;
       },
       contributeGoal: (goalId, rial) => {
         if (rial > state.rialAvailable) return { ok: false, error: "موجودی کافی نیست." };
+        const target = state.goals.find((g) => g.id === goalId);
         setState((s) => ({
           ...s,
           rialAvailable: s.rialAvailable - rial,
@@ -682,98 +696,136 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             g.id === goalId ? { ...g, currentRial: g.currentRial + rial } : g
           ),
         }));
+        if (liveDb && target) {
+          void import("@/lib/db/platform-sync").then(({ persistGoal }) =>
+            persistGoal({
+              ...target,
+              currentRial: target.currentRial + rial,
+            })
+          );
+        }
         return { ok: true };
       },
       requestDelivery: ({ productId, productName, weightGrams, method, feeRial }) => {
         const needMg = Math.round(weightGrams * 1000);
         if (needMg > state.goldMg) return { ok: false, error: "طلای قابل تحویل کافی نیست." };
         if (feeRial > state.rialAvailable) return { ok: false, error: "موجودی ریالی برای کارمزد کافی نیست." };
-        const id = uid("dlv");
+        const id = newId();
+        const delivery = {
+          id,
+          productId,
+          productName,
+          weightGrams,
+          status: "REQUESTED",
+          method,
+          createdAt: nowFa(),
+          feeRial,
+        };
+        const tx: DemoTransaction = {
+          id: newId(),
+          trackingCode: tracking(),
+          type: "تحویل",
+          goldMg: needMg,
+          amountRial: feeRial,
+          feeRial,
+          pricePerGram: state.marketPriceRial,
+          status: "در حال پردازش",
+          createdAt: nowFa(),
+          timeline: [
+            { label: "ثبت درخواست", done: true },
+            { label: "بررسی", done: false },
+            { label: "آماده‌سازی", done: false },
+            { label: "تحویل", done: false },
+          ],
+        };
         setState((s) => ({
           ...s,
           goldMg: s.goldMg - needMg,
           rialAvailable: s.rialAvailable - feeRial,
-          deliveries: [
-            {
-              id,
-              productId,
-              productName,
-              weightGrams,
-              status: "REQUESTED",
-              method,
-              createdAt: nowFa(),
-              feeRial,
-            },
-            ...s.deliveries,
-          ],
-          transactions: [
-            {
-              id: uid("tx"),
-              trackingCode: tracking(),
-              type: "تحویل",
-              goldMg: needMg,
-              amountRial: feeRial,
-              feeRial,
-              pricePerGram: s.marketPriceRial,
-              status: "در حال پردازش",
-              createdAt: nowFa(),
-              timeline: [
-                { label: "ثبت درخواست", done: true },
-                { label: "بررسی", done: false },
-                { label: "آماده‌سازی", done: false },
-                { label: "تحویل", done: false },
-              ],
-            },
-            ...s.transactions,
-          ],
+          deliveries: [delivery, ...s.deliveries],
+          transactions: [tx, ...s.transactions],
         }));
+        if (liveDb) {
+          void import("@/lib/db/platform-sync").then(
+            ({ persistDelivery, persistTransaction }) => {
+              void persistDelivery(delivery);
+              void persistTransaction(tx);
+            }
+          );
+        }
         return { ok: true, id };
       },
       setPin: (pin) => setState((s) => ({ ...s, pin })),
-      addBankAccount: (iban, bank) =>
+      addBankAccount: (iban, bank) => {
+        const next = { id: newId(), iban, bank, verified: true };
         setState((s) => ({
           ...s,
-          bankAccounts: [
-            ...s.bankAccounts,
-            { id: uid("bank"), iban, bank, verified: true },
-          ],
-        })),
-      addAlert: (alert) =>
+          bankAccounts: [...s.bankAccounts, next],
+        }));
+        if (liveDb) {
+          void import("@/lib/db/platform-sync").then(({ persistBankAccount }) =>
+            persistBankAccount(next)
+          );
+        }
+      },
+      addAlert: (alert) => {
+        const next = { ...alert, id: newId(), status: "ACTIVE" as const };
         setState((s) => ({
           ...s,
-          alerts: [...s.alerts, { ...alert, id: uid("alert"), status: "ACTIVE" }],
-        })),
-      markNotificationRead: (id) =>
+          alerts: [...s.alerts, next],
+        }));
+        if (liveDb) {
+          void import("@/lib/db/platform-sync").then(({ persistAlert }) =>
+            persistAlert(next)
+          );
+        }
+      },
+      markNotificationRead: (id) => {
         setState((s) => ({
           ...s,
           notifications: s.notifications.map((n) =>
             n.id === id ? { ...n, read: true } : n
           ),
-        })),
-      markAllNotificationsRead: () =>
+        }));
+        if (liveDb) {
+          void import("@/lib/db/platform-sync").then(({ markNotificationsRead }) =>
+            markNotificationsRead([id])
+          );
+        }
+      },
+      markAllNotificationsRead: () => {
         setState((s) => ({
           ...s,
           notifications: s.notifications.map((n) => ({ ...n, read: true })),
-        })),
+        }));
+        if (liveDb) {
+          void import("@/lib/db/platform-sync").then(({ markNotificationsRead }) =>
+            markNotificationsRead()
+          );
+        }
+      },
       createTicket: (category, subject, message) => {
-        const id = uid("tkt");
+        const id = newId();
+        const ticket: SupportTicket = {
+          id,
+          category,
+          subject,
+          status: "OPEN",
+          createdAt: nowFa(),
+          messages: [{ from: "user", text: message, at: nowFa() }],
+        };
         setState((s) => ({
           ...s,
-          tickets: [
-            {
-              id,
-              category,
-              subject,
-              status: "OPEN",
-              createdAt: nowFa(),
-              messages: [{ from: "user", text: message, at: nowFa() }],
-            },
-            ...s.tickets,
-          ],
+          tickets: [ticket, ...s.tickets],
         }));
+        if (liveDb) {
+          void import("@/lib/db/platform-sync").then(({ persistTicket }) =>
+            persistTicket(ticket, message)
+          );
+        }
         return id;
       },
-      replyTicket: (id, text) =>
+      replyTicket: (id, text) => {
         setState((s) => ({
           ...s,
           tickets: s.tickets.map((t) =>
@@ -786,31 +838,46 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
                     { from: "user", text, at: nowFa() },
                     {
                       from: "support",
-                      text: "پیام شما دریافت شد. تیم پشتیبانی به‌زودی پاسخ می‌دهد. (سندباکس)",
+                      text: "پیام شما دریافت شد. تیم پشتیبانی به‌زودی پاسخ می‌دهد.",
                       at: nowFa(),
                     },
                   ],
                 }
               : t
           ),
-        })),
-      addScheduledPurchase: (amountRial, cadence) =>
+        }));
+        if (liveDb) {
+          void import("@/lib/db/platform-sync").then(({ persistTicketReply }) => {
+            void persistTicketReply(id, text, "user");
+            void persistTicketReply(
+              id,
+              "پیام شما دریافت شد. تیم پشتیبانی به‌زودی پاسخ می‌دهد.",
+              "support"
+            );
+          });
+        }
+      },
+      addScheduledPurchase: (amountRial, cadence) => {
+        const next = {
+          id: newId(),
+          amountRial,
+          cadence,
+          status: "ACTIVE",
+          nextRun: "اول ماه آینده",
+        };
         setState((s) => ({
           ...s,
-          scheduledPurchases: [
-            ...s.scheduledPurchases,
-            {
-              id: uid("sch"),
-              amountRial,
-              cadence,
-              status: "ACTIVE",
-              nextRun: "اول ماه آینده",
-            },
-          ],
-        })),
+          scheduledPurchases: [...s.scheduledPurchases, next],
+        }));
+        if (liveDb) {
+          void import("@/lib/db/platform-sync").then(
+            ({ persistScheduledPurchase }) => persistScheduledPurchase(next)
+          );
+        }
+      },
       refreshMarketPrice,
     }),
-    [hydrated, state, buyGold, sellGold, deposit, withdraw, refreshMarketPrice]
+    [hydrated, state, liveDb, buyGold, sellGold, deposit, withdraw, refreshMarketPrice]
   );
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
