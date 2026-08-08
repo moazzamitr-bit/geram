@@ -91,7 +91,7 @@ export default function PortfolioPage() {
           </div>
         </div>
         <div className="relative mt-5 rounded-xl border border-white/[0.05] bg-[#0A0C0E]/50 p-2">
-          <PriceChart variant="portfolio" height={80} />
+          <PriceChart variant="portfolio" height={80} range="1m" />
         </div>
         <div className="relative mt-6 flex flex-wrap gap-3">
           <Link href="/app/buy">

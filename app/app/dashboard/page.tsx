@@ -130,7 +130,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-5 rounded-xl border border-white/[0.05] bg-[#0A0C0E]/50 p-2">
-            <PriceChart variant="portfolio" height={72} />
+            <PriceChart variant="portfolio" height={72} range="7d" />
           </div>
 
           <div className="mt-5 flex flex-wrap gap-3">
@@ -264,7 +264,7 @@ export default function DashboardPage() {
             <SimulationBadge />
           </div>
           <div className="mt-4 rounded-xl border border-white/[0.05] bg-[#0A0C0E]/60 p-2">
-            <PriceChart variant="market" height={96} />
+            <PriceChart variant="market" height={96} range="7d" />
           </div>
           <div className="mt-5 flex gap-3">
             <Link href="/app/buy">

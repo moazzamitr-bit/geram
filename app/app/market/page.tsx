@@ -11,11 +11,18 @@ import { formatToman } from "@/lib/utils";
 import Link from "next/link";
 import { useState } from "react";
 
-const periods = ["۱ روز", "۷ روز", "۱ ماه", "۳ ماه", "۱ سال"] as const;
+const periods = [
+  { label: "۱ روز", range: "1d" },
+  { label: "۷ روز", range: "7d" },
+  { label: "۱ ماه", range: "1m" },
+  { label: "۳ ماه", range: "3m" },
+  { label: "۱ سال", range: "1y" },
+] as const;
 
 export default function MarketPage() {
   const store = useDemoStore();
-  const [period, setPeriod] = useState<(typeof periods)[number]>("۷ روز");
+  const [period, setPeriod] =
+    useState<(typeof periods)[number]["range"]>("7d");
   const [alertPrice, setAlertPrice] = useState(store.marketPriceRial);
   const [direction, setDirection] = useState<"above" | "below">("above");
   const [msg, setMsg] = useState("");
@@ -71,21 +78,21 @@ export default function MarketPage() {
         <div className="mt-5 flex flex-wrap gap-2">
           {periods.map((p) => (
             <button
-              key={p}
+              key={p.range}
               type="button"
-              onClick={() => setPeriod(p)}
+              onClick={() => setPeriod(p.range)}
               className={`rounded-full px-3 py-1.5 text-[12px] ${
-                period === p
+                period === p.range
                   ? "bg-gold/15 text-gold"
                   : "border border-white/10 text-muted-app"
               }`}
             >
-              {p}
+              {p.label}
             </button>
           ))}
         </div>
         <div className="mt-4 rounded-xl border border-white/[0.06] bg-[#0A0C0E] p-3">
-          <PriceChart variant="market" height={180} />
+          <PriceChart variant="market" height={180} range={period} />
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
           <Link href="/app/buy">
