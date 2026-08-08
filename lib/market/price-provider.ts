@@ -41,10 +41,12 @@ function rialToToman(rial: number) {
 }
 
 function pickInstrument(current: Record<string, unknown>) {
+  // Prefer geram18 — the public "طلای ۱۸ عیار / 750" profile on TGJU.
   const preferred = [
+    "geram18",
+    "geram18_buy",
     "tgju_gold_irg18",
     "tgju_gold_irg18_buy",
-    "geram18",
   ];
   for (const key of preferred) {
     const row = current[key];
