@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { PriceChart } from "@/components/ui/PriceChart";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
+import { unrealizedPnl } from "@/lib/app/pnl";
 import { formatFaNumber, formatToman } from "@/lib/utils";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -15,16 +16,21 @@ import { useMemo } from "react";
 export default function PortfolioPage() {
   const store = useDemoStore();
 
-  const valueRial = useMemo(
-    () => Math.floor((store.goldMg / 1000) * store.marketPriceRial),
-    [store.goldMg, store.marketPriceRial]
+  const { marketValue: valueRial, costBasis, pnl, pnlPct, avgBuyPrice } = useMemo(
+    () =>
+      unrealizedPnl({
+        goldMg: store.goldMg,
+        marketPricePerGram: store.marketPriceRial,
+        avgBuyPricePerGram: store.avgBuyPriceRial,
+        transactions: store.transactions,
+      }),
+    [
+      store.goldMg,
+      store.marketPriceRial,
+      store.avgBuyPriceRial,
+      store.transactions,
+    ]
   );
-  const costBasis = useMemo(
-    () => Math.floor((store.goldMg / 1000) * store.avgBuyPriceRial),
-    [store.goldMg, store.avgBuyPriceRial]
-  );
-  const pnl = valueRial - costBasis;
-  const pnlPct = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
 
   const allocation = [
     { label: "قابل فروش", mg: store.goldMg, share: 100 },
@@ -108,7 +114,7 @@ export default function PortfolioPage() {
         <AppCard>
           <h2 className="text-[15px] font-bold">جزئیات ارزش</h2>
           <dl className="mt-4 space-y-3 text-[13px] tabular-nums">
-            <Row label="میانگین قیمت خرید" value={formatToman(store.avgBuyPriceRial)} />
+            <Row label="میانگین قیمت خرید" value={formatToman(avgBuyPrice)} />
             <Row label="قیمت روز" value={formatToman(store.marketPriceRial)} />
             <Row label="ارزش روز" value={formatToman(valueRial)} />
             <Row label="بهای تمام‌شده" value={formatToman(costBasis)} />

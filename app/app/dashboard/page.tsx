@@ -7,6 +7,7 @@ import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { PriceChart } from "@/components/ui/PriceChart";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
+import { unrealizedPnl } from "@/lib/app/pnl";
 import { useAuth } from "@/lib/auth/auth-context";
 import { formatFaNumber, formatToman } from "@/lib/utils";
 import { ArrowUpLeft, Eye, EyeOff } from "lucide-react";
@@ -18,15 +19,21 @@ export default function DashboardPage() {
   const store = useDemoStore();
   const [hidden, setHidden] = useState(false);
 
-  const valueRial = useMemo(
-    () => Math.floor((store.goldMg / 1000) * store.marketPriceRial),
-    [store.goldMg, store.marketPriceRial]
+  const { marketValue: valueRial, costBasis, pnl, avgBuyPrice } = useMemo(
+    () =>
+      unrealizedPnl({
+        goldMg: store.goldMg,
+        marketPricePerGram: store.marketPriceRial,
+        avgBuyPricePerGram: store.avgBuyPriceRial,
+        transactions: store.transactions,
+      }),
+    [
+      store.goldMg,
+      store.marketPriceRial,
+      store.avgBuyPriceRial,
+      store.transactions,
+    ]
   );
-  const costBasis = useMemo(
-    () => Math.floor((store.goldMg / 1000) * store.avgBuyPriceRial),
-    [store.goldMg, store.avgBuyPriceRial]
-  );
-  const pnl = valueRial - costBasis;
   const goal = store.goals[0];
   const goalPct = goal
     ? Math.min(100, Math.round((goal.currentRial / goal.targetRial) * 100))
@@ -159,13 +166,14 @@ export default function DashboardPage() {
         <AppCard>
           <h2 className="text-[16px] font-bold text-text">خلاصه دارایی</h2>
           <dl className="mt-4 space-y-3 text-[13px] tabular-nums">
-            <Row label="میانگین قیمت خرید" value={formatToman(store.avgBuyPriceRial)} />
+            <Row label="میانگین قیمت خرید" value={formatToman(avgBuyPrice)} />
             <Row label="ارزش روز" value={formatToman(valueRial)} />
             <Row
               label="سود/زیان"
               value={`${pnl >= 0 ? "+" : ""}${formatToman(pnl)}`}
               positive={pnl >= 0}
             />
+            <Row label="بهای تمام‌شده" value={formatToman(costBasis)} />
             <Row label="طلای قابل فروش" value={`${mgToGramsLabel(store.goldMg)} گرم`} />
             <Row label="موجودی ریالی" value={formatToman(store.rialAvailable)} />
             <Row label="در انتظار تسویه" value={formatToman(store.rialPending)} />

@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  averageBuyPriceFromTrades,
+  nextAverageBuyPrice,
+} from "@/lib/app/pnl";
+import {
   createContext,
   useCallback,
   useContext,
@@ -303,6 +307,14 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           const { loadPlatformBundle } = await import("@/lib/db/platform-sync");
           const bundle = await loadPlatformBundle();
           if (bundle && !cancelled) {
+            const reconciledAvg =
+              bundle.avgBuyPriceRial > 0
+                ? bundle.avgBuyPriceRial
+                : averageBuyPriceFromTrades(
+                    bundle.transactions,
+                    // until market quote loads, keep 0; effect below can refine
+                    0
+                  );
             setLiveDb(true);
             setState((s) =>
               stripLiveMarket({
@@ -310,7 +322,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
                 goldMg: bundle.goldMg,
                 rialAvailable: bundle.rialAvailable,
                 rialPending: bundle.rialPending,
-                avgBuyPriceRial: bundle.avgBuyPriceRial,
+                avgBuyPriceRial: reconciledAvg,
                 bankAccounts: bundle.bankAccounts,
                 transactions: bundle.transactions,
                 goals: bundle.goals,
@@ -334,7 +346,14 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw && !cancelled) {
           const parsed = JSON.parse(raw) as Partial<Persisted>;
-          setState(stripLiveMarket({ ...seed, ...parsed }));
+          const merged = stripLiveMarket({ ...seed, ...parsed });
+          if (merged.goldMg > 0 && merged.avgBuyPriceRial <= 0) {
+            merged.avgBuyPriceRial = averageBuyPriceFromTrades(
+              merged.transactions,
+              merged.marketPriceRial
+            );
+          }
+          setState(merged);
         }
       } catch {
         /* ignore */
@@ -375,6 +394,28 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     state.rialAvailable,
     state.rialPending,
     state.avgBuyPriceRial,
+  ]);
+
+  // If holdings exist but average cost is missing, rebuild from buys (or market).
+  useEffect(() => {
+    if (!hydrated) return;
+    if (state.goldMg <= 0 || state.avgBuyPriceRial > 0) return;
+    const fallback =
+      state.marketPriceRial > 0
+        ? state.marketPriceRial
+        : averageBuyPriceFromTrades(state.transactions, 0);
+    const next = averageBuyPriceFromTrades(state.transactions, fallback);
+    if (next > 0) {
+      setState((s) =>
+        s.avgBuyPriceRial > 0 ? s : { ...s, avgBuyPriceRial: next }
+      );
+    }
+  }, [
+    hydrated,
+    state.goldMg,
+    state.avgBuyPriceRial,
+    state.marketPriceRial,
+    state.transactions,
   ]);
 
   const refreshMarketPrice = useCallback(async () => {
@@ -429,7 +470,10 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       const net = rial - fee;
       if (net <= 0) return { ok: false, error: "مبلغ پس از کارمزد معتبر نیست." };
       const goldMg = Math.floor((net / state.marketPriceRial) * 1000);
-      const txId = uid("tx");
+      const txId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : uid("tx");
       const tx: DemoTransaction = {
         id: txId,
         trackingCode: tracking(),
@@ -450,10 +494,17 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           { label: "صدور رسید", done: true, at: "اکنون" },
         ],
       };
+      const nextAvg = nextAverageBuyPrice({
+        prevGoldMg: state.goldMg,
+        prevAvg: state.avgBuyPriceRial,
+        boughtMg: goldMg,
+        buyPricePerGram: state.marketPriceRial,
+      });
       setState((s) => ({
         ...s,
         rialAvailable: s.rialAvailable - rial,
         goldMg: s.goldMg + goldMg,
+        avgBuyPriceRial: nextAvg,
         transactions: [tx, ...s.transactions],
         notifications: [
           {
@@ -468,9 +519,14 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           ...s.notifications,
         ],
       }));
+      if (liveDb) {
+        void import("@/lib/db/platform-sync").then(({ persistTransaction }) =>
+          persistTransaction(tx)
+        );
+      }
       return { ok: true, txId };
     },
-    [state]
+    [state, liveDb]
   );
 
   const sellGold = useCallback(
@@ -484,7 +540,10 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       const gross = Math.floor((goldMg / 1000) * state.marketPriceRial);
       const fee = Math.max(30_000, Math.floor(gross * 0.005));
       const net = gross - fee;
-      const txId = uid("tx");
+      const txId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : uid("tx");
       const pending = destination === "bank";
       const tx: DemoTransaction = {
         id: txId,
@@ -527,9 +586,14 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           ...s.notifications,
         ],
       }));
+      if (liveDb) {
+        void import("@/lib/db/platform-sync").then(({ persistTransaction }) =>
+          persistTransaction(tx)
+        );
+      }
       return { ok: true, txId };
     },
-    [state]
+    [state, liveDb]
   );
 
   const deposit = useCallback((rial: number) => {
