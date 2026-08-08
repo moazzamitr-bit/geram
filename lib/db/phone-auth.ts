@@ -1,4 +1,4 @@
-import { createServiceClient } from "@/lib/supabase/admin";
+import { createClient as createBrowserOrServer } from "@supabase/supabase-js";
 import { isSupabaseConfigured } from "@/lib/db/types";
 
 function phoneEmail(phone: string) {
@@ -13,43 +13,44 @@ function phonePassword(phone: string) {
   return `gram-${pepper}-${phone.replace(/\D/g, "")}`;
 }
 
+/** Ensure a phone-backed auth user exists (works with anon key via signUp/signIn). */
 export async function ensurePhoneUser(phone: string) {
-  if (!isSupabaseConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error("Supabase service not configured");
+  if (!isSupabaseConfigured()) {
+    throw new Error("Supabase not configured");
   }
 
   const digits = phone.replace(/\D/g, "").replace(/^98/, "0");
   const email = phoneEmail(digits);
   const password = phonePassword(digits);
-  const admin = createServiceClient();
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabase = createBrowserOrServer(url, anon, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 
-  const { data: existingProfile } = await admin
-    .from("profiles")
-    .select("id")
-    .eq("phone", digits)
-    .maybeSingle();
-
-  if (!existingProfile) {
-    const { data, error } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { phone: digits },
-    });
-    if (error) throw error;
-    if (data.user) {
-      await admin
-        .from("profiles")
-        .update({ phone: digits })
-        .eq("id", data.user.id);
-    }
-  } else {
-    await admin.auth.admin.updateUserById(existingProfile.id, {
-      password,
-      email,
-      user_metadata: { phone: digits },
-    });
+  const signIn = await supabase.auth.signInWithPassword({ email, password });
+  if (signIn.data.user) {
+    return { email, password, phone: digits };
   }
+
+  const signUp = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { phone: digits } },
+  });
+  if (signUp.error && !/already/i.test(signUp.error.message)) {
+    throw signUp.error;
+  }
+
+  const again = await supabase.auth.signInWithPassword({ email, password });
+  if (again.error || !again.data.user) {
+    throw again.error ?? new Error("phone_sign_in_failed");
+  }
+
+  await supabase
+    .from("profiles")
+    .update({ phone: digits })
+    .eq("id", again.data.user.id);
 
   return { email, password, phone: digits };
 }

@@ -2,6 +2,13 @@ import { isSupabaseConfigured } from "@/lib/db/types";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 
+async function getDb() {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return createServiceClient();
+  }
+  return createClient();
+}
+
 export async function getAdminOverview() {
   if (!isSupabaseConfigured()) {
     return {
@@ -17,7 +24,7 @@ export async function getAdminOverview() {
   }
 
   try {
-    const supabase = createServiceClient();
+    const supabase = await getDb();
     const [
       users,
       txs,
@@ -78,7 +85,7 @@ export async function getAdminOverview() {
 
 export async function listProfiles(limit = 50) {
   if (!isSupabaseConfigured()) return [];
-  const supabase = createServiceClient();
+  const supabase = await getDb();
   const { data } = await supabase
     .from("profiles")
     .select("*")
@@ -89,7 +96,7 @@ export async function listProfiles(limit = 50) {
 
 export async function listTransactions(limit = 50) {
   if (!isSupabaseConfigured()) return [];
-  const supabase = createServiceClient();
+  const supabase = await getDb();
   const { data } = await supabase
     .from("transactions")
     .select("*, profiles(first_name,last_name,phone)")
@@ -100,7 +107,7 @@ export async function listTransactions(limit = 50) {
 
 export async function listWallets(limit = 50) {
   if (!isSupabaseConfigured()) return [];
-  const supabase = createServiceClient();
+  const supabase = await getDb();
   const { data } = await supabase
     .from("wallets")
     .select("*, profiles(first_name,last_name,phone,kyc_status)")
@@ -111,7 +118,7 @@ export async function listWallets(limit = 50) {
 
 export async function listTickets(limit = 50) {
   if (!isSupabaseConfigured()) return [];
-  const supabase = createServiceClient();
+  const supabase = await getDb();
   const { data } = await supabase
     .from("support_tickets")
     .select("*, profiles(first_name,last_name,phone)")
@@ -122,7 +129,7 @@ export async function listTickets(limit = 50) {
 
 export async function listDeliveries(limit = 50) {
   if (!isSupabaseConfigured()) return [];
-  const supabase = createServiceClient();
+  const supabase = await getDb();
   const { data } = await supabase
     .from("delivery_requests")
     .select("*, profiles(first_name,last_name,phone)")
@@ -133,7 +140,7 @@ export async function listDeliveries(limit = 50) {
 
 export async function listGoals(limit = 50) {
   if (!isSupabaseConfigured()) return [];
-  const supabase = createServiceClient();
+  const supabase = await getDb();
   const { data } = await supabase
     .from("goals")
     .select("*, profiles(first_name,last_name,phone)")
@@ -144,7 +151,7 @@ export async function listGoals(limit = 50) {
 
 export async function listMarketPrices(limit = 30) {
   if (!isSupabaseConfigured()) return [];
-  const supabase = createServiceClient();
+  const supabase = await getDb();
   const { data } = await supabase
     .from("market_prices")
     .select("*")
