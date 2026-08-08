@@ -152,15 +152,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {!store.pin && (
-            <div className="mt-3 rounded-xl border border-gold/25 bg-gold/10 px-4 py-3 text-[13px] text-gold">
-              برای خرید و فروش،{" "}
-              <Link href="/app/profile/security" className="underline">
-                پین تراکنش را تنظیم کنید
-              </Link>
-              .
-            </div>
-          )}
         </div>
       </AppCard>
 

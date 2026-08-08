@@ -23,7 +23,6 @@ function NewDeliveryInner() {
   const initial = params.get("product") ?? "p1";
   const [productId, setProductId] = useState(initial);
   const [method, setMethod] = useState("ارسال بیمه‌شده");
-  const [pin, setPin] = useState("");
   const [error, setError] = useState("");
 
   const product = useMemo(
@@ -70,17 +69,6 @@ function NewDeliveryInner() {
             <span className="text-gold">{formatToman(product.fee)}</span>
           </div>
         </div>
-        <label className="block text-[13px]">
-          <span className="text-muted-app">پین تراکنش</span>
-          <input
-            dir="ltr"
-            type="password"
-            maxLength={6}
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-            className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-3 text-center tracking-widest outline-none focus:border-gold"
-          />
-        </label>
         {error && <p className="text-[13px] text-negative">{error}</p>}
         <GoldButton
           type="button"
@@ -92,7 +80,6 @@ function NewDeliveryInner() {
               weightGrams: product.weightGrams,
               method,
               feeRial: product.fee,
-              pin,
             });
             if (!res.ok) {
               setError(res.error ?? "خطا");

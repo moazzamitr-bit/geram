@@ -7,7 +7,6 @@ import { TradeSuccessSheet } from "@/components/app/TradeSuccessSheet";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
 import { formatToman } from "@/lib/utils";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -18,7 +17,6 @@ export default function BuyPage() {
   const router = useRouter();
   const [rial, setRial] = useState(10_000_000);
   const [seconds, setSeconds] = useState(30);
-  const [pin, setPin] = useState("");
   const [checked, setChecked] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,7 +39,6 @@ export default function BuyPage() {
 
   const resetForm = () => {
     setDoneTx(null);
-    setPin("");
     setChecked(false);
     setSeconds(30);
   };
@@ -54,7 +51,7 @@ export default function BuyPage() {
     }
     setLoading(true);
     setTimeout(() => {
-      const res = store.buyGold(rial, pin);
+      const res = store.buyGold(rial);
       setLoading(false);
       if (!res.ok) {
         setError(res.error ?? "خطا در خرید");
@@ -153,29 +150,7 @@ export default function BuyPage() {
 
         <AppCard>
           <h2 className="text-[15px] font-bold text-text">تأیید خرید</h2>
-          <p className="mt-2 text-[13px] text-muted-app">منبع پرداخت: کیف پول گرم (سندباکس)</p>
-          <label className="mt-4 block">
-            <span className="text-[13px] text-text-secondary">پین تراکنش</span>
-            <input
-              dir="ltr"
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className="mt-2 h-12 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-center tracking-[0.4em] text-text outline-none focus:border-gold"
-              placeholder="------"
-            />
-          </label>
-          {!store.pin && (
-            <p className="mt-2 text-[12px] text-warning">
-              پین تنظیم نشده. از{" "}
-              <Link href="/app/profile/security" className="underline">
-                امنیت حساب
-              </Link>{" "}
-              پین بسازید (مثلاً ۱۲۳۴).
-            </p>
-          )}
+          <p className="mt-2 text-[13px] text-muted-app">منبع پرداخت: کیف پول گرم</p>
           <label className="mt-4 flex items-start gap-2 text-[13px] text-text-secondary">
             <input
               type="checkbox"

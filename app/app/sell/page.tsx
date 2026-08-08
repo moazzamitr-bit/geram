@@ -15,7 +15,6 @@ export default function SellPage() {
   const [grams, setGrams] = useState(0.5);
   const [rialTarget, setRialTarget] = useState(3_000_000);
   const [dest, setDest] = useState<"wallet" | "bank">("wallet");
-  const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [doneTx, setDoneTx] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,14 +34,13 @@ export default function SellPage() {
 
   const resetForm = () => {
     setDoneTx(null);
-    setPin("");
   };
 
   const onConfirm = () => {
     setError("");
     setLoading(true);
     setTimeout(() => {
-      const res = store.sellGold(goldMg, pin, dest);
+      const res = store.sellGold(goldMg, dest);
       setLoading(false);
       if (!res.ok) {
         setError(res.error ?? "خطا");
@@ -185,18 +183,6 @@ export default function SellPage() {
               ? "تسویه بانکی معمولاً تا یک روز کاری (در سندباکس: وضعیت در انتظار)."
               : "واریز آنی به موجودی قابل استفاده کیف پول."}
           </p>
-          <label className="mt-4 block">
-            <span className="text-[13px] text-text-secondary">پین تراکنش</span>
-            <input
-              dir="ltr"
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              className="mt-2 h-12 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-center tracking-[0.4em] text-text outline-none focus:border-gold"
-            />
-          </label>
           {error && (
             <p className="mt-3 text-[13px] text-negative" role="alert">
               {error}

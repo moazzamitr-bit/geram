@@ -14,7 +14,6 @@ export default function WalletPage() {
   const store = useDemoStore();
   const [depositAmount, setDepositAmount] = useState(1_000_000);
   const [withdrawAmount, setWithdrawAmount] = useState(500_000);
-  const [pin, setPin] = useState("");
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
@@ -77,15 +76,6 @@ export default function WalletPage() {
               setWithdrawAmount(Number(e.target.value.replace(/\D/g, "") || 0))
             }
           />
-          <input
-            dir="ltr"
-            type="password"
-            placeholder="پین"
-            maxLength={6}
-            className="mt-3 h-12 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-center tracking-widest outline-none focus:border-gold"
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          />
           <GoldButton
             type="button"
             variant="secondary"
@@ -96,7 +86,7 @@ export default function WalletPage() {
                 setErr("حساب بانکی ثبت نشده است.");
                 return;
               }
-              const res = store.withdraw(withdrawAmount, pin, bankId);
+              const res = store.withdraw(withdrawAmount, bankId);
               if (!res.ok) {
                 setErr(res.error ?? "خطا");
                 setMsg("");

@@ -108,14 +108,13 @@ type DemoState = {
     status: string;
     nextRun: string;
   }[];
-  buyGold: (rial: number, pin: string) => { ok: boolean; error?: string; txId?: string };
+  buyGold: (rial: number) => { ok: boolean; error?: string; txId?: string };
   sellGold: (
     goldMg: number,
-    pin: string,
     destination: "wallet" | "bank"
   ) => { ok: boolean; error?: string; txId?: string };
   deposit: (rial: number) => void;
-  withdraw: (rial: number, pin: string, bankId: string) => { ok: boolean; error?: string };
+  withdraw: (rial: number, bankId: string) => { ok: boolean; error?: string };
   addGoal: (goal: Omit<DemoGoal, "id" | "currentRial">) => string;
   contributeGoal: (goalId: string, rial: number) => { ok: boolean; error?: string };
   requestDelivery: (input: {
@@ -124,7 +123,6 @@ type DemoState = {
     weightGrams: number;
     method: string;
     feeRial: number;
-    pin: string;
   }) => { ok: boolean; error?: string; id?: string };
   setPin: (pin: string) => void;
   addBankAccount: (iban: string, bank: string) => void;
@@ -419,12 +417,10 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
   }, [hydrated, refreshMarketPrice]);
 
   const buyGold = useCallback(
-    (rial: number, pin: string) => {
+    (rial: number) => {
       if (state.marketStatus !== "open") {
         return { ok: false, error: "بازار در حال حاضر باز نیست." };
       }
-      if (!state.pin) return { ok: false, error: "ابتدا پین تراکنش را در امنیت حساب تنظیم کنید." };
-      if (pin !== state.pin) return { ok: false, error: "پین تراکنش نادرست است." };
       if (rial < 500_000) return { ok: false, error: "حداقل مبلغ خرید ۵۰۰٬۰۰۰ تومان است." };
       if (rial > state.rialAvailable) {
         return { ok: false, error: "موجودی کیف پول کافی نیست." };
@@ -478,12 +474,10 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const sellGold = useCallback(
-    (goldMg: number, pin: string, destination: "wallet" | "bank") => {
+    (goldMg: number, destination: "wallet" | "bank") => {
       if (state.marketStatus !== "open") {
         return { ok: false, error: "بازار در حال حاضر باز نیست." };
       }
-      if (!state.pin) return { ok: false, error: "ابتدا پین تراکنش را تنظیم کنید." };
-      if (pin !== state.pin) return { ok: false, error: "پین تراکنش نادرست است." };
       if (goldMg <= 0 || goldMg > state.goldMg) {
         return { ok: false, error: "مقدار طلای قابل فروش کافی نیست." };
       }
@@ -565,8 +559,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const withdraw = useCallback(
-    (rial: number, pin: string, bankId: string) => {
-      if (!state.pin || pin !== state.pin) return { ok: false, error: "پین نادرست است." };
+    (rial: number, bankId: string) => {
       if (!state.bankAccounts.find((b) => b.id === bankId)?.verified) {
         return { ok: false, error: "حساب بانکی تأییدشده یافت نشد." };
       }
@@ -627,8 +620,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         }));
         return { ok: true };
       },
-      requestDelivery: ({ productId, productName, weightGrams, method, feeRial, pin }) => {
-        if (!state.pin || pin !== state.pin) return { ok: false, error: "پین نادرست است." };
+      requestDelivery: ({ productId, productName, weightGrams, method, feeRial }) => {
         const needMg = Math.round(weightGrams * 1000);
         if (needMg > state.goldMg) return { ok: false, error: "طلای قابل تحویل کافی نیست." };
         if (feeRial > state.rialAvailable) return { ok: false, error: "موجودی ریالی برای کارمزد کافی نیست." };
