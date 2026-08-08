@@ -61,7 +61,7 @@ export default function LoginPage() {
     }, 600);
   };
 
-  const onSubmitOtp = (e: FormEvent) => {
+  const onSubmitOtp = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     if (attempts >= 5) {
@@ -73,16 +73,20 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      if (otp !== DEMO_OTP) {
-        setAttempts((a) => a + 1);
-        setError("کد تأیید نادرست است.");
-        return;
-      }
-      login(normalizedPhone);
-      router.replace("/auth/onboarding");
-    }, 700);
+    const result = await login(normalizedPhone, otp);
+    setLoading(false);
+    if (!result.ok) {
+      setAttempts((a) => a + 1);
+      setError(
+        result.error === "invalid_otp"
+          ? "کد تأیید نادرست است."
+          : result.error === "supabase_not_configured"
+            ? "اتصال به سرور آماده نیست. دوباره تلاش کنید یا حالت نمایشی را بدون کلید سوپابیس استفاده کنید."
+            : "ورود ناموفق بود. دوباره تلاش کنید."
+      );
+      return;
+    }
+    router.replace("/auth/onboarding");
   };
 
   return (

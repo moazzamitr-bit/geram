@@ -293,24 +293,91 @@ function stripLiveMarket(state: Persisted): Persisted {
 export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<Persisted>(seed);
   const [hydrated, setHydrated] = useState(false);
+  const [liveDb, setLiveDb] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<Persisted>;
-        setState(stripLiveMarket({ ...seed, ...parsed }));
+    let cancelled = false;
+
+    async function hydrate() {
+      try {
+        const { hasSupabaseEnv } = await import("@/lib/supabase/client");
+        if (hasSupabaseEnv()) {
+          const { loadPlatformBundle } = await import("@/lib/db/platform-sync");
+          const bundle = await loadPlatformBundle();
+          if (bundle && !cancelled) {
+            setLiveDb(true);
+            setState((s) =>
+              stripLiveMarket({
+                ...s,
+                goldMg: bundle.goldMg,
+                rialAvailable: bundle.rialAvailable,
+                rialPending: bundle.rialPending,
+                avgBuyPriceRial: bundle.avgBuyPriceRial,
+                bankAccounts: bundle.bankAccounts,
+                transactions: bundle.transactions,
+                goals: bundle.goals,
+                deliveries: bundle.deliveries,
+                notifications: bundle.notifications,
+                tickets: bundle.tickets,
+                scheduledPurchases: bundle.scheduledPurchases,
+                alerts: bundle.alerts,
+                pin: s.pin,
+              })
+            );
+            setHydrated(true);
+            return;
+          }
+        }
+      } catch {
+        /* fall back to local sandbox */
       }
-    } catch {
-      /* ignore */
+
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw && !cancelled) {
+          const parsed = JSON.parse(raw) as Partial<Persisted>;
+          setState(stripLiveMarket({ ...seed, ...parsed }));
+        }
+      } catch {
+        /* ignore */
+      }
+      if (!cancelled) setHydrated(true);
     }
-    setHydrated(true);
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || liveDb) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stripLiveMarket(state)));
-  }, [state, hydrated]);
+  }, [state, hydrated, liveDb]);
+
+  useEffect(() => {
+    if (!hydrated || !liveDb) return;
+    void (async () => {
+      try {
+        const { persistWallet } = await import("@/lib/db/platform-sync");
+        await persistWallet({
+          goldMg: state.goldMg,
+          rialAvailable: state.rialAvailable,
+          rialPending: state.rialPending,
+          avgBuyPriceRial: state.avgBuyPriceRial,
+        });
+      } catch {
+        /* ignore sync errors */
+      }
+    })();
+  }, [
+    hydrated,
+    liveDb,
+    state.goldMg,
+    state.rialAvailable,
+    state.rialPending,
+    state.avgBuyPriceRial,
+  ]);
 
   const refreshMarketPrice = useCallback(async () => {
     try {

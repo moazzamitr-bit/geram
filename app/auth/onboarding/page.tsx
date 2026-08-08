@@ -40,8 +40,8 @@ export default function OnboardingPage() {
   const isLast = index === slides.length - 1;
   const slide = slides[index];
 
-  const finish = () => {
-    completeOnboarding();
+  const finish = async () => {
+    await completeOnboarding();
     router.replace("/app/dashboard");
   };
 
