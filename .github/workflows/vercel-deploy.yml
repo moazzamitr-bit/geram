@@ -1,0 +1,39 @@
+name: Deploy Vercel Production
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check secrets
+        id: check
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_ORG_ID }}" ] || [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
+            echo "missing=true" >> "$GITHUB_OUTPUT"
+            echo "Missing VERCEL_TOKEN / VERCEL_ORG_ID / VERCEL_PROJECT_ID"
+            exit 0
+          fi
+          echo "missing=false" >> "$GITHUB_OUTPUT"
+      - name: Install Vercel CLI
+        if: steps.check.outputs.missing == 'false'
+        run: npm i -g vercel@latest
+      - name: Pull env and deploy production
+        if: steps.check.outputs.missing == 'false'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          vercel build --prod --token="$VERCEL_TOKEN"
+          vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+      - name: Fail if secrets missing
+        if: steps.check.outputs.missing == 'true'
+        run: |
+          echo "::error::Set repo secrets VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID then re-run."
+          exit 1
