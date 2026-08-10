@@ -4,11 +4,16 @@ import {
 } from "@/components/admin/AdminUI";
 import { hasSupabaseEnv } from "@/lib/supabase/client";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { loadCommerceSettings } from "@/lib/commerce/settings-server";
+import { DEFAULT_COMMERCE_SETTINGS } from "@/lib/commerce/types";
 
 export default async function AdminSettingsPage() {
   const envOk = hasSupabaseEnv();
   let serviceOk = false;
   const projectHint = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "—";
+  const settings = envOk
+    ? await loadCommerceSettings().catch(() => DEFAULT_COMMERCE_SETTINGS)
+    : DEFAULT_COMMERCE_SETTINGS;
 
   if (envOk && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     try {
@@ -54,6 +59,48 @@ export default async function AdminSettingsPage() {
               </dd>
             </div>
           </dl>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5">
+          <h2 className="font-bold">کارمزد و درآمد (پیش‌فرض DB)</h2>
+          <dl className="mt-4 space-y-2 text-[13px] text-white/70">
+            <div className="flex justify-between">
+              <dt>خرید (رایگان / پلاس)</dt>
+              <dd dir="ltr">
+                {(settings.fees.buyFeePercentFree * 100).toFixed(2)}% /{" "}
+                {(settings.fees.buyFeePercentPlus * 100).toFixed(2)}%
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt>فروش (رایگان / پلاس)</dt>
+              <dd dir="ltr">
+                {(settings.fees.sellFeePercentFree * 100).toFixed(2)}% /{" "}
+                {(settings.fees.sellFeePercentPlus * 100).toFixed(2)}%
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt>برداشت (رایگان / پلاس)</dt>
+              <dd>
+                {settings.fees.withdrawFeeTomanFree.toLocaleString("fa-IR")} /{" "}
+                {settings.fees.withdrawFeeTomanPlus.toLocaleString("fa-IR")} تومان
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt>گرم پلاس (ماهانه)</dt>
+              <dd>{settings.plus.monthlyPriceToman.toLocaleString("fa-IR")} تومان</dd>
+            </div>
+          </dl>
+          <p className="mt-4 text-[13px] text-white/55">
+            Cron DCA و هشدار:{" "}
+            <code className="rounded bg-white/5 px-1 text-[12px]" dir="ltr">
+              GET /api/cron/revenue
+            </code>{" "}
+            با{" "}
+            <code className="rounded bg-white/5 px-1 text-[12px]" dir="ltr">
+              CRON_SECRET
+            </code>{" "}
+            و Service Role.
+          </p>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5 text-[14px] leading-7 text-white/65">

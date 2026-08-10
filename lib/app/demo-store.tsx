@@ -4,6 +4,17 @@ import {
   averageBuyPriceFromTrades,
   nextAverageBuyPrice,
 } from "@/lib/app/pnl";
+import type { KycStatus } from "@/lib/auth/auth-context";
+import {
+  buyTradeFee,
+  sellTradeFee,
+  withdrawFee,
+} from "@/lib/commerce/fees";
+import { isKycVerified, KYC_REQUIRED_MESSAGE } from "@/lib/commerce/kyc";
+import {
+  DEFAULT_COMMERCE_SETTINGS,
+  type CommerceSettings,
+} from "@/lib/commerce/types";
 import {
   createContext,
   useCallback,
@@ -62,6 +73,8 @@ export type DemoAlert = {
   priceRial: number;
   channels: string[];
   status: "ACTIVE" | "TRIGGERED" | "DISABLED";
+  autoBuyEnabled?: boolean;
+  autoBuyToman?: number;
 };
 
 export type DemoNotification = {
@@ -112,6 +125,10 @@ type DemoState = {
     status: string;
     nextRun: string;
   }[];
+  plusActive: boolean;
+  kycStatus: KycStatus;
+  referralCode: string | null;
+  commerceSettings: CommerceSettings;
   buyGold: (rial: number) => { ok: boolean; error?: string; txId?: string };
   sellGold: (
     goldMg: number,
@@ -130,12 +147,16 @@ type DemoState = {
   }) => { ok: boolean; error?: string; id?: string };
   setPin: (pin: string) => void;
   addBankAccount: (iban: string, bank: string) => void;
-  addAlert: (alert: Omit<DemoAlert, "id" | "status">) => void;
+  addAlert: (
+    alert: Omit<DemoAlert, "id" | "status">
+  ) => { ok: boolean; error?: string };
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   createTicket: (category: string, subject: string, message: string) => string;
   replyTicket: (id: string, text: string) => void;
-  addScheduledPurchase: (amountRial: number, cadence: string) => void;
+  addScheduledPurchase: (amountRial: number, cadence: string) => { ok: boolean; error?: string };
+  applyReferralCode: (code: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
+  activatePlusSandbox: () => Promise<{ ok: boolean; error?: string; message?: string }>;
   refreshMarketPrice: () => Promise<void>;
 };
 
@@ -276,6 +297,10 @@ const seed = {
   ] as DemoNotification[],
   tickets: [] as SupportTicket[],
   scheduledPurchases: [] as DemoState["scheduledPurchases"],
+  plusActive: false,
+  kycStatus: "UNVERIFIED" as KycStatus,
+  referralCode: null as string | null,
+  commerceSettings: DEFAULT_COMMERCE_SETTINGS,
 };
 
 type Persisted = typeof seed;
@@ -341,6 +366,31 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
                 pin: s.pin,
               })
             );
+            try {
+              const [settingsRes, planRes] = await Promise.all([
+                fetch("/api/commerce/settings", { cache: "no-store" }),
+                fetch("/api/commerce/plan", { cache: "no-store" }),
+              ]);
+              if (!cancelled && settingsRes.ok) {
+                const settings = (await settingsRes.json()) as CommerceSettings;
+                setState((s) => ({ ...s, commerceSettings: settings }));
+              }
+              if (!cancelled && planRes.ok) {
+                const plan = (await planRes.json()) as {
+                  planTier: "free" | "plus";
+                  referralCode: string | null;
+                  kycStatus: KycStatus;
+                };
+                setState((s) => ({
+                  ...s,
+                  plusActive: plan.planTier === "plus",
+                  referralCode: plan.referralCode,
+                  kycStatus: plan.kycStatus ?? "UNVERIFIED",
+                }));
+              }
+            } catch {
+              /* defaults */
+            }
             setHydrated(true);
             return;
           }
@@ -360,12 +410,41 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
               merged.marketPriceRial
             );
           }
+          const plusRaw = localStorage.getItem("gram_plus_sandbox");
+          if (plusRaw === "1") merged.plusActive = true;
           setState(merged);
         }
       } catch {
         /* ignore */
       }
-      if (!cancelled) setHydrated(true);
+      if (!cancelled) {
+        try {
+          const [settingsRes, planRes] = await Promise.all([
+            fetch("/api/commerce/settings", { cache: "no-store" }),
+            fetch("/api/commerce/plan", { cache: "no-store" }),
+          ]);
+          if (settingsRes.ok) {
+            const settings = (await settingsRes.json()) as CommerceSettings;
+            setState((s) => ({ ...s, commerceSettings: settings }));
+          }
+          if (planRes.ok) {
+            const plan = (await planRes.json()) as {
+              planTier: "free" | "plus";
+              referralCode: string | null;
+              kycStatus: KycStatus;
+            };
+            setState((s) => ({
+              ...s,
+              plusActive: plan.planTier === "plus",
+              referralCode: plan.referralCode,
+              kycStatus: plan.kycStatus ?? s.kycStatus,
+            }));
+          }
+        } catch {
+          /* ignore */
+        }
+        setHydrated(true);
+      }
     }
 
     void hydrate();
@@ -473,7 +552,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       if (rial > state.rialAvailable) {
         return { ok: false, error: "موجودی کیف پول کافی نیست." };
       }
-      const fee = 50_000;
+      const fee = buyTradeFee(rial, state.plusActive, state.commerceSettings.fees);
       const net = rial - fee;
       if (net <= 0) return { ok: false, error: "مبلغ پس از کارمزد معتبر نیست." };
       const goldMg = Math.floor((net / state.marketPriceRial) * 1000);
@@ -541,11 +620,14 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       if (state.marketStatus !== "open") {
         return { ok: false, error: "بازار در حال حاضر باز نیست." };
       }
+      if (destination === "bank" && !isKycVerified(state.kycStatus)) {
+        return { ok: false, error: KYC_REQUIRED_MESSAGE };
+      }
       if (goldMg <= 0 || goldMg > state.goldMg) {
         return { ok: false, error: "مقدار طلای قابل فروش کافی نیست." };
       }
       const gross = Math.floor((goldMg / 1000) * state.marketPriceRial);
-      const fee = Math.max(30_000, Math.floor(gross * 0.005));
+      const fee = sellTradeFee(gross, state.plusActive, state.commerceSettings.fees);
       const net = gross - fee;
       const txId =
         typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -631,13 +713,23 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
 
   const withdraw = useCallback(
     (rial: number, bankId: string) => {
+      if (!isKycVerified(state.kycStatus)) {
+        return { ok: false, error: KYC_REQUIRED_MESSAGE };
+      }
       if (!state.bankAccounts.find((b) => b.id === bankId)?.verified) {
         return { ok: false, error: "حساب بانکی تأییدشده یافت نشد." };
       }
-      if (rial > state.rialAvailable) return { ok: false, error: "موجودی کافی نیست." };
+      const wFee = withdrawFee(state.plusActive, state.commerceSettings.fees);
+      const total = rial + wFee;
+      if (total > state.rialAvailable) {
+        return {
+          ok: false,
+          error: `موجودی کافی نیست (شامل کارمزد برداشت ${wFee.toLocaleString("fa-IR")} تومان).`,
+        };
+      }
       setState((s) => ({
         ...s,
-        rialAvailable: s.rialAvailable - rial,
+        rialAvailable: s.rialAvailable - total,
         rialPending: s.rialPending + rial,
         transactions: [
           {
@@ -646,7 +738,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             type: "برداشت",
             goldMg: 0,
             amountRial: rial,
-            feeRial: 0,
+            feeRial: wFee,
             pricePerGram: s.marketPriceRial,
             status: "در انتظار تسویه",
             createdAt: nowFa(),
@@ -707,6 +799,9 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
       },
       requestDelivery: ({ productId, productName, weightGrams, method, feeRial }) => {
+        if (!isKycVerified(state.kycStatus)) {
+          return { ok: false, error: KYC_REQUIRED_MESSAGE };
+        }
         const needMg = Math.round(weightGrams * 1000);
         if (needMg > state.goldMg) return { ok: false, error: "طلای قابل تحویل کافی نیست." };
         if (feeRial > state.rialAvailable) return { ok: false, error: "موجودی ریالی برای کارمزد کافی نیست." };
@@ -769,7 +864,18 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         }
       },
       addAlert: (alert) => {
-        const next = { ...alert, id: newId(), status: "ACTIVE" as const };
+        if (
+          alert.channels.includes("sms") &&
+          state.commerceSettings.plus.smsAlertsPlusOnly &&
+          !state.plusActive
+        ) {
+          return { ok: false, error: "اعلان SMS فقط برای اعضای گرم پلاس است." };
+        }
+        const next = {
+          ...alert,
+          id: newId(),
+          status: "ACTIVE" as const,
+        };
         setState((s) => ({
           ...s,
           alerts: [...s.alerts, next],
@@ -779,6 +885,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             persistAlert(next)
           );
         }
+        return { ok: true };
       },
       markNotificationRead: (id) => {
         setState((s) => ({
@@ -858,12 +965,28 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         }
       },
       addScheduledPurchase: (amountRial, cadence) => {
+        const max = state.plusActive
+          ? state.commerceSettings.plus.maxDcaPlus
+          : state.commerceSettings.plus.maxDcaFree;
+        const active = state.scheduledPurchases.filter(
+          (s) => s.status === "ACTIVE"
+        ).length;
+        if (active >= max) {
+          return {
+            ok: false,
+            error: state.plusActive
+              ? `حداکثر ${max} برنامه خرید دوره‌ای فعال دارید.`
+              : `در پلن رایگان فقط ${max} برنامه مجاز است. گرم پلاس را فعال کنید.`,
+          };
+        }
+        const nextRun = new Date();
+        nextRun.setDate(nextRun.getDate() + 1);
         const next = {
           id: newId(),
           amountRial,
           cadence,
           status: "ACTIVE",
-          nextRun: "اول ماه آینده",
+          nextRun: nextRun.toLocaleDateString("fa-IR"),
         };
         setState((s) => ({
           ...s,
@@ -873,6 +996,51 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           void import("@/lib/db/platform-sync").then(
             ({ persistScheduledPurchase }) => persistScheduledPurchase(next)
           );
+        }
+        return { ok: true };
+      },
+      applyReferralCode: async (code) => {
+        try {
+          const res = await fetch("/api/referral/apply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code }),
+          });
+          const data = (await res.json()) as {
+            ok: boolean;
+            error?: string;
+            message?: string;
+          };
+          if (!data.ok) return { ok: false, error: data.error ?? "خطا" };
+          return { ok: true, message: data.message };
+        } catch {
+          return { ok: false, error: "خطا در ثبت کد دعوت" };
+        }
+      },
+      activatePlusSandbox: async () => {
+        try {
+          const res = await fetch("/api/commerce/plus/activate-sandbox", {
+            method: "POST",
+          });
+          const data = (await res.json()) as {
+            ok: boolean;
+            error?: string;
+            message?: string;
+          };
+          if (!data.ok) {
+            if (!liveDb) {
+              localStorage.setItem("gram_plus_sandbox", "1");
+              setState((s) => ({ ...s, plusActive: true }));
+              return { ok: true, message: "گرم پلاس (محلی) فعال شد." };
+            }
+            return { ok: false, error: data.error ?? "خطا" };
+          }
+          setState((s) => ({ ...s, plusActive: true }));
+          return { ok: true, message: data.message };
+        } catch {
+          localStorage.setItem("gram_plus_sandbox", "1");
+          setState((s) => ({ ...s, plusActive: true }));
+          return { ok: true, message: "گرم پلاس (محلی) فعال شد." };
         }
       },
       refreshMarketPrice,

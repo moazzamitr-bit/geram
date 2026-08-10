@@ -9,6 +9,7 @@ import {
   Target,
   Users,
   Wallet,
+  Gift,
   type LucideIcon,
 } from "lucide-react";
 
@@ -23,6 +24,7 @@ export const adminNav: AdminNavItem[] = [
   { label: "کاربران", href: "/admin/users", icon: Users },
   { label: "کیف پول‌ها", href: "/admin/wallets", icon: Wallet },
   { label: "تراکنش‌ها", href: "/admin/transactions", icon: Landmark },
+  { label: "رفرال", href: "/admin/referrals", icon: Gift },
   { label: "احراز هویت", href: "/admin/kyc", icon: ShieldCheck },
   { label: "بازار و قیمت", href: "/admin/market", icon: LineChart },
   { label: "اهداف", href: "/admin/goals", icon: Target },

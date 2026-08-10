@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { TradeSuccessSheet } from "@/components/app/TradeSuccessSheet";
 import { GoldButton } from "@/components/ui/GoldButton";
+import { sellQuote } from "@/lib/commerce/fees";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
 import { formatToman } from "@/lib/utils";
 import { useMemo, useState } from "react";
@@ -25,10 +26,13 @@ export default function SellPage() {
   }, [mode, grams, rialTarget, store.marketPriceRial]);
 
   const quote = useMemo(() => {
-    const gross = Math.floor((goldMg / 1000) * store.marketPriceRial);
-    const fee = Math.max(30_000, Math.floor(gross * 0.005));
-    return { gross, fee, net: Math.max(0, gross - fee) };
-  }, [goldMg, store.marketPriceRial]);
+    return sellQuote(
+      goldMg,
+      store.marketPriceRial,
+      store.plusActive,
+      store.commerceSettings
+    );
+  }, [goldMg, store.marketPriceRial, store.plusActive, store.commerceSettings]);
 
   const done = store.transactions.find((t) => t.id === doneTx);
 

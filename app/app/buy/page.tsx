@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { TradeSuccessSheet } from "@/components/app/TradeSuccessSheet";
 import { GoldButton } from "@/components/ui/GoldButton";
+import { buyQuote } from "@/lib/commerce/fees";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
 import { formatToman } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -29,11 +30,13 @@ export default function BuyPage() {
   }, [doneTx]);
 
   const quote = useMemo(() => {
-    const fee = 50_000;
-    const net = Math.max(0, rial - fee);
-    const goldMg = Math.floor((net / store.marketPriceRial) * 1000);
-    return { fee, net, goldMg, price: store.marketPriceRial };
-  }, [rial, store.marketPriceRial]);
+    return buyQuote(
+      rial,
+      store.marketPriceRial,
+      store.plusActive,
+      store.commerceSettings
+    );
+  }, [rial, store.marketPriceRial, store.plusActive, store.commerceSettings]);
 
   const done = store.transactions.find((t) => t.id === doneTx);
 
@@ -134,14 +137,21 @@ export default function BuyPage() {
             </span>
           </div>
           <dl className="mt-4 space-y-3 text-[13px]">
-            <Row label="قیمت هر گرم" value={formatToman(quote.price)} />
+            <Row label="قیمت هر گرم" value={formatToman(store.marketPriceRial)} />
             <Row label="منبع قیمت" value={store.marketSource} />
             <Row
               label="آخرین به‌روزرسانی"
               value={store.marketUpdatedAt ?? "لحظاتی پیش"}
             />
-            <Row label="مقدار ناخالص تقریبی" value={`${mgToGramsLabel(Math.floor((rial / quote.price) * 1000))} گرم`} />
-            <Row label="کارمزد معامله" value={formatToman(quote.fee)} />
+            <Row
+              label="مقدار ناخالص تقریبی"
+              value={`${mgToGramsLabel(Math.floor((rial / store.marketPriceRial) * 1000))} گرم`}
+            />
+            <Row
+              label="کارمزد معامله"
+              value={formatToman(quote.fee)}
+              hint={store.plusActive ? "نرخ گرم پلاس" : "نرخ رایگان"}
+            />
             <Row label="طلای دریافتی" value={`${mgToGramsLabel(quote.goldMg)} گرم`} highlight />
             <Row label="مبلغ پرداخت" value={formatToman(rial)} highlight />
             <Row label="موجودی کیف پول" value={formatToman(store.rialAvailable)} />
@@ -190,14 +200,21 @@ function Row({
   label,
   value,
   highlight,
+  hint,
 }: {
   label: string;
   value: string;
   highlight?: boolean;
+  hint?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <dt className="text-muted-app">{label}</dt>
+      <dt className="text-muted-app">
+        {label}
+        {hint ? (
+          <span className="mr-2 text-[11px] text-gold/80">({hint})</span>
+        ) : null}
+      </dt>
       <dd className={highlight ? "font-bold text-gold" : "text-text"}>{value}</dd>
     </div>
   );

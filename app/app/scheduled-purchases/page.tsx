@@ -15,6 +15,7 @@ export default function ScheduledPurchasesPage() {
   const store = useDemoStore();
   const [amount, setAmount] = useState(5_000_000);
   const [cadence, setCadence] = useState("هر ماه، روز اول");
+  const [err, setErr] = useState("");
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
@@ -47,11 +48,22 @@ export default function ScheduledPurchasesPage() {
         </label>
         <p className="mt-3 text-[12px] text-muted-app">
           اگر موجودی کافی نباشد، خرید رد می‌شود و به شما اطلاع داده می‌شود.
+          {store.plusActive
+            ? ` حداکثر ${store.commerceSettings.plus.maxDcaPlus} برنامه فعال.`
+            : ` پلن رایگان: ${store.commerceSettings.plus.maxDcaFree} برنامه.`}
         </p>
+        {err && <p className="mt-2 text-[13px] text-negative">{err}</p>}
         <GoldButton
           type="button"
           className="mt-4 w-full"
-          onClick={() => store.addScheduledPurchase(amount, cadence)}
+          onClick={() => {
+            const res = store.addScheduledPurchase(amount, cadence);
+            if (!res.ok) {
+              setErr(res.error ?? "خطا");
+              return;
+            }
+            setErr("");
+          }}
         >
           فعال‌سازی
         </GoldButton>
