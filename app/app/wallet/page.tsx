@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
+import { withdrawFee } from "@/lib/commerce/fees";
+import { isKycVerified, KYC_REQUIRED_MESSAGE } from "@/lib/commerce/kyc";
 import { useDemoStore } from "@/lib/app/demo-store";
 import { formatToman } from "@/lib/utils";
 import { useState } from "react";
@@ -16,6 +18,8 @@ export default function WalletPage() {
   const [withdrawAmount, setWithdrawAmount] = useState(500_000);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+
+  const wFee = withdrawFee(store.plusActive, store.commerceSettings.fees);
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -76,6 +80,13 @@ export default function WalletPage() {
               setWithdrawAmount(Number(e.target.value.replace(/\D/g, "") || 0))
             }
           />
+          <p className="mt-2 text-[12px] text-muted-app">
+            کارمزد برداشت: {formatToman(wFee)}
+            {store.plusActive ? " (گرم پلاس: رایگان)" : ""}
+          </p>
+          {!isKycVerified(store.kycStatus) && (
+            <p className="mt-2 text-[12px] text-warning">{KYC_REQUIRED_MESSAGE}</p>
+          )}
           <GoldButton
             type="button"
             variant="secondary"

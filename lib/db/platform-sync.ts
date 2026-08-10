@@ -180,6 +180,8 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
       priceRial: Number(a.price_toman),
       channels: a.channels ?? ["app"],
       status: a.status as "ACTIVE" | "TRIGGERED" | "DISABLED",
+      autoBuyEnabled: Boolean(a.auto_buy_enabled),
+      autoBuyToman: Number(a.auto_buy_toman ?? 0),
     })),
   };
 }
@@ -358,12 +360,15 @@ export async function persistScheduledPurchase(input: {
 }) {
   const auth = await authedClient();
   if (!auth) return;
+  const nextRunAt = new Date();
+  nextRunAt.setDate(nextRunAt.getDate() + 1);
   const row: Record<string, unknown> = {
     user_id: auth.user.id,
     amount_toman: input.amountRial,
     cadence: input.cadence,
     status: input.status,
     next_run: input.nextRun,
+    next_run_at: nextRunAt.toISOString(),
   };
   if (isUuid(input.id)) row.id = input.id;
   const { error } = await auth.supabase.from("scheduled_purchases").upsert(row, {
@@ -378,6 +383,8 @@ export async function persistAlert(input: {
   priceRial: number;
   channels: string[];
   status: string;
+  autoBuyEnabled?: boolean;
+  autoBuyToman?: number;
 }) {
   const auth = await authedClient();
   if (!auth) return;
@@ -387,6 +394,8 @@ export async function persistAlert(input: {
     price_toman: input.priceRial,
     channels: input.channels,
     status: input.status,
+    auto_buy_enabled: Boolean(input.autoBuyEnabled),
+    auto_buy_toman: input.autoBuyToman ?? 0,
   };
   if (isUuid(input.id)) row.id = input.id;
   const { error } = await auth.supabase.from("price_alerts").upsert(row, {

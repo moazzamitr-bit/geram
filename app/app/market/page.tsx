@@ -26,6 +26,9 @@ export default function MarketPage() {
   const [alertPrice, setAlertPrice] = useState(store.marketPriceRial);
   const [direction, setDirection] = useState<"above" | "below">("above");
   const [msg, setMsg] = useState("");
+  const [autoBuy, setAutoBuy] = useState(false);
+  const [autoBuyAmount, setAutoBuyAmount] = useState(5_000_000);
+  const [smsChannel, setSmsChannel] = useState(false);
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
@@ -137,16 +140,50 @@ export default function MarketPage() {
           size="sm"
           className="mt-4"
           onClick={() => {
-            store.addAlert({
+            const channels = ["app", ...(smsChannel ? ["sms"] : [])];
+            const res = store.addAlert({
               direction,
               priceRial: alertPrice,
-              channels: ["app"],
+              channels,
+              autoBuyEnabled: autoBuy,
+              autoBuyToman: autoBuy ? autoBuyAmount : 0,
             });
+            if (!res.ok) {
+              setMsg(res.error ?? "خطا");
+              return;
+            }
             setMsg("هشدار ذخیره شد.");
           }}
         >
           ثبت هشدار
         </GoldButton>
+        <label className="mt-4 flex items-center gap-2 text-[13px] text-text-secondary">
+          <input
+            type="checkbox"
+            checked={autoBuy}
+            onChange={(e) => setAutoBuy(e.target.checked)}
+          />
+          پس از فعال شدن، خرید خودکار تا سقف مبلغ زیر
+        </label>
+        {autoBuy && (
+          <input
+            dir="ltr"
+            value={autoBuyAmount}
+            onChange={(e) =>
+              setAutoBuyAmount(Number(e.target.value.replace(/\D/g, "") || 0))
+            }
+            className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-3 text-left tabular-nums"
+          />
+        )}
+        <label className="mt-3 flex items-center gap-2 text-[13px] text-text-secondary">
+          <input
+            type="checkbox"
+            checked={smsChannel}
+            onChange={(e) => setSmsChannel(e.target.checked)}
+            disabled={!store.plusActive}
+          />
+          اعلان SMS {store.plusActive ? "" : "(نیاز به گرم پلاس)"}
+        </label>
         {msg && <p className="mt-2 text-[13px] text-positive">{msg}</p>}
         {store.alerts.length > 0 && (
           <ul className="mt-4 space-y-2 text-[13px]">
