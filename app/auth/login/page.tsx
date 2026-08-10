@@ -82,7 +82,11 @@ export default function LoginPage() {
           ? "کد تأیید نادرست است."
           : result.error === "supabase_not_configured"
             ? "اتصال به سرور آماده نیست. دوباره تلاش کنید یا حالت نمایشی را بدون کلید سوپابیس استفاده کنید."
-            : "ورود ناموفق بود. دوباره تلاش کنید."
+            : /rate limit/i.test(result.error ?? "")
+              ? "محدودیت ارسال ایمیل. چند دقیقه بعد دوباره تلاش کنید."
+              : result.error?.includes("invalid")
+                ? "ورود ناموفق بود. دوباره تلاش کنید."
+                : result.error || "ورود ناموفق بود. دوباره تلاش کنید."
       );
       return;
     }

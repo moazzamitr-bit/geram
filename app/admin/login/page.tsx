@@ -23,20 +23,32 @@ export default function AdminLoginPage() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { error: signError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data: authData, error: signError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
       if (signError) {
-        setError(signError.message);
+        setError(
+          signError.message.includes("Invalid login credentials")
+            ? "ایمیل یا رمز عبور اشتباه است."
+            : signError.message
+        );
         setLoading(false);
         return;
       }
-      const { data: profile } = await supabase
+      const userId = authData.user?.id;
+      if (!userId) {
+        setError("خطا در ورود. دوباره تلاش کنید.");
+        setLoading(false);
+        return;
+      }
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role")
-        .single();
-      if (profile?.role !== "admin") {
+        .eq("id", userId)
+        .maybeSingle();
+      if (profileError || profile?.role !== "admin") {
         await supabase.auth.signOut();
         setError("این حساب دسترسی ادمین ندارد.");
         setLoading(false);

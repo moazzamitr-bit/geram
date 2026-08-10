@@ -65,12 +65,9 @@ export async function POST(request: Request) {
       },
     });
   } catch (err) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: err instanceof Error ? err.message : "auth_failed",
-      },
-      { status: 500 }
-    );
+    const message = err instanceof Error ? err.message : "auth_failed";
+    const status =
+      /rate limit/i.test(message) ? 429 : /invalid_otp|invalid_phone/i.test(message) ? 400 : 500;
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }
