@@ -49,9 +49,9 @@ export function FeatureGrid() {
         <div className="max-w-xl">
           <p className="text-[12px] font-medium text-gold">چرا گرم</p>
           <h2 className="mt-2 text-[28px] font-extrabold leading-[1.45] text-text md:text-[34px]">
-            از گرمی و مسچی کامل‌تر:
-            <br />
             سه فلز، یک تجربه
+            <br />
+            برای سرمایه‌گذاری واقعی
           </h2>
           <p className="mt-3 text-[14px] leading-7 text-text-secondary md:text-[15px]">
             قیمت لایو، کارمزد شفاف، بدون اجرت — به‌همراه اهداف، خرید دوره‌ای و
