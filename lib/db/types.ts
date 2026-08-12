@@ -21,9 +21,13 @@ export type WalletRow = {
   id: string;
   user_id: string;
   gold_mg: number;
+  silver_mg: number;
+  copper_mg: number;
   toman_available: number;
   toman_pending: number;
   avg_buy_price_toman: number;
+  avg_buy_price_silver_toman: number;
+  avg_buy_price_copper_toman: number;
 };
 
 export type TransactionRow = {
@@ -31,6 +35,7 @@ export type TransactionRow = {
   user_id: string;
   tracking_code: string;
   type: string;
+  instrument: string;
   gold_mg: number;
   amount_toman: number;
   fee_toman: number;

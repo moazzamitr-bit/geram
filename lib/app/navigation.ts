@@ -32,8 +32,8 @@ export const desktopNavSections: AppNavSection[] = [
   {
     items: [
       { label: "خانه", href: "/app/dashboard", icon: Home },
-      { label: "خرید طلا", href: "/app/buy", icon: ShoppingBag, accent: true },
-      { label: "فروش طلا", href: "/app/sell", icon: HandCoins },
+      { label: "خرید فلز", href: "/app/buy", icon: ShoppingBag, accent: true },
+      { label: "فروش فلز", href: "/app/sell", icon: HandCoins },
       { label: "بازار", href: "/app/market", icon: LineChart },
     ],
   },

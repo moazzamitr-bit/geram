@@ -2,14 +2,20 @@
 
 import { AnimatedNumber } from "@/components/app/AnimatedNumber";
 import { AppCard } from "@/components/app/AppCard";
+import { InstrumentTabs } from "@/components/app/InstrumentTabs";
 import { PageHeader } from "@/components/app/PageHeader";
 import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { PriceChart } from "@/components/ui/PriceChart";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { useDemoStore } from "@/lib/app/demo-store";
+import {
+  INSTRUMENT_IDS,
+  INSTRUMENTS,
+  type InstrumentId,
+} from "@/lib/market/instruments";
 import { formatToman } from "@/lib/utils";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const periods = [
   { label: "۱ روز", range: "1d" },
@@ -21,59 +27,104 @@ const periods = [
 
 export default function MarketPage() {
   const store = useDemoStore();
+  const [instrument, setInstrument] = useState<InstrumentId>("gold18");
   const [period, setPeriod] =
     useState<(typeof periods)[number]["range"]>("7d");
-  const [alertPrice, setAlertPrice] = useState(store.marketPriceRial);
+  const price = store.getMarketPrice(instrument);
+  const quote = store.marketQuotes[instrument];
+  const meta = INSTRUMENTS[instrument];
+  const [alertPrice, setAlertPrice] = useState(price);
   const [direction, setDirection] = useState<"above" | "below">("above");
   const [msg, setMsg] = useState("");
   const [autoBuy, setAutoBuy] = useState(false);
   const [autoBuyAmount, setAutoBuyAmount] = useState(5_000_000);
   const [smsChannel, setSmsChannel] = useState(false);
 
+  useEffect(() => {
+    setAlertPrice(price);
+  }, [price, instrument]);
+
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <PageHeader
-        title="بازار طلا"
-        description="مشاهده قیمت، روند و ثبت هشدار — بدون ظاهر صرافی."
+        title="بازار فلزات"
+        description="طلا، نقره و مس — قیمت لایو، نمودار و معامله در یک جا."
         action={<SimulationBadge />}
       />
 
+      <div className="grid gap-3 sm:grid-cols-3">
+        {INSTRUMENT_IDS.map((id) => {
+          const m = INSTRUMENTS[id];
+          const p = store.getMarketPrice(id);
+          const q = store.marketQuotes[id];
+          const active = id === instrument;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setInstrument(id)}
+              className={`rounded-2xl border px-4 py-3 text-right transition-colors ${
+                active
+                  ? "border-gold/40 bg-gold/10"
+                  : "border-white/[0.07] bg-elevated-app hover:border-white/15"
+              }`}
+            >
+              <p className="text-[12px] text-muted-app">{m.title}</p>
+              <p className="mt-1 text-[18px] font-extrabold tabular-nums text-text">
+                {formatToman(p)}
+              </p>
+              <p
+                className={`mt-1 text-[12px] tabular-nums ${
+                  (q.changePercent ?? 0) >= 0 ? "text-positive" : "text-negative"
+                }`}
+              >
+                {q.changePercent != null
+                  ? `${q.changePercent >= 0 ? "+" : ""}${q.changePercent.toLocaleString("fa-IR", { maximumFractionDigits: 2 })}٪`
+                  : "—"}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
       <AppCard>
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <InstrumentTabs value={instrument} onChange={setInstrument} />
+        <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[13px] text-muted-app">طلای ۱۸ عیار</p>
+            <p className="text-[13px] text-muted-app">{meta.title}</p>
             <p className="mt-2 text-[36px] font-extrabold text-text">
               <AnimatedNumber
-                value={store.marketPriceRial}
+                value={price}
                 formatter={(n) => formatToman(Math.round(n))}
               />
             </p>
             <p className="mt-1 text-[13px] tabular-nums text-positive">
-              {store.marketChangePercent != null
-                ? `${store.marketChangePercent >= 0 ? "+" : ""}${store.marketChangePercent.toLocaleString("fa-IR", { maximumFractionDigits: 2 })}٪ تغییر`
+              {quote.changePercent != null
+                ? `${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toLocaleString("fa-IR", { maximumFractionDigits: 2 })}٪ تغییر`
                 : "تغییر —"}
             </p>
           </div>
           <div className="space-y-1 text-[13px] tabular-nums text-muted-app">
             <p>
               بالاترین:{" "}
-              {store.marketHighToman
-                ? formatToman(store.marketHighToman)
-                : "—"}
+              {quote.highToman ? formatToman(quote.highToman) : "—"}
             </p>
             <p>
               پایین‌ترین:{" "}
-              {store.marketLowToman ? formatToman(store.marketLowToman) : "—"}
+              {quote.lowToman ? formatToman(quote.lowToman) : "—"}
             </p>
             <p>
-              منبع: <span className="text-text-secondary">{store.marketSource}</span>
+              منبع:{" "}
+              <span className="text-text-secondary">
+                {quote.source || store.marketSource}
+              </span>
             </p>
             <p>
               وضعیت:{" "}
               <span className="text-positive">
                 {store.marketStatus === "open" ? "باز" : "بسته"}
               </span>
-              {store.marketStale ? " · ذخیره‌شده" : " · لایو ۳۰ث"}
+              {quote.stale ? " · ذخیره‌شده" : " · لایو ۳۰ث"}
             </p>
           </div>
         </div>
@@ -95,15 +146,20 @@ export default function MarketPage() {
           ))}
         </div>
         <div className="mt-4 rounded-xl border border-white/[0.06] bg-[#0A0C0E] p-3">
-          <PriceChart variant="market" height={180} range={period} />
+          <PriceChart
+            variant="market"
+            height={180}
+            range={period}
+            instrument={instrument}
+          />
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
-          <Link href="/app/buy">
-            <GoldButton type="button">خرید طلا</GoldButton>
+          <Link href={`/app/buy?instrument=${instrument}`}>
+            <GoldButton type="button">خرید {meta.label}</GoldButton>
           </Link>
-          <Link href="/app/sell">
+          <Link href={`/app/sell?instrument=${instrument}`}>
             <GoldButton type="button" variant="secondary">
-              فروش طلا
+              فروش {meta.label}
             </GoldButton>
           </Link>
         </div>
@@ -111,6 +167,9 @@ export default function MarketPage() {
 
       <AppCard>
         <h2 className="text-[16px] font-bold text-text">هشدار قیمت</h2>
+        <p className="mt-1 text-[12px] text-muted-app">
+          فعلاً هشدار روی قیمت طلای ۱۸ عیار فعال است.
+        </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="block text-[13px]">
             <span className="text-muted-app">نوع</span>
@@ -205,11 +264,11 @@ export default function MarketPage() {
 
       <AppCard>
         <h2 className="text-[16px] font-bold text-text">
-          چه عواملی روی قیمت طلا تأثیر می‌گذارند؟
+          چرا گرم برای فلزات؟
         </h2>
         <p className="mt-3 text-[14px] leading-8 text-muted-app">
-          نرخ ارز، تقاضای فیزیکی، نرخ بهره جهانی و انتظارات تورمی از مهم‌ترین عوامل
-          هستند. گرم قیمت آینده را تضمین یا پیش‌بینی قطعی نمی‌کند؛ تصمیم‌گیری با شماست.
+          یک کیف پول برای طلا، نقره و مس؛ کارمزد شفاف قبل از تأیید؛ بدون اجرت ساخت؛
+          و همان زیرساخت اعتماد، اهداف و گرم پلاس که فقط روی طلا نبود.
         </p>
       </AppCard>
     </div>

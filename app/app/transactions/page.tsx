@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { mgToGramsLabel, useDemoStore, type TxType } from "@/lib/app/demo-store";
+import { instrumentLabel, type InstrumentId } from "@/lib/market/instruments";
 import { formatToman } from "@/lib/utils";
 import { Receipt } from "lucide-react";
 import Link from "next/link";
@@ -96,6 +97,11 @@ export default function TransactionsPage() {
                     <td className="px-5 py-3.5">
                       <Link href={`/app/transactions/${t.id}`} className="text-text hover:text-gold">
                         {t.type}
+                        {(t.type === "خرید" || t.type === "فروش" || t.type === "تحویل") && (
+                          <span className="mr-1 text-muted-app">
+                            {instrumentLabel((t.instrument as InstrumentId) ?? "gold18")}
+                          </span>
+                        )}
                       </Link>
                     </td>
                     <td className="px-3 py-3.5 text-text-secondary">

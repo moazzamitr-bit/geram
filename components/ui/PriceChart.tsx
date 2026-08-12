@@ -20,6 +20,7 @@ type PriceChartProps = {
   className?: string;
   height?: number;
   range?: ChartRange;
+  instrument?: string;
 };
 
 export function PriceChart({
@@ -27,6 +28,7 @@ export function PriceChart({
   className,
   height = 88,
   range = "7d",
+  instrument = "gold18",
 }: PriceChartProps) {
   const [data, setData] = useState<Point[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,10 +42,13 @@ export function PriceChart({
       setLoading(true);
       setError(false);
       try {
-        const res = await fetch(`/api/market/history?range=${range}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
+        const res = await fetch(
+          `/api/market/history?range=${range}&instrument=${instrument}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
         if (!res.ok) throw new Error("history failed");
         const json = (await res.json()) as {
           points?: { label: string; value: number }[];
@@ -71,7 +76,7 @@ export function PriceChart({
       cancelled = true;
       controller.abort();
     };
-  }, [range]);
+  }, [range, instrument]);
 
   const domainPad = useMemo(() => {
     if (!data.length) return 100_000;

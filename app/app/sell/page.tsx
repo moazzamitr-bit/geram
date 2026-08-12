@@ -1,17 +1,37 @@
 "use client";
 
 import { AppCard } from "@/components/app/AppCard";
+import { InstrumentTabs } from "@/components/app/InstrumentTabs";
 import { PageHeader } from "@/components/app/PageHeader";
 import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { TradeSuccessSheet } from "@/components/app/TradeSuccessSheet";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { sellQuote } from "@/lib/commerce/fees";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
+import {
+  INSTRUMENTS,
+  type InstrumentId,
+  parseInstrumentId,
+} from "@/lib/market/instruments";
 import { formatToman } from "@/lib/utils";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 export default function SellPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-2xl p-6 text-muted-app">در حال بارگذاری...</div>}>
+      <SellPageInner />
+    </Suspense>
+  );
+}
+
+function SellPageInner() {
   const store = useDemoStore();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [instrument, setInstrument] = useState<InstrumentId>(() =>
+    parseInstrumentId(searchParams.get("instrument"))
+  );
   const [mode, setMode] = useState<"weight" | "rial">("weight");
   const [grams, setGrams] = useState(0.5);
   const [rialTarget, setRialTarget] = useState(3_000_000);
@@ -20,19 +40,22 @@ export default function SellPage() {
   const [doneTx, setDoneTx] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const goldMg = useMemo(() => {
+  const meta = INSTRUMENTS[instrument];
+  const price = store.getMarketPrice(instrument);
+  const heldMg = store.getMetalMg(instrument);
+
+  useEffect(() => {
+    setInstrument(parseInstrumentId(searchParams.get("instrument")));
+  }, [searchParams]);
+
+  const metalMg = useMemo(() => {
     if (mode === "weight") return Math.round(grams * 1000);
-    return Math.floor((rialTarget / store.marketPriceRial) * 1000);
-  }, [mode, grams, rialTarget, store.marketPriceRial]);
+    return Math.floor((rialTarget / Math.max(price, 1)) * 1000);
+  }, [mode, grams, rialTarget, price]);
 
   const quote = useMemo(() => {
-    return sellQuote(
-      goldMg,
-      store.marketPriceRial,
-      store.plusActive,
-      store.commerceSettings
-    );
-  }, [goldMg, store.marketPriceRial, store.plusActive, store.commerceSettings]);
+    return sellQuote(metalMg, price, store.plusActive, store.commerceSettings);
+  }, [metalMg, price, store.plusActive, store.commerceSettings]);
 
   const done = store.transactions.find((t) => t.id === doneTx);
 
@@ -40,11 +63,17 @@ export default function SellPage() {
     setDoneTx(null);
   };
 
+  const onInstrumentChange = (id: InstrumentId) => {
+    setInstrument(id);
+    setError("");
+    router.replace(`/app/sell?instrument=${id}`);
+  };
+
   const onConfirm = () => {
     setError("");
     setLoading(true);
     setTimeout(() => {
-      const res = store.sellGold(goldMg, dest);
+      const res = store.sellMetal(instrument, metalMg, dest);
       setLoading(false);
       if (!res.ok) {
         setError(res.error ?? "خطا");
@@ -76,14 +105,15 @@ export default function SellPage() {
       />
 
       <PageHeader
-        title="فروش طلا"
-        description="مقدار، کارمزد و مقصد تسویه را قبل از تأیید ببینید."
+        title={`فروش ${meta.label}`}
+        description="طلا، نقره یا مس — مقدار، کارمزد و مقصد تسویه را قبل از تأیید ببینید."
         action={<SimulationBadge />}
       />
 
       <div className="space-y-5">
         <AppCard>
-          <div className="flex gap-2">
+          <InstrumentTabs value={instrument} onChange={onInstrumentChange} />
+          <div className="mt-5 flex gap-2">
             {(
               [
                 ["weight", "بر اساس وزن"],
@@ -133,7 +163,8 @@ export default function SellPage() {
             </label>
           )}
           <p className="mt-2 text-[13px] tabular-nums text-muted-app">
-            طلای قابل فروش: {mgToGramsLabel(store.goldMg)} گرم
+            {meta.label} قابل فروش: {mgToGramsLabel(heldMg)} گرم · قیمت روز{" "}
+            {formatToman(price)}
           </p>
         </AppCard>
 
@@ -142,7 +173,7 @@ export default function SellPage() {
           <dl className="mt-4 space-y-3 text-[13px] tabular-nums">
             <div className="flex justify-between">
               <dt className="text-muted-app">وزن</dt>
-              <dd>{mgToGramsLabel(goldMg)} گرم</dd>
+              <dd>{mgToGramsLabel(metalMg)} گرم</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-app">ارزش ناخالص</dt>
@@ -198,7 +229,7 @@ export default function SellPage() {
             disabled={loading}
             onClick={onConfirm}
           >
-            {loading ? "در حال ثبت..." : "تأیید و فروش"}
+            {loading ? "در حال ثبت..." : `تأیید و فروش ${meta.label}`}
           </GoldButton>
         </AppCard>
       </div>

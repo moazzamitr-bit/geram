@@ -3,12 +3,14 @@ type TradeLike = {
   status: string;
   goldMg: number;
   pricePerGram: number;
+  instrument?: string;
 };
 
 /** Weighted average buy price (تومان / گرم) from completed buy trades. */
 export function averageBuyPriceFromTrades(
   transactions: TradeLike[],
-  fallbackPrice = 0
+  fallbackPrice = 0,
+  instrument?: string
 ) {
   let totalMg = 0;
   let totalCost = 0;
@@ -17,6 +19,8 @@ export function averageBuyPriceFromTrades(
     if (tx.type !== "خرید") continue;
     if (tx.status === "ناموفق" || tx.status === "لغو شده") continue;
     if (tx.goldMg <= 0 || tx.pricePerGram <= 0) continue;
+    const txInstrument = tx.instrument ?? "gold18";
+    if (instrument && txInstrument !== instrument) continue;
     totalMg += tx.goldMg;
     totalCost += (tx.goldMg / 1000) * tx.pricePerGram;
   }
@@ -53,13 +57,18 @@ export function unrealizedPnl(input: {
   marketPricePerGram: number;
   avgBuyPricePerGram: number;
   transactions?: TradeLike[];
+  instrument?: string;
 }) {
   const goldMg = Math.max(0, input.goldMg);
   const market = Math.max(0, input.marketPricePerGram);
   let avg = Math.max(0, input.avgBuyPricePerGram);
 
   if (goldMg > 0 && avg <= 0 && input.transactions) {
-    avg = averageBuyPriceFromTrades(input.transactions, market);
+    avg = averageBuyPriceFromTrades(
+      input.transactions,
+      market,
+      input.instrument ?? "gold18"
+    );
   }
 
   const grams = goldMg / 1000;

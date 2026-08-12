@@ -19,13 +19,14 @@ export default function DashboardPage() {
   const store = useDemoStore();
   const [hidden, setHidden] = useState(false);
 
-  const { marketValue: valueRial, costBasis, pnl, avgBuyPrice } = useMemo(
+  const goldPnl = useMemo(
     () =>
       unrealizedPnl({
         goldMg: store.goldMg,
         marketPricePerGram: store.marketPriceRial,
         avgBuyPricePerGram: store.avgBuyPriceRial,
         transactions: store.transactions,
+        instrument: "gold18",
       }),
     [
       store.goldMg,
@@ -34,12 +35,50 @@ export default function DashboardPage() {
       store.transactions,
     ]
   );
+  const silverPnl = useMemo(
+    () =>
+      unrealizedPnl({
+        goldMg: store.silverMg,
+        marketPricePerGram: store.getMarketPrice("silver925"),
+        avgBuyPricePerGram: store.avgBuyPriceSilverRial,
+        transactions: store.transactions,
+        instrument: "silver925",
+      }),
+    [
+      store.silverMg,
+      store.avgBuyPriceSilverRial,
+      store.transactions,
+      store.marketPrices,
+    ]
+  );
+  const copperPnl = useMemo(
+    () =>
+      unrealizedPnl({
+        goldMg: store.copperMg,
+        marketPricePerGram: store.getMarketPrice("copper"),
+        avgBuyPricePerGram: store.avgBuyPriceCopperRial,
+        transactions: store.transactions,
+        instrument: "copper",
+      }),
+    [
+      store.copperMg,
+      store.avgBuyPriceCopperRial,
+      store.transactions,
+      store.marketPrices,
+    ]
+  );
+  const valueRial =
+    goldPnl.marketValue + silverPnl.marketValue + copperPnl.marketValue;
+  const costBasis = goldPnl.costBasis + silverPnl.costBasis + copperPnl.costBasis;
+  const pnl = valueRial - costBasis;
+  const avgBuyPrice = goldPnl.avgBuyPrice;
   const goal = store.goals[0];
   const goalPct = goal
     ? Math.min(100, Math.round((goal.currentRial / goal.targetRial) * 100))
     : 0;
   const marketOpen = store.marketStatus === "open";
-  const grams = store.goldMg / 1000;
+  const grams =
+    (store.goldMg + store.silverMg + store.copperMg) / 1000;
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 md:space-y-6">
@@ -70,7 +109,7 @@ export default function DashboardPage() {
         <div className="relative">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] text-muted-app">دارایی طلای من</p>
+              <p className="text-[13px] text-muted-app">دارایی فلزات من</p>
               <p className="mt-2 text-[36px] font-extrabold tracking-tight text-text md:text-[42px]">
                 {hidden ? (
                   "••••"
@@ -135,11 +174,11 @@ export default function DashboardPage() {
 
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href="/app/buy">
-              <GoldButton type="button">خرید طلا</GoldButton>
+              <GoldButton type="button">خرید فلز</GoldButton>
             </Link>
             <Link href="/app/sell">
               <GoldButton type="button" variant="secondary">
-                فروش طلا
+                فروش
               </GoldButton>
             </Link>
             <Link href="/app/portfolio">
@@ -175,6 +214,14 @@ export default function DashboardPage() {
             />
             <Row label="بهای تمام‌شده" value={formatToman(costBasis)} />
             <Row label="طلای قابل فروش" value={`${mgToGramsLabel(store.goldMg)} گرم`} />
+            <Row
+              label="نقره قابل فروش"
+              value={`${mgToGramsLabel(store.silverMg)} گرم`}
+            />
+            <Row
+              label="مس قابل فروش"
+              value={`${mgToGramsLabel(store.copperMg)} گرم`}
+            />
             <Row label="موجودی ریالی" value={formatToman(store.rialAvailable)} />
             <Row label="در انتظار تسویه" value={formatToman(store.rialPending)} />
           </dl>
