@@ -1,9 +1,8 @@
 export const navItems = [
   { label: "خانه", href: "#home" },
+  { label: "بازار فلزات", href: "#metals" },
   { label: "امکانات", href: "#features" },
-  { label: "قیمت طلا", href: "#price" },
-  { label: "باشگاه گرم", href: "#club" },
-  { label: "راهنما", href: "#guide" },
+  { label: "اپلیکیشن", href: "#app" },
   { label: "درباره ما", href: "#about" },
 ] as const;
 
@@ -27,84 +26,88 @@ export const heroTrustItems = [
 
 export const features = [
   {
+    id: "multi-metal",
+    title: "طلا، نقره و مس",
+    description:
+      "سه فلز در یک کیف‌پول — خرید و فروش لحظه‌ای با قیمت لایو بازار آزاد.",
+    icon: "chart",
+  },
+  {
+    id: "transparent-fees",
+    title: "کارمزد شفاف",
+    description:
+      "قبل از تأیید، قیمت هر گرم، کارمزد و مقدار نهایی را دقیق می‌بینید.",
+    icon: "badge",
+  },
+  {
+    id: "no-making-fee",
+    title: "بدون اجرت ساخت",
+    description:
+      "فقط فلز؛ بدون هزینه ساخت و بدون حاشیه پنهان روی خرید و فروش.",
+    icon: "zap",
+  },
+  {
     id: "targeted-savings",
-    title: "پس‌انداز هدفمند",
-    description: "برای اهداف مالی خود برنامه‌ریزی کنید و قدم‌به‌قدم به آن‌ها برسید.",
+    title: "اهداف و خرید دوره‌ای",
+    description:
+      "برای هدف مالی برنامه‌ بریزید و با خرید زمان‌بندی‌شده منظم پس‌انداز کنید.",
     icon: "target",
   },
   {
     id: "physical-delivery",
     title: "تحویل فیزیکی",
-    description: "طلای خود را در وزن‌های مختلف به‌صورت فیزیکی دریافت کنید.",
+    description:
+      "در صورت نیاز، دارایی خود را به‌صورت فیزیکی تحویل بگیرید.",
     icon: "package",
-  },
-  {
-    id: "liquidity",
-    title: "نقدشوندگی سریع",
-    description: "در چند ثانیه دارایی خود را به ریال تبدیل کنید.",
-    icon: "zap",
-  },
-  {
-    id: "security",
-    title: "امنیت بی‌نظیر",
-    description: "با استانداردهای امنیتی سطح بالا از دارایی شما محافظت می‌کنیم.",
-    icon: "lock",
-  },
-  {
-    id: "smart-invest",
-    title: "سرمایه‌گذاری هوشمند",
-    description: "با ابزارهای تحلیلی، تصمیم‌های دقیق‌تری برای دارایی خود بگیرید.",
-    icon: "chart",
   },
 ] as const;
 
 export const metrics = [
   {
-    value: "۱٬۲۰۰٬۰۰۰+",
-    label: "کاربر فعال",
+    value: "۳ فلز",
+    label: "طلا · نقره · مس",
   },
   {
-    value: "۲.۵+ تن",
-    label: "طلای معامله‌شده",
+    value: "۳۰ث",
+    label: "به‌روزرسانی قیمت",
   },
   {
-    value: "۹۸٪+",
-    label: "رضایت کاربران",
+    value: "۰ اجرت",
+    label: "بدون هزینه ساخت",
   },
   {
     value: "۲۴/۷",
-    label: "پشتیبانی",
+    label: "دسترسی به بازار",
   },
 ] as const;
 
 export const footerGroups = [
   {
-    title: "دسترسی سریع",
+    title: "معامله",
     links: [
-      { label: "خرید طلا", href: "#" },
-      { label: "فروش طلا", href: "#" },
-      { label: "قیمت طلا", href: "#price" },
-      { label: "کارمزدها", href: "#" },
-      { label: "سوالات متداول", href: "#" },
+      { label: "خرید طلا", href: "/app/buy?instrument=gold18" },
+      { label: "خرید نقره", href: "/app/buy?instrument=silver925" },
+      { label: "خرید مس", href: "/app/buy?instrument=copper" },
+      { label: "بازار فلزات", href: "/app/market" },
+      { label: "فروش", href: "/app/sell" },
     ],
   },
   {
     title: "امکانات",
     links: [
-      { label: "پس‌انداز هدفمند", href: "#features" },
-      { label: "تحویل فیزیکی", href: "#features" },
-      { label: "باشگاه گرم", href: "#club" },
-      { label: "اپلیکیشن موبایل", href: "#app" },
-      { label: "امنیت", href: "#features" },
+      { label: "پرتفوی چندفلزی", href: "/app/portfolio" },
+      { label: "پس‌انداز هدفمند", href: "/app/goals" },
+      { label: "تحویل فیزیکی", href: "/app/delivery" },
+      { label: "اپلیکیشن", href: "#app" },
+      { label: "مرکز اعتماد", href: "/app/trust" },
     ],
   },
   {
     title: "شرکت",
     links: [
       { label: "درباره ما", href: "#about" },
-      { label: "مجوزها و تاییدیه‌ها", href: "#" },
-      { label: "وبلاگ", href: "#" },
-      { label: "فرصت‌های شغلی", href: "#" },
+      { label: "مجوزها و تاییدیه‌ها", href: "/app/trust" },
+      { label: "پشتیبانی", href: "/app/support" },
       { label: "تماس با ما", href: "#contact" },
     ],
   },
