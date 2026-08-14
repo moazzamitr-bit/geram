@@ -1,9 +1,11 @@
 import { randomUUID } from "crypto";
 import type { AssetCode, LedgerAsset } from "./assets";
 import { ALL_ASSETS } from "./assets";
+import { IRR_ONLY, assertAccountPolicy } from "./account-policy";
 import type {
   AccountCode,
   CostBasis,
+  IdempotencyClaim,
   IdempotencyRecord,
   JournalEntry,
   JournalLine,
@@ -16,7 +18,7 @@ import type {
   Trade,
   TradeStatus,
 } from "./types";
-import { PLATFORM_HOLDER } from "./types";
+import { CoreError, PLATFORM_HOLDER } from "./types";
 
 export class StoreConflictError extends Error {
   constructor(message: string) {
@@ -40,6 +42,11 @@ export class InsufficientBalanceError extends Error {
 }
 
 export interface CoreStore {
+  readonly persistence: "memory" | "postgres";
+  inTransaction(): boolean;
+  withTransaction<T>(fn: () => Promise<T>): Promise<T>;
+  withAdvisoryLock<T>(key: string, fn: () => Promise<T>): Promise<T>;
+  /** Convenience: withTransaction + withAdvisoryLock. Prefer explicit calls in new code. */
   withLock<T>(key: string, fn: () => Promise<T>): Promise<T>;
   getAccount(
     holderId: string,
@@ -52,6 +59,8 @@ export interface CoreStore {
     asset: LedgerAsset
   ): Promise<LedgerAccount>;
   listAccountsForHolder(holderId: string): Promise<LedgerAccount[]>;
+  listAllAccounts(): Promise<LedgerAccount[]>;
+  listJournals(): Promise<JournalEntry[]>;
   insertJournal(entry: JournalEntry): Promise<void>;
   applyBalanceDeltas(deltas: { accountId: string; delta: bigint }[]): Promise<void>;
   insertQuote(quote: Quote): Promise<void>;
@@ -71,9 +80,15 @@ export interface CoreStore {
   openReservationQuantityUg(asset: AssetCode): Promise<bigint>;
   insertTrade(trade: Trade): Promise<void>;
   getTrade(id: string): Promise<Trade | null>;
+  getSettledTradeByQuote(quoteId: string): Promise<Trade | null>;
   listTradesForUser(userId: string, limit?: number): Promise<Trade[]>;
   updateTrade(id: string, from: TradeStatus[], patch: Partial<Trade>): Promise<Trade>;
-  getIdempotency(userId: string, key: string): Promise<IdempotencyRecord | null>;
+  getIdempotency(
+    userId: string,
+    operation: string,
+    key: string
+  ): Promise<IdempotencyRecord | null>;
+  claimIdempotency(rec: IdempotencyRecord): Promise<IdempotencyClaim>;
   putIdempotency(rec: IdempotencyRecord): Promise<void>;
   insertOutbox(event: OutboxEvent): Promise<void>;
   listPendingOutbox(limit: number): Promise<OutboxEvent[]>;
@@ -104,13 +119,6 @@ const PLATFORM_CODES: AccountCode[] = [
   "PLATFORM_CASH_CONTROL",
   "PLATFORM_OPENING",
   "PLATFORM_RESTRICTED",
-];
-
-const IRR_ONLY: AccountCode[] = [
-  "PLATFORM_FEE_REVENUE",
-  "PAYMENT_GATEWAY_CLEARING",
-  "BANK_SETTLEMENT_CLEARING",
-  "PLATFORM_CASH_CONTROL",
 ];
 
 export async function ensurePlatformAccounts(store: CoreStore): Promise<void> {
@@ -150,6 +158,9 @@ class Mutex {
 }
 
 export class MemoryCoreStore implements CoreStore {
+  readonly persistence = "memory" as const;
+  private txDepth = 0;
+  private txMutex = new Mutex();
   private mutexes = new Map<string, Mutex>();
   private accounts = new Map<string, LedgerAccount>();
   readonly journals: JournalEntry[] = [];
@@ -171,13 +182,79 @@ export class MemoryCoreStore implements CoreStore {
     return `${holderId}:${code}:${asset}`;
   }
 
-  async withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  inTransaction() {
+    return this.txDepth > 0;
+  }
+
+  private snapshot() {
+    return {
+      accounts: new Map(
+        [...this.accounts.entries()].map(([k, v]) => [k, { ...v }])
+      ),
+      journals: this.journals.map((j) => ({
+        ...j,
+        lines: j.lines.map((l) => ({ ...l })),
+      })),
+      quotes: new Map([...this.quotes.entries()].map(([k, v]) => [k, { ...v }])),
+      reservations: new Map(
+        [...this.reservations.entries()].map(([k, v]) => [k, { ...v }])
+      ),
+      trades: new Map([...this.trades.entries()].map(([k, v]) => [k, { ...v }])),
+      idem: new Map([...this.idem.entries()].map(([k, v]) => [k, { ...v }])),
+      outbox: new Map([...this.outbox.entries()].map(([k, v]) => [k, { ...v }])),
+      cost: new Map([...this.cost.entries()].map(([k, v]) => [k, { ...v }])),
+      deposits: this.deposits.map((d) => ({ ...d })),
+    };
+  }
+
+  private restore(s: ReturnType<MemoryCoreStore["snapshot"]>) {
+    this.accounts = s.accounts;
+    this.journals.length = 0;
+    this.journals.push(...s.journals);
+    this.quotes = s.quotes;
+    this.reservations = s.reservations;
+    this.trades = s.trades;
+    this.idem = s.idem;
+    this.outbox = s.outbox;
+    this.cost = s.cost;
+    this.deposits = s.deposits;
+  }
+
+  async withTransaction<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.txDepth > 0) {
+      this.txDepth += 1;
+      try {
+        return await fn();
+      } finally {
+        this.txDepth -= 1;
+      }
+    }
+    return this.txMutex.run(async () => {
+      const snap = this.snapshot();
+      this.txDepth = 1;
+      try {
+        const result = await fn();
+        this.txDepth = 0;
+        return result;
+      } catch (err) {
+        this.restore(snap);
+        this.txDepth = 0;
+        throw err;
+      }
+    });
+  }
+
+  async withAdvisoryLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
     let m = this.mutexes.get(key);
     if (!m) {
       m = new Mutex();
       this.mutexes.set(key, m);
     }
     return m.run(fn);
+  }
+
+  async withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    return this.withTransaction(() => this.withAdvisoryLock(key, fn));
   }
 
   async getAccount(
@@ -193,6 +270,7 @@ export class MemoryCoreStore implements CoreStore {
     accountCode: AccountCode,
     asset: LedgerAsset
   ): Promise<LedgerAccount> {
+    assertAccountPolicy(holderId, accountCode, asset, PLATFORM_HOLDER);
     const key = this.accountKey(holderId, accountCode, asset);
     const existing = this.accounts.get(key);
     if (existing) return existing;
@@ -211,7 +289,23 @@ export class MemoryCoreStore implements CoreStore {
     return [...this.accounts.values()].filter((a) => a.holderId === holderId);
   }
 
+  async listAllAccounts(): Promise<LedgerAccount[]> {
+    return [...this.accounts.values()].map((a) => ({ ...a }));
+  }
+
+  async listJournals(): Promise<JournalEntry[]> {
+    return this.journals.map((j) => ({
+      ...j,
+      lines: j.lines.map((l) => ({ ...l })),
+    }));
+  }
+
   async insertJournal(entry: JournalEntry): Promise<void> {
+    for (const l of entry.lines) {
+      if (!((l.debit > 0n && l.credit === 0n) || (l.credit > 0n && l.debit === 0n))) {
+        throw new CoreError("invalid_journal", "exactly one of debit/credit must be positive");
+      }
+    }
     this.journals.push({
       ...entry,
       lines: entry.lines.map((l) => ({ ...l })),
@@ -263,6 +357,8 @@ export class MemoryCoreStore implements CoreStore {
   }
 
   async insertReservation(res: MetalSoftReservation): Promise<void> {
+    const dup = [...this.reservations.values()].find((x) => x.quoteId === res.quoteId);
+    if (dup) throw new StoreConflictError("one reservation per quote");
     this.reservations.set(res.id, { ...res });
   }
 
@@ -295,12 +391,27 @@ export class MemoryCoreStore implements CoreStore {
   }
 
   async insertTrade(trade: Trade): Promise<void> {
+    const trackingDup = [...this.trades.values()].find(
+      (t) => t.trackingCode === trade.trackingCode
+    );
+    if (trackingDup) throw new StoreConflictError("tracking_code must be unique");
+    if (trade.status === "SETTLED") {
+      const existing = await this.getSettledTradeByQuote(trade.quoteId);
+      if (existing) throw new StoreConflictError("one settled trade per quote");
+    }
     this.trades.set(trade.id, { ...trade });
   }
 
   async getTrade(id: string): Promise<Trade | null> {
     const t = this.trades.get(id);
     return t ? { ...t } : null;
+  }
+
+  async getSettledTradeByQuote(quoteId: string): Promise<Trade | null> {
+    return (
+      [...this.trades.values()].find((t) => t.quoteId === quoteId && t.status === "SETTLED") ??
+      null
+    );
   }
 
   async listTradesForUser(userId: string, limit = 100): Promise<Trade[]> {
@@ -317,16 +428,46 @@ export class MemoryCoreStore implements CoreStore {
       throw new StoreConflictError(`trade status ${t.status}`);
     }
     const next = { ...t, ...patch };
+    if (next.status === "SETTLED") {
+      const existing = [...this.trades.values()].find(
+        (x) => x.quoteId === next.quoteId && x.status === "SETTLED" && x.id !== next.id
+      );
+      if (existing) throw new StoreConflictError("one settled trade per quote");
+    }
     this.trades.set(id, next);
     return next;
   }
 
-  async getIdempotency(userId: string, key: string): Promise<IdempotencyRecord | null> {
-    return this.idem.get(`${userId}:${key}`) ?? null;
+  private idemKey(userId: string, operation: string, key: string) {
+    return `${userId}:${operation}:${key}`;
+  }
+
+  async getIdempotency(
+    userId: string,
+    operation: string,
+    key: string
+  ): Promise<IdempotencyRecord | null> {
+    return this.idem.get(this.idemKey(userId, operation, key)) ?? null;
+  }
+
+  async claimIdempotency(rec: IdempotencyRecord): Promise<IdempotencyClaim> {
+    const k = this.idemKey(rec.userId, rec.operation, rec.key);
+    const existing = this.idem.get(k);
+    if (existing) {
+      if (existing.requestHash !== rec.requestHash) {
+        return { kind: "conflict", record: existing };
+      }
+      if (existing.status === "COMPLETED") {
+        return { kind: "replay", record: existing };
+      }
+      return { kind: "in_progress", record: existing };
+    }
+    this.idem.set(k, { ...rec, status: "IN_PROGRESS", responseJson: null });
+    return { kind: "claimed" };
   }
 
   async putIdempotency(rec: IdempotencyRecord): Promise<void> {
-    this.idem.set(`${rec.userId}:${rec.key}`, { ...rec });
+    this.idem.set(this.idemKey(rec.userId, rec.operation, rec.key), { ...rec });
   }
 
   async insertOutbox(event: OutboxEvent): Promise<void> {

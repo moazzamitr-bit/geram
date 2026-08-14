@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "async_hooks";
 import type { AssetCode, LedgerAsset } from "./assets";
+import { assertAccountPolicy } from "./account-policy";
 import { CORE_SCHEMA_SQL } from "./schema";
 import {
   newId,
@@ -8,19 +9,20 @@ import {
   InsufficientBalanceError,
   type CoreStore,
 } from "./store";
-import type {
-  AccountCode,
-  CostBasis,
-  IdempotencyRecord,
-  JournalEntry,
-  LedgerAccount,
-  MetalSoftReservation,
-  OutboxEvent,
-  Quote,
-  QuoteStatus,
-  ReservationStatus,
-  Trade,
-  TradeStatus,
+import {
+  PLATFORM_HOLDER,
+  type AccountCode,
+  type CostBasis,
+  type IdempotencyClaim,
+  type IdempotencyOperation,
+  type IdempotencyRecord,
+  type JournalEntry,
+  type OutboxEvent,
+  type Quote,
+  type QuoteStatus,
+  type ReservationStatus,
+  type Trade,
+  type TradeStatus,
 } from "./types";
 
 export type SqlQueryFn = (sql: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
@@ -41,11 +43,16 @@ function big(v: unknown): bigint {
   return BigInt(String(v));
 }
 
+function bigOrNull(v: unknown): bigint | null {
+  if (v == null) return null;
+  return big(v);
+}
+
 function str(v: unknown) {
   return String(v);
 }
 
-function mapAccount(row: Record<string, unknown>): LedgerAccount {
+function mapAccount(row: Record<string, unknown>) {
   return {
     id: str(row.id),
     holderId: str(row.holder_id),
@@ -62,8 +69,8 @@ function mapQuote(row: Record<string, unknown>): Quote {
     asset: str(row.asset) as Quote["asset"],
     side: str(row.side) as Quote["side"],
     inputMode: str(row.input_mode) as Quote["inputMode"],
-    requestedIrr: big(row.requested_irr),
-    requestedWeightUg: big(row.requested_weight_ug),
+    requestedIrr: bigOrNull(row.requested_irr),
+    requestedWeightUg: bigOrNull(row.requested_weight_ug),
     referencePriceIrrPerGram: big(row.reference_price_irr_per_gram),
     executionPriceIrrPerGram: big(row.execution_price_irr_per_gram),
     grossIrr: big(row.gross_irr),
@@ -97,7 +104,39 @@ function mapTrade(row: Record<string, unknown>): Trade {
   };
 }
 
+function mapReservation(r: Record<string, unknown>) {
+  return {
+    id: str(r.id),
+    quoteId: str(r.quote_id),
+    asset: str(r.asset) as AssetCode,
+    quantityUg: big(r.quantity_ug),
+    status: str(r.status) as ReservationStatus,
+    createdAt: new Date(str(r.created_at)).toISOString(),
+  };
+}
+
+function mapIdem(r: Record<string, unknown>): IdempotencyRecord {
+  return {
+    key: str(r.key),
+    userId: str(r.user_id),
+    operation: str(r.operation) as IdempotencyOperation,
+    method: str(r.method),
+    path: str(r.path),
+    requestHash: str(r.request_hash),
+    responseJson: r.response_json == null ? null : str(r.response_json),
+    status: str(r.status) as IdempotencyRecord["status"],
+    createdAt: new Date(str(r.created_at)).toISOString(),
+  };
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  const e = err as { code?: string; message?: string };
+  return e?.code === "23505" || /duplicate key|unique constraint/i.test(e?.message ?? "");
+}
+
 export class PostgresCoreStore implements CoreStore {
+  readonly persistence = "postgres" as const;
+
   constructor(
     private readonly base: SqlSession,
     private readonly checkout?: () => Promise<{
@@ -112,21 +151,22 @@ export class PostgresCoreStore implements CoreStore {
     return sqlAls.getStore() ?? this.base;
   }
 
+  inTransaction() {
+    return sqlAls.getStore() != null;
+  }
+
   static async applySchema(sql: SqlSession) {
     await sql.exec(CORE_SCHEMA_SQL);
   }
 
-  async withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-    const current = sqlAls.getStore();
-    if (current) {
-      await current.query("select pg_advisory_xact_lock(hashtext($1::text))", [key]);
+  async withTransaction<T>(fn: () => Promise<T>): Promise<T> {
+    if (sqlAls.getStore()) {
       return fn();
     }
     if (this.checkout) {
       const tx = await this.checkout();
       try {
         return await sqlAls.run(tx.session, async () => {
-          await tx.session.query("select pg_advisory_xact_lock(hashtext($1::text))", [key]);
           const result = await fn();
           await tx.commit();
           return result;
@@ -138,12 +178,28 @@ export class PostgresCoreStore implements CoreStore {
         tx.release();
       }
     }
-    await this.base.query("select pg_advisory_lock(hashtext($1::text))", [key]);
+    await this.base.exec("begin");
     try {
-      return await fn();
-    } finally {
-      await this.base.query("select pg_advisory_unlock(hashtext($1::text))", [key]);
+      const result = await sqlAls.run(this.base, fn);
+      await this.base.exec("commit");
+      return result;
+    } catch (err) {
+      await this.base.exec("rollback").catch(() => undefined);
+      throw err;
     }
+  }
+
+  async withAdvisoryLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const run = async () => {
+      await this.sql().query("select pg_advisory_xact_lock(hashtext($1::text))", [key]);
+      return fn();
+    };
+    if (this.inTransaction()) return run();
+    return this.withTransaction(run);
+  }
+
+  async withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    return this.withTransaction(() => this.withAdvisoryLock(key, fn));
   }
 
   async getAccount(holderId: string, accountCode: AccountCode, asset: LedgerAsset) {
@@ -155,6 +211,7 @@ export class PostgresCoreStore implements CoreStore {
   }
 
   async ensureAccount(holderId: string, accountCode: AccountCode, asset: LedgerAsset) {
+    assertAccountPolicy(holderId, accountCode, asset, PLATFORM_HOLDER);
     const existing = await this.getAccount(holderId, accountCode, asset);
     if (existing) return existing;
     const id = newId("acc");
@@ -177,16 +234,58 @@ export class PostgresCoreStore implements CoreStore {
     return rows.map(mapAccount);
   }
 
+  async listAllAccounts() {
+    const { rows } = await this.sql().query(`select * from core_ledger_accounts`);
+    return rows.map(mapAccount);
+  }
+
+  async listJournals(): Promise<JournalEntry[]> {
+    const { rows: headers } = await this.sql().query(
+      `select * from core_journals order by created_at asc, id asc`
+    );
+    const { rows: lines } = await this.sql().query(
+      `select * from core_journal_lines order by id asc`
+    );
+    const byJournal = new Map<string, JournalEntry["lines"]>();
+    for (const row of lines) {
+      const jid = str(row.journal_id);
+      const list = byJournal.get(jid) ?? [];
+      list.push({
+        accountCode: str(row.account_code) as AccountCode,
+        holderId: str(row.holder_id),
+        asset: str(row.asset) as LedgerAsset,
+        debit: big(row.debit),
+        credit: big(row.credit),
+      });
+      byJournal.set(jid, list);
+    }
+    return headers.map((h) => ({
+      id: str(h.id),
+      createdAt: new Date(str(h.created_at)).toISOString(),
+      reason: str(h.reason),
+      refType: str(h.ref_type),
+      refId: str(h.ref_id),
+      lines: byJournal.get(str(h.id)) ?? [],
+    }));
+  }
+
   async insertJournal(entry: JournalEntry) {
     await this.sql().exec(
       `insert into core_journals (id, created_at, reason, ref_type, ref_id) values ($1,$2,$3,$4,$5)`,
       [entry.id, entry.createdAt, entry.reason, entry.refType, entry.refId]
     );
-    for (const line of entry.lines) {
+    for (const journalLine of entry.lines) {
       await this.sql().exec(
         `insert into core_journal_lines (journal_id, account_code, holder_id, asset, debit, credit)
          values ($1,$2,$3,$4,$5,$6)`,
-        [entry.id, line.accountCode, line.holderId, line.asset, line.debit.toString(), line.credit.toString()]
+        [
+          entry.id,
+          journalLine.accountCode,
+          journalLine.holderId,
+          journalLine.asset,
+          journalLine.debit.toString(),
+          journalLine.credit.toString(),
+        ]
       );
     }
   }
@@ -219,8 +318,8 @@ export class PostgresCoreStore implements CoreStore {
         quote.asset,
         quote.side,
         quote.inputMode,
-        quote.requestedIrr.toString(),
-        quote.requestedWeightUg.toString(),
+        quote.requestedIrr == null ? null : quote.requestedIrr.toString(),
+        quote.requestedWeightUg == null ? null : quote.requestedWeightUg.toString(),
         quote.referencePriceIrrPerGram.toString(),
         quote.executionPriceIrrPerGram.toString(),
         quote.grossIrr.toString(),
@@ -252,12 +351,24 @@ export class PostgresCoreStore implements CoreStore {
     return mapQuote(rows[0]);
   }
 
-  async insertReservation(res: MetalSoftReservation) {
-    await this.sql().exec(
-      `insert into core_reservations (id, quote_id, asset, quantity_ug, status, created_at)
-       values ($1,$2,$3,$4,$5,$6)`,
-      [res.id, res.quoteId, res.asset, res.quantityUg.toString(), res.status, res.createdAt]
-    );
+  async insertReservation(res: {
+    id: string;
+    quoteId: string;
+    asset: AssetCode;
+    quantityUg: bigint;
+    status: ReservationStatus;
+    createdAt: string;
+  }) {
+    try {
+      await this.sql().exec(
+        `insert into core_reservations (id, quote_id, asset, quantity_ug, status, created_at)
+         values ($1,$2,$3,$4,$5,$6)`,
+        [res.id, res.quoteId, res.asset, res.quantityUg.toString(), res.status, res.createdAt]
+      );
+    } catch (err) {
+      if (isUniqueViolation(err)) throw new StoreConflictError("one reservation per quote");
+      throw err;
+    }
   }
 
   async getReservationByQuote(quoteId: string) {
@@ -266,15 +377,7 @@ export class PostgresCoreStore implements CoreStore {
       [quoteId]
     );
     if (!rows[0]) return null;
-    const r = rows[0];
-    return {
-      id: str(r.id),
-      quoteId: str(r.quote_id),
-      asset: str(r.asset) as AssetCode,
-      quantityUg: big(r.quantity_ug),
-      status: str(r.status) as ReservationStatus,
-      createdAt: new Date(str(r.created_at)).toISOString(),
-    };
+    return mapReservation(rows[0]);
   }
 
   async updateReservationStatus(id: string, from: ReservationStatus[], to: ReservationStatus) {
@@ -284,15 +387,7 @@ export class PostgresCoreStore implements CoreStore {
       [id, to, ...from]
     );
     if (!rows[0]) throw new StoreConflictError("reservation status conflict");
-    const r = rows[0];
-    return {
-      id: str(r.id),
-      quoteId: str(r.quote_id),
-      asset: str(r.asset) as AssetCode,
-      quantityUg: big(r.quantity_ug),
-      status: str(r.status) as ReservationStatus,
-      createdAt: new Date(str(r.created_at)).toISOString(),
-    };
+    return mapReservation(rows[0]);
   }
 
   async openReservationQuantityUg(asset: AssetCode) {
@@ -304,31 +399,44 @@ export class PostgresCoreStore implements CoreStore {
   }
 
   async insertTrade(trade: Trade) {
-    await this.sql().exec(
-      `insert into core_trades (
-        id, user_id, quote_id, asset, side, status, weight_ug, gross_irr, fee_irr, net_irr,
-        idempotency_key, created_at, tracking_code
-      ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [
-        trade.id,
-        trade.userId,
-        trade.quoteId,
-        trade.asset,
-        trade.side,
-        trade.status,
-        trade.weightUg.toString(),
-        trade.grossIrr.toString(),
-        trade.feeIrr.toString(),
-        trade.netIrr.toString(),
-        trade.idempotencyKey,
-        trade.createdAt,
-        trade.trackingCode,
-      ]
-    );
+    try {
+      await this.sql().exec(
+        `insert into core_trades (
+          id, user_id, quote_id, asset, side, status, weight_ug, gross_irr, fee_irr, net_irr,
+          idempotency_key, created_at, tracking_code
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+        [
+          trade.id,
+          trade.userId,
+          trade.quoteId,
+          trade.asset,
+          trade.side,
+          trade.status,
+          trade.weightUg.toString(),
+          trade.grossIrr.toString(),
+          trade.feeIrr.toString(),
+          trade.netIrr.toString(),
+          trade.idempotencyKey,
+          trade.createdAt,
+          trade.trackingCode,
+        ]
+      );
+    } catch (err) {
+      if (isUniqueViolation(err)) throw new StoreConflictError("trade uniqueness conflict");
+      throw err;
+    }
   }
 
   async getTrade(id: string) {
     const { rows } = await this.sql().query(`select * from core_trades where id=$1`, [id]);
+    return rows[0] ? mapTrade(rows[0]) : null;
+  }
+
+  async getSettledTradeByQuote(quoteId: string) {
+    const { rows } = await this.sql().query(
+      `select * from core_trades where quote_id=$1 and status='SETTLED' limit 1`,
+      [quoteId]
+    );
     return rows[0] ? mapTrade(rows[0]) : null;
   }
 
@@ -344,41 +452,71 @@ export class PostgresCoreStore implements CoreStore {
     const status = patch.status;
     if (!status) throw new StoreConflictError("trade patch requires status");
     const placeholders = from.map((_, i) => `$${i + 3}`).join(",");
-    const { rows } = await this.sql().query(
-      `update core_trades set status=$2 where id=$1 and status in (${placeholders}) returning *`,
-      [id, status, ...from]
-    );
-    if (!rows[0]) throw new StoreConflictError("trade status conflict");
-    return mapTrade(rows[0]);
+    try {
+      const { rows } = await this.sql().query(
+        `update core_trades set status=$2 where id=$1 and status in (${placeholders}) returning *`,
+        [id, status, ...from]
+      );
+      if (!rows[0]) throw new StoreConflictError("trade status conflict");
+      return mapTrade(rows[0]);
+    } catch (err) {
+      if (err instanceof StoreConflictError) throw err;
+      if (isUniqueViolation(err)) throw new StoreConflictError("one settled trade per quote");
+      throw err;
+    }
   }
 
-  async getIdempotency(userId: string, key: string) {
+  async getIdempotency(userId: string, operation: string, key: string) {
     const { rows } = await this.sql().query(
-      `select * from core_idempotency where user_id=$1 and key=$2`,
-      [userId, key]
+      `select * from core_idempotency where user_id=$1 and operation=$2 and key=$3`,
+      [userId, operation, key]
     );
     if (!rows[0]) return null;
-    const r = rows[0];
-    return {
-      key: str(r.key),
-      userId: str(r.user_id),
-      method: str(r.method),
-      path: str(r.path),
-      requestHash: str(r.request_hash),
-      responseJson: r.response_json == null ? null : str(r.response_json),
-      status: str(r.status) as IdempotencyRecord["status"],
-      createdAt: new Date(str(r.created_at)).toISOString(),
-    };
+    return mapIdem(rows[0]);
+  }
+
+  async claimIdempotency(rec: IdempotencyRecord): Promise<IdempotencyClaim> {
+    const { rows } = await this.sql().query(
+      `insert into core_idempotency
+        (user_id, operation, key, method, path, request_hash, response_json, status, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7,'IN_PROGRESS',$8)
+       on conflict (user_id, operation, key) do nothing
+       returning *`,
+      [
+        rec.userId,
+        rec.operation,
+        rec.key,
+        rec.method,
+        rec.path,
+        rec.requestHash,
+        rec.responseJson,
+        rec.createdAt,
+      ]
+    );
+    if (rows[0]) return { kind: "claimed" };
+    const existing = await this.getIdempotency(rec.userId, rec.operation, rec.key);
+    if (!existing) {
+      throw new StoreConflictError("idempotency claim raced without a row");
+    }
+    if (existing.requestHash !== rec.requestHash) {
+      return { kind: "conflict", record: existing };
+    }
+    if (existing.status === "COMPLETED") return { kind: "replay", record: existing };
+    return { kind: "in_progress", record: existing };
   }
 
   async putIdempotency(rec: IdempotencyRecord) {
     await this.sql().exec(
-      `insert into core_idempotency (user_id, key, method, path, request_hash, response_json, status, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8)
-       on conflict (user_id, key) do update set
-         response_json=excluded.response_json, status=excluded.status`,
+      `insert into core_idempotency
+        (user_id, operation, key, method, path, request_hash, response_json, status, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       on conflict (user_id, operation, key) do update set
+         response_json=excluded.response_json,
+         status=excluded.status,
+         request_hash=excluded.request_hash`,
       [
         rec.userId,
+        rec.operation,
         rec.key,
         rec.method,
         rec.path,

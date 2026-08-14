@@ -51,8 +51,8 @@ export type Quote = {
   asset: AssetCode;
   side: QuoteSide;
   inputMode: InputMode;
-  requestedIrr: Irr;
-  requestedWeightUg: Microgram;
+  requestedIrr: Irr | null;
+  requestedWeightUg: Microgram | null;
   referencePriceIrrPerGram: Irr;
   executionPriceIrrPerGram: Irr;
   grossIrr: Irr;
@@ -104,14 +104,24 @@ export type OutboxEvent = {
   lastError: string | null;
 };
 
+export type IdempotencyStatus = "IN_PROGRESS" | "COMPLETED";
+export type IdempotencyOperation = "TRADE_EXECUTE" | "SANDBOX_DEPOSIT" | "OPENING";
+
+export type IdempotencyClaim =
+  | { kind: "claimed" }
+  | { kind: "replay"; record: IdempotencyRecord }
+  | { kind: "in_progress"; record: IdempotencyRecord }
+  | { kind: "conflict"; record: IdempotencyRecord };
+
 export type IdempotencyRecord = {
   key: string;
   userId: string;
+  operation: IdempotencyOperation;
   method: string;
   path: string;
   requestHash: string;
   responseJson: string | null;
-  status: "PENDING" | "COMPLETED";
+  status: IdempotencyStatus;
   createdAt: string;
 };
 
@@ -152,6 +162,18 @@ export type PriceQuote = {
   observedAt: string;
   stale: boolean;
 };
+
+export type OpeningRefType = "SYSTEM_SEED" | "MIGRATION" | "APPROVED_OPENING_BALANCE";
+
+export const OPENING_REF_TYPES: OpeningRefType[] = [
+  "SYSTEM_SEED",
+  "MIGRATION",
+  "APPROVED_OPENING_BALANCE",
+];
+
+export function isOpeningRefType(v: string): v is OpeningRefType {
+  return OPENING_REF_TYPES.includes(v as OpeningRefType);
+}
 
 export class CoreError extends Error {
   constructor(

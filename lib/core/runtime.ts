@@ -2,7 +2,12 @@ import { FinancialCore, feesFromCommercePercent } from "@/lib/core/engine";
 import { MemoryCoreStore, type CoreStore } from "@/lib/core/store";
 import { PostgresCoreStore } from "@/lib/core/pg-store";
 import { tgjuExecutableFeed, staticPriceFeed } from "@/lib/core/price";
-import { getExecutionMode } from "@/lib/core/mode";
+import {
+  getExecutionMode,
+  getFeatureFlags,
+  isDeployedEnvironment,
+  postgresRequired,
+} from "@/lib/core/mode";
 import { DEFAULT_COMMERCE_SETTINGS } from "@/lib/commerce/types";
 import { tomanToIrr } from "@/lib/core/money";
 import { CoreError } from "@/lib/core/types";
@@ -62,14 +67,21 @@ function dbUrl() {
   return process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || process.env.POSTGRES_URL;
 }
 
+function memoryStoreAllowed() {
+  const mode = getExecutionMode();
+  if (postgresRequired(mode)) return false;
+  if (isDeployedEnvironment()) return false;
+  return mode === "SANDBOX";
+}
+
 function getStore(): CoreStore {
   const url = dbUrl();
   const mode = getExecutionMode();
   if (!url) {
-    if (mode === "PRODUCTION") {
+    if (!memoryStoreAllowed()) {
       throw new CoreError(
         "misconfigured",
-        "DATABASE_URL is required when GERAM_EXECUTION_MODE=PRODUCTION",
+        `Postgres (DATABASE_URL) is required for ${mode} and any deployed/multi-instance environment`,
         500
       );
     }
@@ -118,6 +130,7 @@ export function getFinancialCore(): FinancialCore {
   if (g.__geramCore) return g.__geramCore;
   const mode = getExecutionMode();
   const store = getStore();
+  const flags = getFeatureFlags(mode);
   const useStatic = process.env.GERAM_PRICE_FEED === "static" || process.env.VITEST === "true";
   const prices = useStatic ? testPrices() : tgjuExecutableFeed(fetchTgjuCurrent);
   const fees = DEFAULT_COMMERCE_SETTINGS.fees;
@@ -125,6 +138,7 @@ export function getFinancialCore(): FinancialCore {
     store,
     prices,
     mode,
+    flags,
     fees: feesFromCommercePercent({
       plus: false,
       buyFeePercentFree: fees.buyFeePercentFree,
@@ -144,4 +158,23 @@ export function resetFinancialCoreForTests() {
   g.__geramCore = undefined;
   g.__geramStore = undefined;
   g.__geramPg = undefined;
+}
+
+export function readinessSnapshot() {
+  const mode = getExecutionMode();
+  const flags = getFeatureFlags(mode);
+  const url = Boolean(dbUrl());
+  const databaseBacked = url || (g.__geramPg != null && g.__geramPg.persistence === "postgres");
+  const marketDataProductionApproved =
+    mode !== "PRODUCTION" || process.env.GERAM_MARKET_DATA_PRODUCTION_APPROVED === "true";
+  const financialWritesAllowed =
+    databaseBacked &&
+    (mode !== "PRODUCTION" || marketDataProductionApproved);
+  return {
+    executionMode: mode,
+    databaseBacked,
+    sandboxSeedEnabled: flags.SANDBOX_SEED_ENABLED && mode === "SANDBOX",
+    marketDataProductionApproved,
+    financialWritesAllowed,
+  };
 }

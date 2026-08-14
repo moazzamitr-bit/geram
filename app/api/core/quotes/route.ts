@@ -35,13 +35,13 @@ export async function POST(request: Request) {
         ? BigInt(body.requestedIrr)
         : body.requestedToman != null
           ? tomanToIrr(body.requestedToman)
-          : 0n;
+          : undefined;
     const requestedWeightUg =
       body.requestedWeightUg != null
         ? BigInt(body.requestedWeightUg)
         : body.requestedGrams != null
           ? gramsToUg(body.requestedGrams)
-          : 0n;
+          : undefined;
     const core = getFinancialCore();
     const quote = await core.issueQuote({
       userId,

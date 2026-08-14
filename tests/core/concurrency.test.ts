@@ -1,28 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { FinancialCore } from "@/lib/core/engine";
-import { MemoryCoreStore } from "@/lib/core/store";
-import { staticPriceFeed } from "@/lib/core/price";
-import { tomanToIrr, UG_PER_GRAM } from "@/lib/core/money";
-import { DEFAULT_FEE_SNAPSHOT } from "@/lib/core/fees";
+import { tomanToIrr } from "@/lib/core/money";
+import { makeMemoryCore } from "./helpers";
 
 function makeCore() {
-  return new FinancialCore({
-    store: new MemoryCoreStore(),
-    prices: staticPriceFeed({
-      GOLD: tomanToIrr(7_000_000),
-      SILVER: tomanToIrr(400_000),
-      COPPER: tomanToIrr(2_500),
-      TEST_METAL: tomanToIrr(10_000),
-    }),
-    mode: "SANDBOX",
-    fees: { ...DEFAULT_FEE_SNAPSHOT, buyFeeMinIrr: 0n, sellFeeMinIrr: 0n },
-    seedInventoryUg: {
-      GOLD: UG_PER_GRAM * 10_000n,
-      SILVER: UG_PER_GRAM * 10_000n,
-      COPPER: UG_PER_GRAM * 10_000n,
-      TEST_METAL: UG_PER_GRAM * 10_000n,
-    },
-  });
+  return makeMemoryCore().core;
 }
 
 describe("concurrent trades", () => {

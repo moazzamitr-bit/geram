@@ -2,40 +2,15 @@ import { describe, expect, it } from "vitest";
 import { FinancialCore } from "@/lib/core/engine";
 import { MemoryCoreStore } from "@/lib/core/store";
 import { staticPriceFeed } from "@/lib/core/price";
-import { tomanToIrr, gramsToUg, UG_PER_GRAM } from "@/lib/core/money";
-import { DEFAULT_FEE_SNAPSHOT } from "@/lib/core/fees";
+import { tomanToIrr, gramsToUg } from "@/lib/core/money";
 import type { AssetCode } from "@/lib/core/assets";
 import { CoreError } from "@/lib/core/types";
+import { makeMemoryCore, TEST_PRICES } from "./helpers";
 
 const ASSETS: AssetCode[] = ["GOLD", "SILVER", "COPPER", "TEST_METAL"];
 
 function makeCore(opts?: { now?: () => Date; inventory?: bigint }) {
-  const store = new MemoryCoreStore();
-  const core = new FinancialCore({
-    store,
-    prices: staticPriceFeed({
-      GOLD: tomanToIrr(7_000_000),
-      SILVER: tomanToIrr(400_000),
-      COPPER: tomanToIrr(2_500),
-      TEST_METAL: tomanToIrr(10_000),
-    }),
-    mode: "SANDBOX",
-    fees: {
-      ...DEFAULT_FEE_SNAPSHOT,
-      buyFeeMinIrr: 0n,
-      sellFeeMinIrr: 0n,
-      buyFeeBps: 70n,
-      sellFeeBps: 50n,
-    },
-    now: opts?.now,
-    seedInventoryUg: {
-      GOLD: opts?.inventory ?? UG_PER_GRAM * 1_000n,
-      SILVER: opts?.inventory ?? UG_PER_GRAM * 1_000n,
-      COPPER: opts?.inventory ?? UG_PER_GRAM * 10_000n,
-      TEST_METAL: opts?.inventory ?? UG_PER_GRAM * 1_000n,
-    },
-  });
-  return { store, core };
+  return makeMemoryCore(opts);
 }
 
 describe.each(ASSETS)("wallet-funded buy/sell %s", (asset) => {
@@ -200,14 +175,14 @@ describe("quote expiry race", () => {
 });
 
 describe("sandbox deposit isolation", () => {
-  it("blocks sandbox deposit in PRODUCTION", async () => {
-    const store = new MemoryCoreStore();
-    const core = new FinancialCore({
-      store,
-      prices: staticPriceFeed({ GOLD: 1n, SILVER: 1n, COPPER: 1n, TEST_METAL: 1n }),
-      mode: "PRODUCTION",
-    });
-    await expect(core.sandboxDeposit("u", 100n, "k")).rejects.toBeInstanceOf(CoreError);
+  it("rejects MemoryCoreStore in PRODUCTION", () => {
+    expect(() => {
+      new FinancialCore({
+        store: new MemoryCoreStore(),
+        prices: staticPriceFeed(TEST_PRICES),
+        mode: "PRODUCTION",
+      });
+    }).toThrow(/Postgres/);
   });
 });
 

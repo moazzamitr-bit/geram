@@ -6,13 +6,16 @@ import {
   type FeeSnapshot,
   type SpreadSnapshot,
 } from "./fees";
+import { assertSystemSeedAllowed } from "./account-policy";
 import { getBalance, line, postJournal, requireBalance } from "./ledger";
 import {
   assertAssetSideEnabled,
   getExecutionMode,
   getFeatureFlags,
   getKillSwitches,
+  postgresRequired,
   sandboxDepositAllowed,
+  sandboxSeedAllowed,
   type ExecutionMode,
   type FeatureFlags,
   type KillSwitches,
@@ -44,6 +47,7 @@ export type EngineDeps = {
   spread?: SpreadSnapshot;
   safetyBufferUg?: Partial<Record<AssetCode, Microgram>>;
   seedInventoryUg?: Partial<Record<AssetCode, Microgram>>;
+  seedCashIrr?: Irr;
 };
 
 export type IssueQuoteInput = {
@@ -62,15 +66,20 @@ export type WalletView = {
 };
 
 export type TreasuryView = {
+  kind: "CORE_MILESTONE_PLACEHOLDER";
+  inventoryComplete: false;
+  customerLiabilityComplete: false;
   asset: AssetCode;
   platformFreeControlledUg: Microgram;
-  customerMetalLiabilityUg: Microgram;
+  /** Not aggregated in this milestone. Null means unavailable — never treat as 0. */
+  customerMetalLiabilityUg: null;
   openSoftReservationsUg: Microgram;
   restrictedFreeUg: Microgram;
   safetyBufferUg: Microgram;
   availableToSellUg: Microgram;
   weightedAverageCostIrrPerGram: Irr;
   netPositionUg: Microgram;
+  note: string;
 };
 
 function trackingCode() {
@@ -83,7 +92,20 @@ function hashPayload(value: unknown) {
 
 export class FinancialCore {
   private seeded = false;
-  constructor(private readonly deps: EngineDeps) {}
+  constructor(private readonly deps: EngineDeps) {
+    this.assertStoreForMode();
+  }
+
+  private assertStoreForMode() {
+    const mode = this.mode();
+    if (postgresRequired(mode) && this.deps.store.persistence !== "postgres") {
+      throw new CoreError(
+        "store_not_allowed",
+        `${mode} requires Postgres; MemoryCoreStore is forbidden`,
+        500
+      );
+    }
+  }
 
   now() {
     return this.deps.now ? this.deps.now() : new Date();
@@ -109,58 +131,83 @@ export class FinancialCore {
     return this.deps.spread ?? DEFAULT_SPREAD_SNAPSHOT;
   }
 
+  /**
+   * Ensures the chart of accounts. Does NOT manufacture inventory or cash.
+   * PRODUCTION / CLOSED_BETA start at 0 unless an approved opening is posted.
+   * SANDBOX may SYSTEM_SEED only when SANDBOX_SEED_ENABLED is explicitly true.
+   */
   async bootstrap() {
+    this.assertStoreForMode();
     await ensurePlatformAccounts(this.deps.store);
     if (this.seeded) return;
     this.seeded = true;
-    const defaults: Record<AssetCode, bigint> = {
-      GOLD: UG_PER_GRAM * 100_000n,
-      SILVER: UG_PER_GRAM * 1_000_000n,
-      COPPER: UG_PER_GRAM * 10_000_000n,
-      TEST_METAL: UG_PER_GRAM * 100_000n,
-    };
-    for (const asset of Object.keys(defaults) as AssetCode[]) {
-      const qty = this.deps.seedInventoryUg?.[asset] ?? defaults[asset];
+
+    if (!sandboxSeedAllowed(this.mode(), this.flags())) {
+      return;
+    }
+    assertSystemSeedAllowed(this.mode());
+
+    for (const asset of Object.keys(ASSET_SPECS) as AssetCode[]) {
+      const qty = this.deps.seedInventoryUg?.[asset] ?? 0n;
       if (qty <= 0n) continue;
-      const existing = await getBalance(
-        this.deps.store,
-        PLATFORM_HOLDER,
-        "PLATFORM_AVAILABLE",
-        asset
-      );
-      if (existing > 0n) continue;
-      await postJournal(this.deps.store, {
-        id: newId("jnl"),
-        createdAt: this.now().toISOString(),
+      await this.postOpening({
+        accountCode: "PLATFORM_AVAILABLE",
+        asset,
+        amount: qty,
+        refType: "SYSTEM_SEED",
         reason: "SEED_INVENTORY",
-        refType: "opening",
         refId: `seed:${asset}`,
-        lines: [
-          line("PLATFORM_OPENING", PLATFORM_HOLDER, asset, qty, 0n),
-          line("PLATFORM_AVAILABLE", PLATFORM_HOLDER, asset, 0n, qty),
-        ],
       });
     }
-    const cash = await getBalance(
-      this.deps.store,
-      PLATFORM_HOLDER,
-      "PLATFORM_CASH_CONTROL",
-      "IRR"
-    );
-    if (cash === 0n) {
-      const seedCash = 1_000_000_000_000_000n;
-      await postJournal(this.deps.store, {
-        id: newId("jnl"),
-        createdAt: this.now().toISOString(),
+    const seedCash = this.deps.seedCashIrr ?? 0n;
+    if (seedCash > 0n) {
+      await this.postOpening({
+        accountCode: "PLATFORM_CASH_CONTROL",
+        asset: "IRR",
+        amount: seedCash,
+        refType: "SYSTEM_SEED",
         reason: "SEED_CASH",
-        refType: "opening",
         refId: "seed:IRR",
-        lines: [
-          line("PLATFORM_OPENING", PLATFORM_HOLDER, "IRR", seedCash, 0n),
-          line("PLATFORM_CASH_CONTROL", PLATFORM_HOLDER, "IRR", 0n, seedCash),
-        ],
       });
     }
+  }
+
+  async postOpening(input: {
+    accountCode: "PLATFORM_AVAILABLE" | "PLATFORM_CASH_CONTROL" | "USER_AVAILABLE";
+    holderId?: string;
+    asset: AssetCode | "IRR";
+    amount: bigint;
+    refType: "SYSTEM_SEED" | "MIGRATION" | "APPROVED_OPENING_BALANCE";
+    reason?: string;
+    refId?: string;
+  }): Promise<string> {
+    if (input.amount <= 0n) {
+      throw new CoreError("invalid_amount", "Opening amount must be positive");
+    }
+    if (input.refType === "SYSTEM_SEED") {
+      if (this.mode() === "PRODUCTION") {
+        throw new CoreError("opening_forbidden", "SYSTEM_SEED is forbidden in PRODUCTION", 403);
+      }
+      assertSystemSeedAllowed(this.mode());
+      if (!this.flags().SANDBOX_SEED_ENABLED) {
+        throw new CoreError("opening_forbidden", "SANDBOX_SEED_ENABLED is not set", 403);
+      }
+    }
+    const holderId = input.holderId ?? PLATFORM_HOLDER;
+    await ensurePlatformAccounts(this.deps.store);
+    const journalId = newId("jnl");
+    await postJournal(this.deps.store, {
+      id: journalId,
+      createdAt: this.now().toISOString(),
+      reason: input.reason ?? "APPROVED_OPENING",
+      refType: input.refType,
+      refId: input.refId ?? journalId,
+      lines: [
+        line("PLATFORM_OPENING", PLATFORM_HOLDER, input.asset, input.amount, 0n),
+        line(input.accountCode, holderId, input.asset, 0n, input.amount),
+      ],
+    });
+    return journalId;
   }
 
   async sandboxDeposit(userId: string, amountIrr: Irr, idempotencyKey: string) {
@@ -178,11 +225,41 @@ export class FinancialCore {
     await this.bootstrap();
     await ensureUserAccounts(this.deps.store, userId);
 
-    return this.deps.store.withLock(`user:${userId}`, async () => {
-      const existing = await this.deps.store.getIdempotency(userId, idempotencyKey);
-      if (existing?.status === "COMPLETED" && existing.responseJson) {
-        return JSON.parse(existing.responseJson) as { id: string; trackingCode: string };
+    const requestHash = hashPayload({
+      operation: "SANDBOX_DEPOSIT",
+      amountIrr: amountIrr.toString(),
+    });
+
+    return this.deps.store.withTransaction(async () => {
+      const claim = await this.deps.store.claimIdempotency({
+        key: idempotencyKey,
+        userId,
+        operation: "SANDBOX_DEPOSIT",
+        method: "POST",
+        path: "/api/core/sandbox/deposit",
+        requestHash,
+        responseJson: null,
+        status: "IN_PROGRESS",
+        createdAt: this.now().toISOString(),
+      });
+      if (claim.kind === "conflict") {
+        throw new CoreError(
+          "idempotency_conflict",
+          "Idempotency key reused with a different request",
+          409
+        );
       }
+      if (claim.kind === "in_progress") {
+        throw new CoreError(
+          "idempotency_in_progress",
+          "Request is already in progress",
+          409
+        );
+      }
+      if (claim.kind === "replay" && claim.record.responseJson) {
+        return JSON.parse(claim.record.responseJson) as { id: string; trackingCode: string };
+      }
+
       const id = newId();
       const createdAt = this.now().toISOString();
       const tracking = trackingCode();
@@ -207,7 +284,13 @@ export class FinancialCore {
       await this.deps.store.insertOutbox({
         id: newId("obx"),
         topic: "sandbox.deposit.credited",
-        payloadJson: JSON.stringify({ id, userId, irr: amountIrr.toString() }),
+        payloadJson: JSON.stringify({
+          id,
+          userId,
+          irr: amountIrr.toString(),
+          simulated: true,
+          note: "SANDBOX simulated funding — not a real PSP settlement",
+        }),
         createdAt,
         processedAt: null,
         attempts: 0,
@@ -218,9 +301,10 @@ export class FinancialCore {
       await this.deps.store.putIdempotency({
         key: idempotencyKey,
         userId,
+        operation: "SANDBOX_DEPOSIT",
         method: "POST",
         path: "/api/core/sandbox/deposit",
-        requestHash: hashPayload({ amountIrr: amountIrr.toString() }),
+        requestHash,
         responseJson: JSON.stringify(result),
         status: "COMPLETED",
         createdAt,
@@ -246,6 +330,30 @@ export class FinancialCore {
     };
   }
 
+  private async availableToSellUg(asset: AssetCode): Promise<Microgram> {
+    const platformFree = await getBalance(
+      this.deps.store,
+      PLATFORM_HOLDER,
+      "PLATFORM_AVAILABLE",
+      asset
+    );
+    const restricted = await getBalance(
+      this.deps.store,
+      PLATFORM_HOLDER,
+      "PLATFORM_RESTRICTED",
+      asset
+    );
+    const safety = this.deps.safetyBufferUg?.[asset] ?? 0n;
+    let available = platformFree - safety - restricted;
+    if (available < 0n) available = 0n;
+    return available;
+  }
+
+  /**
+   * CORE_MILESTONE_PLACEHOLDER — inventory lots, custody, and customer metal
+   * liability are not implemented. Do not treat these figures as production treasury truth.
+   * `customerMetalLiabilityUg` is null (unavailable), never a fake 0.
+   */
   async treasury(asset: AssetCode): Promise<TreasuryView> {
     await this.bootstrap();
     const platformFree = await getBalance(
@@ -268,29 +376,26 @@ export class FinancialCore {
     );
     const openSoft = await this.deps.store.openReservationQuantityUg(asset);
     const safety = this.deps.safetyBufferUg?.[asset] ?? 0n;
-    let available = platformFree - safety - restricted;
-    if (available < 0n) available = 0n;
-    // Open reservations already live in PLATFORM_RESERVED, not PLATFORM_AVAILABLE.
-    // Do not subtract customer liability — lots are consumed on buy.
-    void platformReserved;
-    void openSoft;
+    const available = await this.availableToSellUg(asset);
 
     const wac = await this.deps.store.getCostBasis(PLATFORM_HOLDER, asset);
     const wacPerGram =
       wac.quantityUg > 0n ? mulDivFloor(wac.costIrr, UG_PER_GRAM, wac.quantityUg) : 0n;
 
-    // Customer liability is not stored as a single account; callers pass 0 here
-    // unless they aggregate. Engine exposes 0 at platform level; use list later.
     return {
+      kind: "CORE_MILESTONE_PLACEHOLDER",
+      inventoryComplete: false,
+      customerLiabilityComplete: false,
       asset,
       platformFreeControlledUg: platformFree,
-      customerMetalLiabilityUg: 0n,
+      customerMetalLiabilityUg: null,
       openSoftReservationsUg: openSoft,
       restrictedFreeUg: restricted,
       safetyBufferUg: safety,
       availableToSellUg: available,
       weightedAverageCostIrrPerGram: wacPerGram,
       netPositionUg: platformFree + platformReserved - restricted,
+      note: "Inventory lots, custody, and customer metal liability are not implemented. Do not treat these figures as production treasury truth.",
     };
   }
 
@@ -327,7 +432,9 @@ export class FinancialCore {
       return { ...fresh, status: "EXPIRED" as const };
     };
     if (opts?.alreadyLocked) return run();
-    return this.deps.store.withLock(`quote:${quote.id}`, run);
+    return this.deps.store.withTransaction(() =>
+      this.deps.store.withAdvisoryLock(`quote:${quote.id}`, run)
+    );
   }
 
   async issueQuote(input: IssueQuoteInput): Promise<Quote> {
@@ -375,13 +482,21 @@ export class FinancialCore {
     }
 
     const execution = applySpread(price.irrPerGram, input.side, this.spread());
-    const requestedIrr = input.requestedIrr ?? 0n;
-    const requestedWeightUg = input.requestedWeightUg ?? 0n;
+    const requestedIrr =
+      input.inputMode === "RIAL_AMOUNT" ? (input.requestedIrr ?? null) : null;
+    const requestedWeightUg =
+      input.inputMode === "METAL_WEIGHT" ? (input.requestedWeightUg ?? null) : null;
+    if (input.inputMode === "RIAL_AMOUNT" && !(requestedIrr && requestedIrr > 0n)) {
+      throw new CoreError("invalid_amount", "RIAL_AMOUNT requires requestedIrr > 0");
+    }
+    if (input.inputMode === "METAL_WEIGHT" && !(requestedWeightUg && requestedWeightUg > 0n)) {
+      throw new CoreError("invalid_amount", "METAL_WEIGHT requires requestedWeightUg > 0");
+    }
     const computed = computeQuote({
       side: input.side,
       inputMode: input.inputMode,
-      requestedIrr,
-      requestedWeightUg,
+      requestedIrr: requestedIrr ?? 0n,
+      requestedWeightUg: requestedWeightUg ?? 0n,
       executionPriceIrrPerGram: execution,
       fees: this.fees(),
     });
@@ -437,10 +552,11 @@ export class FinancialCore {
     const lockKey =
       input.side === "BUY" ? `asset:${input.asset}:inventory` : `user:${input.userId}`;
 
-    return this.deps.store.withLock(lockKey, async () => {
+    return this.deps.store.withTransaction(async () => {
+      return this.deps.store.withAdvisoryLock(lockKey, async () => {
       if (input.side === "BUY") {
-        const tre = await this.treasury(input.asset);
-        if (tre.availableToSellUg < computed.weightUg) {
+        const available = await this.availableToSellUg(input.asset);
+        if (available < computed.weightUg) {
           throw new CoreError("insufficient_inventory", "Not enough metal available to sell", 409);
         }
         const rial = await getBalance(this.deps.store, input.userId, "USER_AVAILABLE", "IRR");
@@ -489,6 +605,7 @@ export class FinancialCore {
         lastError: null,
       });
       return quote;
+      });
     });
   }
 
@@ -500,15 +617,50 @@ export class FinancialCore {
     await this.bootstrap();
     await ensureUserAccounts(this.deps.store, input.userId);
 
-    return this.deps.store.withLock(`user:${input.userId}`, async () => {
-      const existing = await this.deps.store.getIdempotency(input.userId, input.idempotencyKey);
-      if (existing?.status === "COMPLETED" && existing.responseJson) {
-        const parsed = JSON.parse(existing.responseJson) as { tradeId: string };
-        const t = await this.deps.store.getTrade(parsed.tradeId);
-        if (t) return t;
+    const requestHash = hashPayload({
+      operation: "TRADE_EXECUTE",
+      quoteId: input.quoteId,
+    });
+
+    return this.deps.store.withTransaction(async () => {
+      const claim = await this.deps.store.claimIdempotency({
+        key: input.idempotencyKey,
+        userId: input.userId,
+        operation: "TRADE_EXECUTE",
+        method: "POST",
+        path: "/api/core/trades",
+        requestHash,
+        responseJson: null,
+        status: "IN_PROGRESS",
+        createdAt: this.now().toISOString(),
+      });
+      if (claim.kind === "conflict") {
+        throw new CoreError(
+          "idempotency_conflict",
+          "Idempotency key reused with a different request",
+          409
+        );
+      }
+      if (claim.kind === "in_progress") {
+        throw new CoreError(
+          "idempotency_in_progress",
+          "Request is already in progress",
+          409
+        );
+      }
+      if (claim.kind === "replay") {
+        const parsed = claim.record.responseJson
+          ? (JSON.parse(claim.record.responseJson) as { tradeId: string })
+          : null;
+        if (parsed?.tradeId) {
+          const t = await this.deps.store.getTrade(parsed.tradeId);
+          if (t) return t;
+        }
+        throw new CoreError("internal", "Idempotent trade missing", 500);
       }
 
-      return this.deps.store.withLock(`quote:${input.quoteId}`, async () => {
+      return this.deps.store.withAdvisoryLock(`user:${input.userId}`, async () => {
+      return this.deps.store.withAdvisoryLock(`quote:${input.quoteId}`, async () => {
       const quote0 = await this.deps.store.getQuote(input.quoteId);
       if (!quote0) throw new CoreError("not_found", "Quote not found", 404);
       if (quote0.userId !== input.userId) {
@@ -577,9 +729,10 @@ export class FinancialCore {
         await this.deps.store.putIdempotency({
           key: input.idempotencyKey,
           userId: input.userId,
+          operation: "TRADE_EXECUTE",
           method: "POST",
           path: "/api/core/trades",
-          requestHash: hashPayload({ quoteId: input.quoteId }),
+          requestHash,
           responseJson: JSON.stringify({ tradeId: settled.id }),
           status: "COMPLETED",
           createdAt,
@@ -597,6 +750,7 @@ export class FinancialCore {
         }
         throw err;
       }
+    });
     });
     });
   }
