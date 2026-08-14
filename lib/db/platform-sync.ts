@@ -197,7 +197,7 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
   };
 }
 
-export async function persistWallet(input: {
+export async function persistWallet(_input: {
   goldMg: number;
   silverMg: number;
   copperMg: number;
@@ -207,45 +207,8 @@ export async function persistWallet(input: {
   avgBuyPriceSilverRial: number;
   avgBuyPriceCopperRial: number;
 }) {
-  const auth = await authedClient();
-  if (!auth) return;
-
-  const base = {
-    user_id: auth.user.id,
-    gold_mg: input.goldMg,
-    toman_available: input.rialAvailable,
-    toman_pending: input.rialPending,
-    avg_buy_price_toman: input.avgBuyPriceRial,
-    updated_at: new Date().toISOString(),
-  };
-  const multi = {
-    ...base,
-    silver_mg: input.silverMg,
-    copper_mg: input.copperMg,
-    avg_buy_price_silver_toman: input.avgBuyPriceSilverRial,
-    avg_buy_price_copper_toman: input.avgBuyPriceCopperRial,
-  };
-
-  let { error } = await auth.supabase
-    .from("wallets")
-    .upsert(multi, { onConflict: "user_id" });
-
-  // Migration may not be applied yet — fall back to gold-only columns.
-  if (error) {
-    const msg = error.message.toLowerCase();
-    if (
-      msg.includes("silver_mg") ||
-      msg.includes("copper_mg") ||
-      msg.includes("avg_buy_price_silver") ||
-      msg.includes("avg_buy_price_copper") ||
-      msg.includes("schema cache")
-    ) {
-      ({ error } = await auth.supabase
-        .from("wallets")
-        .upsert(base, { onConflict: "user_id" }));
-    }
-  }
-  if (error) console.error("persistWallet", error.message);
+  // Ledger is the only wallet authority. Client/app must not upsert balances.
+  return;
 }
 
 export async function persistTransaction(tx: DemoTransaction) {

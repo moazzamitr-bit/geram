@@ -32,9 +32,9 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentMeta> = {
   silver925: {
     id: "silver925",
     label: "نقره",
-    title: "نقره ۹۲۵",
+    title: "نقره ۹۹۹",
     unitLabel: "گرم",
-    sourceHint: "بازار آزاد · TGJU silver_925",
+    sourceHint: "بازار آزاد · TGJU silver_999",
     minBuyToman: 200_000,
     fallbackPriceToman: 384_000,
     accent: "#C0C7D1",

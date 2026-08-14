@@ -83,13 +83,15 @@ function BuyPageInner() {
     }
     setLoading(true);
     setTimeout(() => {
-      const res = store.buyMetal(instrument, rial);
-      setLoading(false);
-      if (!res.ok) {
-        setError(res.error ?? "خطا در خرید");
-        return;
-      }
-      setDoneTx(res.txId ?? null);
+      void (async () => {
+        const res = await store.buyMetal(instrument, rial);
+        setLoading(false);
+        if (!res.ok) {
+          setError(res.error ?? "خطا در خرید");
+          return;
+        }
+        setDoneTx(res.txId ?? null);
+      })();
     }, 700);
   };
 

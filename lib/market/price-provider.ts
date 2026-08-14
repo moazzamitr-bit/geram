@@ -205,8 +205,8 @@ function buildQuote(
   }
 
   if (instrument === "silver925") {
-    const picked = pickRow(current, ["silver_925", "silver_999"]);
-    if (!picked) throw new Error("TGJU silver instrument missing");
+    const picked = pickRow(current, ["silver_999"]);
+    if (!picked) throw new Error("TGJU silver_999 instrument missing");
     return quoteFromRialRow({
       instrument,
       picked,

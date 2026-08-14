@@ -73,13 +73,15 @@ function SellPageInner() {
     setError("");
     setLoading(true);
     setTimeout(() => {
-      const res = store.sellMetal(instrument, metalMg, dest);
-      setLoading(false);
-      if (!res.ok) {
-        setError(res.error ?? "خطا");
-        return;
-      }
-      setDoneTx(res.txId ?? null);
+      void (async () => {
+        const res = await store.sellMetal(instrument, metalMg, dest);
+        setLoading(false);
+        if (!res.ok) {
+          setError(res.error ?? "خطا");
+          return;
+        }
+        setDoneTx(res.txId ?? null);
+      })();
     }, 700);
   };
 
