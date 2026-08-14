@@ -1,16 +1,15 @@
 import {
   AdminBadge,
+  AdminNotice,
   AdminPageHeader,
   AdminStatCard,
-  AdminTable,
+  OpsBadge,
 } from "@/components/admin/AdminUI";
-import {
-  getAdminOverview,
-  listTransactions,
-} from "@/lib/db/admin-queries";
+import { loadDashboardOps, metricText } from "@/lib/admin/ops";
 import { formatToman } from "@/lib/utils";
 import {
-  Headphones,
+  Activity,
+  AlertTriangle,
   Landmark,
   LineChart,
   ShieldAlert,
@@ -19,122 +18,127 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+function Card({
+  label,
+  metric,
+  icon,
+  format,
+  tone,
+}: {
+  label: string;
+  metric: { kind: "value"; value: number | string } | { kind: "unavailable"; reason?: string };
+  icon: typeof Users;
+  format?: (n: number) => string;
+  tone?: "default" | "gold" | "positive" | "warning";
+}) {
+  if (metric.kind === "unavailable") {
+    return (
+      <AdminStatCard
+        label={label}
+        value=""
+        unavailable
+        hint={metric.reason}
+        icon={icon}
+        tone="warning"
+      />
+    );
+  }
+  const raw = metric.value;
+  const display =
+    typeof raw === "number" && format ? format(raw) : typeof raw === "number" ? raw.toLocaleString("fa-IR") : String(raw);
+  return <AdminStatCard label={label} value={display} icon={icon} tone={tone} />;
+}
+
 export default async function AdminDashboardPage() {
-  const overview = await getAdminOverview();
-  const txs = await listTransactions(8);
+  const ops = await loadDashboardOps();
 
   return (
     <div>
       <AdminPageHeader
         title="داشبورد عملیات"
-        description="نمای کلی کاربران، دارایی‌ها، تراکنش‌ها و وضعیت بازار از سوپابیس."
+        description="شاخص‌های واقعی از سوپابیس. مقادیر دفترکل/خزانه/PSP اگر پیاده نشده باشند نمایش داده نمی‌شوند."
         action={
-          <AdminBadge tone={overview.connected ? "positive" : "warning"}>
-            {overview.connected ? "متصل به سوپابیس" : "بدون اتصال DB"}
-          </AdminBadge>
+          <div className="flex flex-wrap gap-2">
+            <AdminBadge tone={ops.connected ? "positive" : "warning"}>
+              {ops.connected ? "سوپابیس متصل" : "بدون DB"}
+            </AdminBadge>
+            {ops.mode ? <OpsBadge state={ops.mode === "PRODUCTION" ? "LIVE" : "SANDBOX"} /> : (
+              <AdminBadge tone="warning">MODE نامشخص</AdminBadge>
+            )}
+          </div>
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <AdminStatCard
-          label="کاربران"
-          value={overview.users.toLocaleString("fa-IR")}
-          icon={Users}
-        />
-        <AdminStatCard
-          label="تراکنش‌ها"
-          value={overview.transactions.toLocaleString("fa-IR")}
-          icon={Landmark}
-          tone="gold"
-        />
-        <AdminStatCard
-          label="تیکت‌های باز"
-          value={overview.openTickets.toLocaleString("fa-IR")}
-          icon={Headphones}
-          tone="warning"
-        />
-        <AdminStatCard
-          label="طلای کل مشتریان"
-          value={`${(overview.goldMg / 1000).toLocaleString("fa-IR", {
-            maximumFractionDigits: 3,
-          })} گرم`}
-          icon={Wallet}
-        />
-        <AdminStatCard
-          label="موجودی ریالی کیف‌ها"
-          value={formatToman(overview.tomanAvailable)}
-          icon={Wallet}
-          tone="positive"
-        />
-        <AdminStatCard
-          label="KYC در انتظار"
-          value={overview.pendingKyc.toLocaleString("fa-IR")}
-          icon={ShieldAlert}
-          tone="warning"
-        />
+      {!ops.connected ? (
+        <AdminNotice title="اتصال دیتابیس برقرار نیست">
+          کارت‌ها صفر جعلی نشان نمی‌دهند. پس از اتصال سوپابیس داده‌های واقعی می‌آیند.
+        </AdminNotice>
+      ) : null}
+
+      <h2 className="mb-3 text-[14px] font-bold text-white/70">مشتریان</h2>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card label="کل کاربران" metric={ops.connected ? ops.customers.total : { kind: "unavailable" }} icon={Users} />
+        <Card label="KYC تأییدشده" metric={ops.connected ? ops.customers.kycVerified : { kind: "unavailable" }} icon={Users} tone="positive" />
+        <Card label="KYC در انتظار" metric={ops.connected ? ops.customers.kycPending : { kind: "unavailable" }} icon={ShieldAlert} tone="warning" />
+        <Card label="رد / نیاز به اصلاح" metric={ops.connected ? ops.customers.kycRejected : { kind: "unavailable" }} icon={ShieldAlert} tone="warning" />
+        <Card label="کاربر جدید امروز" metric={ops.connected ? ops.customers.newToday : { kind: "unavailable" }} icon={Users} />
+        <Card label="۷ روز" metric={ops.connected ? ops.customers.new7 : { kind: "unavailable" }} icon={Users} />
+        <Card label="۳۰ روز" metric={ops.connected ? ops.customers.new30 : { kind: "unavailable" }} icon={Users} />
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5 lg:col-span-1">
-          <div className="flex items-center justify-between">
-            <h2 className="font-bold">قیمت طلای ۱۸</h2>
-            <LineChart size={18} className="text-gold" />
-          </div>
-          <p className="mt-4 text-[28px] font-extrabold tabular-nums text-gold">
-            {overview.latestPrice != null
-              ? formatToman(overview.latestPrice)
-              : "—"}
-          </p>
-          <Link href="/admin/market" className="mt-4 inline-block text-[13px] text-gold">
-            مدیریت بازار
-          </Link>
-        </div>
-        <div className="lg:col-span-2">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-bold">آخرین تراکنش‌ها</h2>
-            <Link href="/admin/transactions" className="text-[13px] text-gold">
-              همه
-            </Link>
-          </div>
-          <AdminTable
-            headers={["نوع", "کاربر", "مبلغ", "وضعیت", "تاریخ"]}
-            empty={txs.length === 0}
-          >
-            {txs.map((tx) => {
-              const profile = Array.isArray(tx.profiles)
-                ? tx.profiles[0]
-                : tx.profiles;
-              return (
-                <tr key={tx.id} className="border-b border-white/5 last:border-0">
-                  <td className="px-4 py-3.5 md:px-5">{tx.type}</td>
-                  <td className="px-4 py-3.5 text-white/60 md:px-5">
-                    {profile
-                      ? `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() ||
-                        profile.phone
-                      : "—"}
-                  </td>
-                  <td className="px-4 py-3.5 tabular-nums md:px-5">
-                    {formatToman(Number(tx.amount_toman))}
-                  </td>
-                  <td className="px-4 py-3.5 md:px-5">
-                    <AdminBadge
-                      tone={
-                        String(tx.status).includes("انتظار")
-                          ? "warning"
-                          : "positive"
-                      }
-                    >
-                      {tx.status}
-                    </AdminBadge>
-                  </td>
-                  <td className="px-4 py-3.5 text-white/45 md:px-5">
-                    {new Date(tx.created_at).toLocaleString("fa-IR")}
-                  </td>
-                </tr>
-              );
-            })}
-          </AdminTable>
-        </div>
+      <h2 className="mb-3 mt-8 text-[14px] font-bold text-white/70">معاملات (دفتر میراث transactions)</h2>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card label="معامله امروز" metric={ops.connected ? ops.trading.tradesToday : { kind: "unavailable" }} icon={Landmark} tone="gold" />
+        <Card label="حجم خرید امروز" metric={ops.connected ? ops.trading.buyVolumeToman : { kind: "unavailable" }} icon={Landmark} format={formatToman} />
+        <Card label="حجم فروش امروز" metric={ops.connected ? ops.trading.sellVolumeToman : { kind: "unavailable" }} icon={Landmark} format={formatToman} />
+        <Card label="حجم طلا امروز" metric={ops.connected ? ops.trading.goldVolumeMg : { kind: "unavailable" }} icon={Wallet} format={(n) => `${(n / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم`} />
+        <Card label="حجم نقره امروز" metric={ops.connected ? ops.trading.silverVolumeMg : { kind: "unavailable" }} icon={Wallet} format={(n) => `${(n / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم`} />
+        <Card label="حجم مس امروز" metric={ops.connected ? ops.trading.copperVolumeMg : { kind: "unavailable" }} icon={Wallet} format={(n) => `${(n / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم`} />
+        <Card label="معاملات ناموفق" metric={ops.connected ? ops.trading.failedTrades : { kind: "unavailable" }} icon={AlertTriangle} tone="warning" />
+        <Card label="نقل‌قول منقضی" metric={ops.connected ? ops.trading.expiredQuotes : { kind: "unavailable" }} icon={AlertTriangle} />
+      </div>
+
+      <h2 className="mb-3 mt-8 text-[14px] font-bold text-white/70">پول</h2>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Card label="بدهی IRR مشتری (دفترکل)" metric={ops.connected ? ops.money.userIrrLiability : { kind: "unavailable" }} icon={Wallet} />
+        <Card label="تومان دفتری wallets (میراث)" metric={ops.connected ? ops.money.legacyTomanBook : { kind: "unavailable" }} icon={Wallet} format={formatToman} tone="positive" />
+        <Card label="تومان در انتظار" metric={ops.connected ? ops.money.pendingDeposits : { kind: "unavailable" }} icon={Wallet} format={formatToman} tone="warning" />
+        <Card label="PSP clearing" metric={ops.connected ? ops.money.pspClearing : { kind: "unavailable" }} icon={Landmark} />
+        <Card label="تسویه بانک" metric={ops.connected ? ops.money.bankSettlement : { kind: "unavailable" }} icon={Landmark} />
+        <Card label="کنترل نقد داخلی" metric={ops.connected ? ops.money.controlledCash : { kind: "unavailable" }} icon={Wallet} />
+      </div>
+
+      <h2 className="mb-3 mt-8 text-[14px] font-bold text-white/70">فلزات</h2>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Card label="طلای دفتری wallets" metric={ops.connected ? ops.metals.customerGoldBookMg : { kind: "unavailable" }} icon={Wallet} format={(n) => `${(n / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم`} tone="gold" />
+        <Card label="نقره دفتری wallets" metric={ops.connected ? ops.metals.customerSilverBookMg : { kind: "unavailable" }} icon={Wallet} format={(n) => `${(n / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم`} />
+        <Card label="مس دفتری wallets" metric={ops.connected ? ops.metals.customerCopperBookMg : { kind: "unavailable" }} icon={Wallet} format={(n) => `${(n / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم`} />
+        <Card label="بدهی فلز مشتری (ledger)" metric={ops.connected ? ops.metals.customerGoldLiability : { kind: "unavailable" }} icon={AlertTriangle} />
+        <Card label="موجودی خزانه قابل فروش" metric={ops.connected ? ops.metals.availableTreasury : { kind: "unavailable" }} icon={Wallet} />
+        <Card label="پوشش حضانت" metric={ops.connected ? ops.metals.custodyCoverage : { kind: "unavailable" }} icon={ShieldAlert} />
+      </div>
+
+      <h2 className="mb-3 mt-8 text-[14px] font-bold text-white/70">عملیات</h2>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Card label="عدم تطبیق باز" metric={ops.connected ? ops.operations.reconMismatches : { kind: "unavailable" }} icon={Activity} />
+        <Card label="حوادث باز" metric={ops.connected ? ops.operations.openIncidents : { kind: "unavailable" }} icon={AlertTriangle} />
+        <Card label="خطای provider" metric={ops.connected ? ops.operations.failedProviderCalls : { kind: "unavailable" }} icon={Activity} />
+        <Card label="صف outbox" metric={ops.connected ? ops.operations.outboxBacklog : { kind: "unavailable" }} icon={Activity} />
+        <Card label="قیمت کهنه" metric={ops.connected ? ops.operations.stalePrices : { kind: "unavailable" }} icon={LineChart} tone="warning" />
+        <Card label="تیکت باز" metric={ops.connected ? ops.operations.openTickets : { kind: "unavailable" }} icon={Users} tone="warning" />
+      </div>
+
+      {ops.connected && ops.operations.killSwitchesOff.length > 0 ? (
+        <p className="mt-4 text-[13px] text-warning">
+          کلیدهای خاموش: {ops.operations.killSwitchesOff.join("، ")}
+        </p>
+      ) : null}
+
+      <div className="mt-8 flex flex-wrap gap-3 text-[13px]">
+        <Link className="text-gold" href="/admin/readiness">آمادگی انتشار</Link>
+        <Link className="text-gold" href="/admin/health">سلامت عملیات</Link>
+        <Link className="text-gold" href="/admin/kyc">صف KYC</Link>
+        <Link className="text-gold" href="/admin/trades">معاملات</Link>
       </div>
     </div>
   );

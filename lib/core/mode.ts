@@ -23,6 +23,18 @@ export type KillSwitches = {
   COPPER_SELL_ENABLED: boolean;
 };
 
+export const KILL_SWITCH_KEYS: (keyof KillSwitches)[] = [
+  "TRADING_ENABLED",
+  "DEPOSIT_ENABLED",
+  "WITHDRAWAL_ENABLED",
+  "GOLD_BUY_ENABLED",
+  "GOLD_SELL_ENABLED",
+  "SILVER_BUY_ENABLED",
+  "SILVER_SELL_ENABLED",
+  "COPPER_BUY_ENABLED",
+  "COPPER_SELL_ENABLED",
+];
+
 export const DEFAULT_KILLS: KillSwitches = {
   TRADING_ENABLED: true,
   DEPOSIT_ENABLED: true,

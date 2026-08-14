@@ -1,9 +1,9 @@
 "use client";
 
 import { BrandLogo } from "@/components/brand/BrandLogo";
-import { adminNav } from "@/lib/admin/navigation";
+import { adminNavGroups } from "@/lib/admin/navigation";
 import { cn } from "@/lib/utils";
-import { LogOut, Menu, X } from "lucide-react";
+import { LogOut, Menu, Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -12,13 +12,16 @@ import { createClient } from "@/lib/supabase/client";
 export function AdminShell({
   children,
   adminName,
+  roleLabel,
 }: {
   children: React.ReactNode;
   adminName?: string;
+  roleLabel?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
 
   const logout = async () => {
     try {
@@ -29,6 +32,14 @@ export function AdminShell({
     }
     router.replace("/admin/login");
     router.refresh();
+  };
+
+  const submitSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = q.trim();
+    if (!query) return;
+    router.push(`/admin/search?q=${encodeURIComponent(query)}`);
+    setOpen(false);
   };
 
   return (
@@ -59,31 +70,40 @@ export function AdminShell({
             <X size={18} />
           </button>
         </div>
-        <p className="px-5 pb-3 text-[11px] text-white/40">پنل مدیریت گرم</p>
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
-          {adminNav.map((item) => {
-            const active =
-              item.href === "/admin"
-                ? pathname === "/admin"
-                : pathname.startsWith(item.href);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] transition",
-                  active
-                    ? "bg-gold/15 text-gold"
-                    : "text-white/65 hover:bg-white/[0.04] hover:text-white"
-                )}
-              >
-                <Icon size={18} strokeWidth={1.7} />
-                {item.label}
-              </Link>
-            );
-          })}
+        <p className="px-5 pb-3 text-[11px] text-white/40">کنسول عملیات گرم</p>
+        <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
+          {adminNavGroups.map((group) => (
+            <div key={group.id}>
+              <p className="mb-1 px-3 text-[10px] font-bold tracking-wide text-white/35">
+                {group.label}
+              </p>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const active =
+                    item.href === "/admin"
+                      ? pathname === "/admin"
+                      : pathname.startsWith(item.href);
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-[13px] transition",
+                        active
+                          ? "bg-gold/15 text-gold"
+                          : "text-white/65 hover:bg-white/[0.04] hover:text-white"
+                      )}
+                    >
+                      <Icon size={16} strokeWidth={1.7} />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
         <div className="border-t border-white/10 p-3">
           <button
@@ -98,8 +118,8 @@ export function AdminShell({
       </aside>
 
       <div className="lg:mr-[280px]">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-[#070B12]/90 px-4 backdrop-blur md:px-6">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-white/10 bg-[#070B12]/90 px-4 backdrop-blur md:px-6">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 lg:hidden"
@@ -108,18 +128,28 @@ export function AdminShell({
             >
               <Menu size={18} />
             </button>
-            <div>
+            <div className="min-w-0">
               <p className="text-[15px] font-bold">مدیریت گرم</p>
-              <p className="text-[12px] text-white/45">Supabase · کنترل عملیات</p>
+              <p className="truncate text-[12px] text-white/45">RTL · عملیات چنددارایی</p>
             </div>
           </div>
+          <form onSubmit={submitSearch} className="hidden max-w-md flex-1 md:block">
+            <label className="relative block">
+              <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/35" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="جستجو: کد پیگیری، user id، تیکت…"
+                className="h-10 w-full rounded-xl border border-white/10 bg-[#0B1220] pr-9 pl-3 text-[12px] outline-none focus:border-gold"
+              />
+            </label>
+          </form>
           <div className="rounded-full border border-white/10 px-3 py-1.5 text-[12px] text-white/70">
             {adminName || "ادمین"}
+            {roleLabel ? <span className="text-white/40"> · {roleLabel}</span> : null}
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1400px] p-4 md:p-6 lg:p-8">
-          {children}
-        </main>
+        <main className="mx-auto w-full max-w-[1400px] p-4 md:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

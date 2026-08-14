@@ -31,5 +31,9 @@ export default async function AdminDashboardLayout({
     auth.profile.email ||
     "ادمین";
 
-  return <AdminShell adminName={name}>{children}</AdminShell>;
+  return (
+    <AdminShell adminName={name} roleLabel={auth.profile.role === "admin" ? "SUPER_ADMIN" : auth.profile.role}>
+      {children}
+    </AdminShell>
+  );
 }

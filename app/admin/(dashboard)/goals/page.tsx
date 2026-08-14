@@ -1,16 +1,25 @@
-import { AdminPageHeader, AdminTable } from "@/components/admin/AdminUI";
+import { AdminNotice, AdminPageHeader, AdminTable, OpsBadge } from "@/components/admin/AdminUI";
 import { listGoals } from "@/lib/db/admin-queries";
 import { formatToman } from "@/lib/utils";
+import { getExecutionMode, getFeatureFlags } from "@/lib/core/mode";
 
 export default async function AdminGoalsPage() {
   const rows = await listGoals(100);
+  let enabled = false;
+  try {
+    enabled = getFeatureFlags(getExecutionMode()).GOALS_ENABLED;
+  } catch {
+    enabled = false;
+  }
 
   return (
     <div>
       <AdminPageHeader
         title="اهداف پس‌انداز"
-        description="اهداف پس‌انداز کاربران و پیشرفت آن‌ها."
+        description="نمایش عملیاتی. اجرای مالی جدا از این صفحه است."
       />
+      <OpsBadge state={enabled ? "SANDBOX" : "NOT_READY"} />
+      <AdminNotice title="GOALS_ENABLED">{String(enabled)}</AdminNotice>
       <AdminTable
         headers={["عنوان", "کاربر", "هدف", "پیشرفت", "ماهانه"]}
         empty={rows.length === 0}
