@@ -2,80 +2,79 @@
 
 import { GoldIcon } from "@/components/ui/GoldIcon";
 import { features } from "@/lib/data";
-import { cn } from "@/lib/utils";
-import { ArrowUpLeft } from "lucide-react";
+import { prefersReducedMotion } from "@/lib/motion";
+import { useEffect, useRef } from "react";
 
 export function FeatureGrid() {
+  const rootRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    let ctx: { revert: () => void } | undefined;
+    const run = async () => {
+      if (!rootRef.current || prefersReducedMotion()) return;
+      const gsap = (await import("gsap")).default;
+      const { ScrollTrigger } = await import("gsap/ScrollTrigger");
+      gsap.registerPlugin(ScrollTrigger);
+
+      ctx = gsap.context(() => {
+        gsap.fromTo(
+          rootRef.current!.querySelectorAll("[data-feature]"),
+          { opacity: 0, y: 24 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            stagger: 0.08,
+            ease: "power2.out",
+            scrollTrigger: {
+              trigger: rootRef.current,
+              start: "top 78%",
+            },
+          }
+        );
+      }, rootRef);
+    };
+    void run();
+    return () => ctx?.revert();
+  }, []);
+
   return (
     <section
       id="features"
-      className="relative z-20 -mt-[60px] pb-6"
+      ref={rootRef}
+      className="relative scroll-mt-[84px] py-16 md:py-20"
       aria-label="امکانات"
     >
       <div className="container-site">
-        <div className="overflow-hidden rounded-[24px] border border-white/[0.07] bg-card-elevated shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
-          <ul className="flex snap-x snap-mandatory overflow-x-auto scrollbar-none lg:grid lg:grid-cols-5 lg:overflow-visible">
-            {features.map((feature, i) => (
-              <FeatureItem
-                key={feature.id}
-                feature={feature}
-                className={cn(
-                  "min-w-[78%] snap-center border-l border-white/[0.06] sm:min-w-[46%] lg:min-w-0",
-                  i === features.length - 1 && "border-l-0 lg:border-l-0"
-                )}
-              />
-            ))}
-          </ul>
+        <div className="max-w-xl">
+          <p className="text-[12px] font-medium text-gold">چرا گرم</p>
+          <h2 className="mt-2 text-[28px] font-extrabold leading-[1.45] text-text md:text-[34px]">
+            سه فلز، یک تجربه
+            <br />
+            برای سرمایه‌گذاری واقعی
+          </h2>
+          <p className="mt-3 text-[14px] leading-7 text-text-secondary md:text-[15px]">
+            قیمت لایو، کارمزد شفاف، بدون اجرت — به‌همراه اهداف، خرید دوره‌ای و
+            تحویل فیزیکی.
+          </p>
         </div>
+
+        <ul className="mt-12 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((feature) => (
+            <li key={feature.id} data-feature className="group">
+              <span className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-full border border-gold/25 bg-gold/[0.05] transition-shadow duration-250 group-hover:shadow-[0_0_24px_rgba(214,168,75,0.2)]">
+                <GoldIcon name={feature.icon} size={20} />
+              </span>
+              <h3 className="text-[18px] font-bold text-text transition-colors group-hover:text-gold md:text-[19px]">
+                {feature.title}
+              </h3>
+              <p className="mt-2 max-w-sm text-[13px] leading-7 text-text-secondary">
+                {feature.description}
+              </p>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
-  );
-}
-
-function FeatureItem({
-  feature,
-  className,
-}: {
-  feature: (typeof features)[number];
-  className?: string;
-}) {
-  return (
-    <li
-      className={cn(
-        "group relative flex flex-col px-6 py-8 transition-all duration-250",
-        className
-      )}
-    >
-      <div
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-250 group-hover:opacity-100"
-        style={{
-          background:
-            "radial-gradient(circle at 50% 0%, rgba(214,168,75,0.08), transparent 65%)",
-        }}
-      />
-
-      <span className="relative mb-5 inline-flex h-11 w-11 items-center justify-center rounded-full border border-gold/25 bg-gold/[0.05] transition-shadow duration-250 group-hover:shadow-[0_0_24px_rgba(214,168,75,0.25)]">
-        <GoldIcon
-          name={feature.icon}
-          size={20}
-          className="transition-transform duration-250 group-hover:scale-105"
-        />
-      </span>
-
-      <h3 className="relative text-[18px] font-bold text-text transition-colors duration-250 group-hover:text-gold md:text-[20px]">
-        {feature.title}
-      </h3>
-      <p className="relative mt-3 flex-1 text-[13px] leading-7 text-text-secondary">
-        {feature.description}
-      </p>
-
-      <button
-        type="button"
-        aria-label={`جزئیات ${feature.title}`}
-        className="relative mt-6 flex h-9 w-9 items-center justify-center rounded-full border border-white/[0.08] text-text-secondary transition-all duration-250 group-hover:border-gold/35 group-hover:text-gold group-hover:-translate-x-1"
-      >
-        <ArrowUpLeft size={15} strokeWidth={1.75} />
-      </button>
-    </li>
   );
 }

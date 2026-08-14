@@ -1,10 +1,12 @@
 import {
   AdminBadge,
+  AdminNotice,
   AdminPageHeader,
   AdminTable,
 } from "@/components/admin/AdminUI";
 import { listTransactions } from "@/lib/db/admin-queries";
 import { formatToman } from "@/lib/utils";
+import Link from "next/link";
 
 export default async function AdminTransactionsPage() {
   const rows = await listTransactions(100);
@@ -13,8 +15,9 @@ export default async function AdminTransactionsPage() {
     <div>
       <AdminPageHeader
         title="تراکنش‌ها"
-        description="همه خرید، فروش، واریز، برداشت و تحویل."
+        description="فهرست میراث. برای معامله از صفحه Trades و برای دفترکل از Ledger استفاده کنید."
       />
+      <AdminNotice title="منبع">جدول transactions — نه core_journals.</AdminNotice>
       <AdminTable
         headers={["کد", "نوع", "کاربر", "طلا", "مبلغ", "وضعیت", "زمان"]}
         empty={rows.length === 0}
@@ -24,7 +27,7 @@ export default async function AdminTransactionsPage() {
           return (
             <tr key={tx.id} className="border-b border-white/5 last:border-0">
               <td className="px-4 py-3.5 font-mono text-[12px] md:px-5" dir="ltr">
-                {tx.tracking_code}
+                <Link className="text-gold" href={`/admin/trades/${tx.id}`}>{tx.tracking_code}</Link>
               </td>
               <td className="px-4 py-3.5 md:px-5">{tx.type}</td>
               <td className="px-4 py-3.5 text-white/60 md:px-5">

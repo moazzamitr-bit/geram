@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/app/StatusBadge";
 import { Timeline } from "@/components/app/Timeline";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
+import { instrumentLabel, type InstrumentId } from "@/lib/market/instruments";
 import { formatToman } from "@/lib/utils";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -24,10 +25,12 @@ export default function TransactionDetailPage() {
     );
   }
 
+  const metal = instrumentLabel((tx.instrument as InstrumentId) ?? "gold18");
+
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <PageHeader
-        title={`${tx.type} — جزئیات`}
+        title={`${tx.type} ${metal} — جزئیات`}
         backHref="/app/transactions"
         action={<SimulationBadge />}
       />
@@ -40,8 +43,12 @@ export default function TransactionDetailPage() {
         <dl className="mt-5 space-y-3 text-[13px]">
           <Row label="شناسه تراکنش" value={tx.id} />
           <Row label="کد رهگیری" value={tx.trackingCode} />
+          <Row label="فلز" value={metal} />
           <Row label="قیمت هر گرم" value={formatToman(tx.pricePerGram)} />
-          <Row label="مقدار طلا" value={tx.goldMg ? `${mgToGramsLabel(tx.goldMg)} گرم` : "—"} />
+          <Row
+            label={`مقدار ${metal}`}
+            value={tx.goldMg ? `${mgToGramsLabel(tx.goldMg)} گرم` : "—"}
+          />
           <Row label="مبلغ ناخالص/پرداختی" value={formatToman(tx.amountRial)} />
           <Row label="کارمزد" value={formatToman(tx.feeRial)} />
           {tx.paymentRef && <Row label="مرجع پرداخت" value={tx.paymentRef} />}

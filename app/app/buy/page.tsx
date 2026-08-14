@@ -1,27 +1,54 @@
 "use client";
 
 import { AppCard } from "@/components/app/AppCard";
+import { InstrumentTabs } from "@/components/app/InstrumentTabs";
 import { PageHeader } from "@/components/app/PageHeader";
 import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { TradeSuccessSheet } from "@/components/app/TradeSuccessSheet";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { buyQuote } from "@/lib/commerce/fees";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
+import {
+  INSTRUMENTS,
+  type InstrumentId,
+  parseInstrumentId,
+} from "@/lib/market/instruments";
 import { formatToman } from "@/lib/utils";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 const QUICK = [500_000, 1_000_000, 5_000_000];
 
 export default function BuyPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-2xl p-6 text-muted-app">در حال بارگذاری...</div>}>
+      <BuyPageInner />
+    </Suspense>
+  );
+}
+
+function BuyPageInner() {
   const store = useDemoStore();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [instrument, setInstrument] = useState<InstrumentId>(() =>
+    parseInstrumentId(searchParams.get("instrument"))
+  );
   const [rial, setRial] = useState(10_000_000);
   const [seconds, setSeconds] = useState(30);
   const [checked, setChecked] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [doneTx, setDoneTx] = useState<string | null>(null);
+
+  const meta = INSTRUMENTS[instrument];
+  const price = store.getMarketPrice(instrument);
+  const quoteMeta = store.marketQuotes[instrument];
+
+  useEffect(() => {
+    const fromUrl = parseInstrumentId(searchParams.get("instrument"));
+    setInstrument(fromUrl);
+  }, [searchParams]);
 
   useEffect(() => {
     if (doneTx) return;
@@ -30,13 +57,8 @@ export default function BuyPage() {
   }, [doneTx]);
 
   const quote = useMemo(() => {
-    return buyQuote(
-      rial,
-      store.marketPriceRial,
-      store.plusActive,
-      store.commerceSettings
-    );
-  }, [rial, store.marketPriceRial, store.plusActive, store.commerceSettings]);
+    return buyQuote(rial, price, store.plusActive, store.commerceSettings);
+  }, [rial, price, store.plusActive, store.commerceSettings]);
 
   const done = store.transactions.find((t) => t.id === doneTx);
 
@@ -44,6 +66,13 @@ export default function BuyPage() {
     setDoneTx(null);
     setChecked(false);
     setSeconds(30);
+  };
+
+  const onInstrumentChange = (id: InstrumentId) => {
+    setInstrument(id);
+    setChecked(false);
+    setError("");
+    router.replace(`/app/buy?instrument=${id}`);
   };
 
   const onConfirm = () => {
@@ -54,13 +83,15 @@ export default function BuyPage() {
     }
     setLoading(true);
     setTimeout(() => {
-      const res = store.buyGold(rial);
-      setLoading(false);
-      if (!res.ok) {
-        setError(res.error ?? "خطا در خرید");
-        return;
-      }
-      setDoneTx(res.txId ?? null);
+      void (async () => {
+        const res = await store.buyMetal(instrument, rial);
+        setLoading(false);
+        if (!res.ok) {
+          setError(res.error ?? "خطا در خرید");
+          return;
+        }
+        setDoneTx(res.txId ?? null);
+      })();
     }, 700);
   };
 
@@ -69,7 +100,7 @@ export default function BuyPage() {
       <TradeSuccessSheet
         open={Boolean(doneTx && done)}
         title="خرید انجام شد"
-        subtitle="طلا پس از کسر کارمزد به دارایی شما اضافه شد."
+        subtitle={`${meta.label} پس از کسر کارمزد به دارایی شما اضافه شد.`}
         goldLabel={done ? `${mgToGramsLabel(done.goldMg)} گرم` : undefined}
         amountLabel={done ? formatToman(done.amountRial) : undefined}
         feeLabel={done ? formatToman(done.feeRial) : undefined}
@@ -82,19 +113,25 @@ export default function BuyPage() {
       />
 
       <PageHeader
-        title="خرید طلا"
-        description="قیمت، کارمزد و مقدار نهایی قبل از تأیید به‌صورت شفاف نمایش داده می‌شود."
+        title={`خرید ${meta.label}`}
+        description="طلا، نقره و مس — قیمت و کارمزد شفاف قبل از تأیید."
         action={<SimulationBadge />}
       />
 
       <div className="space-y-5">
         <AppCard>
-          <div className="flex items-center justify-between text-[13px]">
+          <InstrumentTabs value={instrument} onChange={onInstrumentChange} />
+          <div className="mt-5 flex items-center justify-between text-[13px]">
             <span className="text-muted-app">وضعیت بازار</span>
             <span className="text-positive">
               {store.marketStatus === "open" ? "باز است" : "بسته"}
             </span>
           </div>
+          <p className="mt-2 text-[13px] text-text-secondary">
+            {meta.title} ·{" "}
+            <span className="tabular-nums text-text">{formatToman(price)}</span>{" "}
+            / گرم
+          </p>
           <label className="mt-5 block">
             <span className="text-[13px] text-text-secondary">مبلغ خرید (تومان)</span>
             <input
@@ -106,7 +143,8 @@ export default function BuyPage() {
             />
           </label>
           <p className="mt-2 text-[13px] tabular-nums text-muted-app">
-            تقریباً {mgToGramsLabel(quote.goldMg)} گرم
+            تقریباً {mgToGramsLabel(quote.goldMg)} گرم · حداقل خرید{" "}
+            {formatToman(meta.minBuyToman)}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {QUICK.map((q) => (
@@ -137,22 +175,26 @@ export default function BuyPage() {
             </span>
           </div>
           <dl className="mt-4 space-y-3 text-[13px]">
-            <Row label="قیمت هر گرم" value={formatToman(store.marketPriceRial)} />
-            <Row label="منبع قیمت" value={store.marketSource} />
+            <Row label="قیمت هر گرم" value={formatToman(price)} />
+            <Row label="منبع قیمت" value={quoteMeta.source || store.marketSource} />
             <Row
               label="آخرین به‌روزرسانی"
-              value={store.marketUpdatedAt ?? "لحظاتی پیش"}
+              value={quoteMeta.updatedAt ?? store.marketUpdatedAt ?? "لحظاتی پیش"}
             />
             <Row
               label="مقدار ناخالص تقریبی"
-              value={`${mgToGramsLabel(Math.floor((rial / store.marketPriceRial) * 1000))} گرم`}
+              value={`${mgToGramsLabel(Math.floor((rial / Math.max(price, 1)) * 1000))} گرم`}
             />
             <Row
               label="کارمزد معامله"
               value={formatToman(quote.fee)}
               hint={store.plusActive ? "نرخ گرم پلاس" : "نرخ رایگان"}
             />
-            <Row label="طلای دریافتی" value={`${mgToGramsLabel(quote.goldMg)} گرم`} highlight />
+            <Row
+              label={`${meta.label} دریافتی`}
+              value={`${mgToGramsLabel(quote.goldMg)} گرم`}
+              highlight
+            />
             <Row label="مبلغ پرداخت" value={formatToman(rial)} highlight />
             <Row label="موجودی کیف پول" value={formatToman(store.rialAvailable)} />
           </dl>
@@ -168,7 +210,7 @@ export default function BuyPage() {
               onChange={(e) => setChecked(e.target.checked)}
               className="mt-1"
             />
-            مبلغ، کارمزد و مقدار نهایی طلا را بررسی کردم.
+            مبلغ، کارمزد و مقدار نهایی {meta.label} را بررسی کردم.
           </label>
           {error && (
             <p className="mt-3 text-[13px] text-negative" role="alert">
@@ -181,7 +223,7 @@ export default function BuyPage() {
             disabled={loading}
             onClick={onConfirm}
           >
-            {loading ? "در حال ثبت..." : "تأیید و خرید"}
+            {loading ? "در حال ثبت..." : `تأیید و خرید ${meta.label}`}
           </GoldButton>
           <button
             type="button"

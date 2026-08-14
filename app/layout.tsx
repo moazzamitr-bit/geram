@@ -12,11 +12,11 @@ const vazirmatn = Vazirmatn({
 
 export const metadata: Metadata = {
   title: {
-    default: "گرم | طلای واقعی، به ساده‌ترین شکل",
+    default: "گرم | طلا، نقره و مس در یک کیف‌پول",
     template: "%s | گرم",
   },
   description:
-    "پلتفرم خرید و فروش آنلاین طلا با پشتوانه واقعی، شفافیت کامل و تجربه‌ای مدرن برای مدیریت دارایی.",
+    "خرید و فروش آنلاین طلا، نقره و مس با قیمت لایو، کارمزد شفاف و بدون اجرت ساخت.",
   applicationName: "گرم",
   manifest: "/manifest.webmanifest",
   icons: {
@@ -32,9 +32,9 @@ export const metadata: Metadata = {
     title: "گرم",
   },
   openGraph: {
-    title: "گرم | طلای واقعی، به ساده‌ترین شکل",
+    title: "گرم | طلا، نقره و مس در یک کیف‌پول",
     description:
-      "پلتفرم خرید و فروش آنلاین طلا با پشتوانه واقعی، شفافیت کامل و تجربه‌ای مدرن برای مدیریت دارایی.",
+      "خرید و فروش آنلاین طلا، نقره و مس با قیمت لایو، کارمزد شفاف و بدون اجرت ساخت.",
     locale: "fa_IR",
     type: "website",
     images: [{ url: "/brand/logo.png", width: 528, height: 525, alt: "گرم" }],

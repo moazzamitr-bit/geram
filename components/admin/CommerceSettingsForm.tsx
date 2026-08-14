@@ -59,6 +59,7 @@ export function CommerceSettingsForm({ initial }: Props) {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [reason, setReason] = useState("");
 
   const preview = useMemo(() => {
     const sampleBuy = 10_000_000;
@@ -85,7 +86,7 @@ export function CommerceSettingsForm({ initial }: Props) {
       const res = await fetch("/api/admin/commerce-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fees, plus, referral }),
+        body: JSON.stringify({ fees, plus, referral, reason }),
       });
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (!res.ok || !data.ok) {
@@ -274,6 +275,18 @@ export function CommerceSettingsForm({ initial }: Props) {
             واریز پاداش فقط پس از احراز هویت
           </label>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5">
+        <h2 className="font-bold">دلیل تغییر (الزامی — audit)</h2>
+        <textarea
+          required
+          minLength={8}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="چرا این مقادیر عوض می‌شوند؟"
+          className="mt-3 h-20 w-full rounded-xl border border-white/10 bg-[#070B12] p-3 text-[13px] outline-none focus:border-gold"
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

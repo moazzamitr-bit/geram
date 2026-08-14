@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "crypto";
+import { getFeatureFlags } from "@/lib/core/mode";
 import { buyQuote, dcaExecutionFee, isPlusActive } from "@/lib/commerce/fees";
 import { loadCommerceSettings } from "@/lib/commerce/settings-server";
 import { createServiceClient } from "@/lib/supabase/admin";
@@ -37,6 +38,7 @@ async function notifyUser(
 
 export async function runDcaCron(): Promise<CronRunSummary["dca"]> {
   const summary = { processed: 0, success: 0, failed: 0 };
+  if (!getFeatureFlags().DCA_ENABLED) return summary;
   const admin = createServiceClient();
   const settings = await loadCommerceSettings();
   const quote = await getLiveGold18Price();
@@ -172,11 +174,14 @@ export async function runDcaCron(): Promise<CronRunSummary["dca"]> {
 export async function runAlertsCron(): Promise<
   Pick<CronRunSummary, "alerts">
 > {
+  const summary = { checked: 0, triggered: 0, orders: 0 };
+  if (!getFeatureFlags().ALERT_AUTOBUY_ENABLED) {
+    return { alerts: summary };
+  }
   const admin = createServiceClient();
   const settings = await loadCommerceSettings();
   const quote = await getLiveGold18Price();
   const price = quote.priceToman;
-  const summary = { checked: 0, triggered: 0, orders: 0 };
 
   if (!price || price < 100_000) {
     return { alerts: summary };

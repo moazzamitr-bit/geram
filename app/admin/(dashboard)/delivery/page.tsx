@@ -1,20 +1,33 @@
 import {
   AdminBadge,
+  AdminNotice,
   AdminPageHeader,
   AdminTable,
+  OpsBadge,
 } from "@/components/admin/AdminUI";
 import { listDeliveries } from "@/lib/db/admin-queries";
 import { formatToman } from "@/lib/utils";
+import { getExecutionMode, getFeatureFlags } from "@/lib/core/mode";
 
 export default async function AdminDeliveryPage() {
   const rows = await listDeliveries(100);
+  let enabled = false;
+  try {
+    enabled = getFeatureFlags(getExecutionMode()).PHYSICAL_REDEMPTION_ENABLED;
+  } catch {
+    enabled = false;
+  }
 
   return (
     <div>
       <AdminPageHeader
         title="درخواست‌های تحویل"
-        description="پیگیری تحویل فیزیکی طلا به مشتریان."
+        description="گردش fulfillment واقعی تا تأیید بعدی ساخته نمی‌شود."
       />
+      <OpsBadge state={enabled ? "SANDBOX" : "NOT_READY"} />
+      <AdminNotice title="PHYSICAL_REDEMPTION_ENABLED">
+        {enabled ? "SANDBOX" : "NOT ENABLED / false by default. No real fulfillment workflow."}
+      </AdminNotice>
       <AdminTable
         headers={["کاربر", "محصول", "وزن", "روش", "کارمزد", "وضعیت", "زمان"]}
         empty={rows.length === 0}

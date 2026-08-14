@@ -107,14 +107,14 @@ export function AppShowcase() {
           </SectionLabel>
 
           <h2 className="mt-4 text-[36px] font-extrabold leading-[1.45] text-text md:text-[44px] xl:text-[50px]">
-            طراحی شده برای
+            بازار سه فلز
             <br />
-            نسل جدید سرمایه‌گذاران
+            در جیب شما
           </h2>
 
           <p className="mt-5 max-w-md text-[15px] leading-8 text-text-secondary md:text-[16px]">
-            رابط کاربری مینیمال، نمودارهای حرفه‌ای، شفافیت کامل در کارمزدها و
-            دسترسی سریع به اطلاعاتی که برای تصمیم‌گیری نیاز دارید.
+            قیمت لایو طلا، نقره و مس، نمودار حرفه‌ای، کارمزد شفاف و پرتفوی یکپارچه
+            — برای تصمیم‌گیری سریع و مطمئن.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -130,10 +130,10 @@ export function AppShowcase() {
           </div>
 
           <Link
-            href="#"
+            href="/auth/login"
             className="link-underline mt-5 inline-block text-[13px] text-gold"
           >
-            نسخه وب اپلیکیشن
+            ورود به نسخه وب
           </Link>
         </div>
 

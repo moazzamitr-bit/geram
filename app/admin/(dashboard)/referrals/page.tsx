@@ -1,20 +1,31 @@
 import {
   AdminBadge,
+  AdminNotice,
   AdminPageHeader,
   AdminTable,
+  OpsBadge,
 } from "@/components/admin/AdminUI";
 import { listReferralEvents } from "@/lib/db/admin-queries";
 import { formatToman } from "@/lib/utils";
+import { getExecutionMode, getFeatureFlags } from "@/lib/core/mode";
 
 export default async function AdminReferralsPage() {
   const rows = await listReferralEvents(100);
+  let enabled = false;
+  try {
+    enabled = getFeatureFlags(getExecutionMode()).REFERRAL_ENABLED;
+  } catch {
+    enabled = false;
+  }
 
   return (
     <div>
       <AdminPageHeader
         title="دعوت دوستان"
-        description="رویدادهای رفرال، پاداش‌ها و وضعیت پرداخت."
+        description="پرداخت پاداش به دفترکل تولید از جاب دمو انجام نمی‌شود."
       />
+      <OpsBadge state={enabled ? "SANDBOX" : "NOT_READY"} />
+      <AdminNotice title="REFERRAL_ENABLED">{String(enabled)}</AdminNotice>
       <AdminTable
         headers={[
           "دعوت‌کننده",

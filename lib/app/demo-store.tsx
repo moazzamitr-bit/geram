@@ -1,20 +1,15 @@
 "use client";
 
-import {
-  averageBuyPriceFromTrades,
-  nextAverageBuyPrice,
-} from "@/lib/app/pnl";
 import type { KycStatus } from "@/lib/auth/auth-context";
-import {
-  buyTradeFee,
-  sellTradeFee,
-  withdrawFee,
-} from "@/lib/commerce/fees";
-import { isKycVerified, KYC_REQUIRED_MESSAGE } from "@/lib/commerce/kyc";
 import {
   DEFAULT_COMMERCE_SETTINGS,
   type CommerceSettings,
 } from "@/lib/commerce/types";
+import {
+  INSTRUMENTS,
+  type InstrumentId,
+  parseInstrumentId,
+} from "@/lib/market/instruments";
 import {
   createContext,
   useCallback,
@@ -36,6 +31,7 @@ export type DemoTransaction = {
   id: string;
   trackingCode: string;
   type: TxType;
+  instrument: InstrumentId;
   goldMg: number;
   amountRial: number;
   feeRial: number;
@@ -99,10 +95,15 @@ export type SupportTicket = {
 type DemoState = {
   hydrated: boolean;
   goldMg: number;
+  silverMg: number;
+  copperMg: number;
   rialAvailable: number;
   rialPending: number;
   avgBuyPriceRial: number;
+  avgBuyPriceSilverRial: number;
+  avgBuyPriceCopperRial: number;
   marketPriceRial: number;
+  marketPrices: Record<InstrumentId, number>;
   marketStatus: "open" | "closed" | "paused";
   marketSource: string;
   marketUpdatedAt: string | null;
@@ -110,6 +111,17 @@ type DemoState = {
   marketHighToman: number | null;
   marketLowToman: number | null;
   marketChangePercent: number | null;
+  marketQuotes: Record<
+    InstrumentId,
+    {
+      highToman: number | null;
+      lowToman: number | null;
+      changePercent: number | null;
+      source: string;
+      updatedAt: string | null;
+      stale: boolean;
+    }
+  >;
   pin: string | null;
   bankAccounts: { id: string; iban: string; bank: string; verified: boolean }[];
   transactions: DemoTransaction[];
@@ -129,13 +141,26 @@ type DemoState = {
   kycStatus: KycStatus;
   referralCode: string | null;
   commerceSettings: CommerceSettings;
-  buyGold: (rial: number) => { ok: boolean; error?: string; txId?: string };
+  getMetalMg: (instrument: InstrumentId) => number;
+  getAvgBuyPrice: (instrument: InstrumentId) => number;
+  getMarketPrice: (instrument: InstrumentId) => number;
+  buyMetal: (
+    instrument: InstrumentId,
+    rial: number
+  ) => Promise<{ ok: boolean; error?: string; txId?: string }>;
+  sellMetal: (
+    instrument: InstrumentId,
+    metalMg: number,
+    destination: "wallet" | "bank"
+  ) => Promise<{ ok: boolean; error?: string; txId?: string }>;
+  buyGold: (rial: number) => Promise<{ ok: boolean; error?: string; txId?: string }>;
   sellGold: (
     goldMg: number,
     destination: "wallet" | "bank"
-  ) => { ok: boolean; error?: string; txId?: string };
-  deposit: (rial: number) => void;
-  withdraw: (rial: number, bankId: string) => { ok: boolean; error?: string };
+  ) => Promise<{ ok: boolean; error?: string; txId?: string }>;
+  deposit: (rial: number) => Promise<{ ok: boolean; error?: string }>;
+  withdraw: (rial: number, bankId: string) => Promise<{ ok: boolean; error?: string }>;
+  refreshFinancial: () => Promise<void>;
   addGoal: (goal: Omit<DemoGoal, "id" | "currentRial">) => string;
   contributeGoal: (goalId: string, rial: number) => { ok: boolean; error?: string };
   requestDelivery: (input: {
@@ -160,7 +185,7 @@ type DemoState = {
   refreshMarketPrice: () => Promise<void>;
 };
 
-const STORAGE_KEY = "gram_demo_platform_v1";
+const STORAGE_KEY = "gram_demo_platform_v2";
 
 const DemoContext = createContext<DemoState | null>(null);
 
@@ -169,10 +194,6 @@ function nowFa() {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date());
-}
-
-function tracking() {
-  return `GRM-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
 
 function uid(prefix: string) {
@@ -191,6 +212,7 @@ const initialTransactions: DemoTransaction[] = [
     id: "tx-buy-1",
     trackingCode: "GRM-A1B2C3",
     type: "خرید",
+    instrument: "gold18",
     goldMg: 125,
     amountRial: 950_000,
     feeRial: 25_000,
@@ -209,6 +231,7 @@ const initialTransactions: DemoTransaction[] = [
     id: "tx-sell-1",
     trackingCode: "GRM-D4E5F6",
     type: "فروش",
+    instrument: "gold18",
     goldMg: 800,
     amountRial: 6_100_000,
     feeRial: 40_000,
@@ -226,6 +249,7 @@ const initialTransactions: DemoTransaction[] = [
     id: "tx-buy-2",
     trackingCode: "GRM-G7H8I9",
     type: "خرید",
+    instrument: "gold18",
     goldMg: 1200,
     amountRial: 8_200_000,
     feeRial: 50_000,
@@ -239,14 +263,68 @@ const initialTransactions: DemoTransaction[] = [
       { label: "ثبت نهایی", done: true },
     ],
   },
+  {
+    id: "tx-buy-silver-1",
+    trackingCode: "GRM-AG01",
+    type: "خرید",
+    instrument: "silver925",
+    goldMg: 5000,
+    amountRial: 1_950_000,
+    feeRial: 20_000,
+    pricePerGram: 386_000,
+    status: "تکمیل‌شده",
+    createdAt: "۱۴۰۴/۰۵/۰۸، ۱۶:۱۰",
+    timeline: [
+      { label: "سفارش ایجاد شد", done: true },
+      { label: "پرداخت", done: true },
+      { label: "تخصیص نقره", done: true },
+      { label: "ثبت نهایی", done: true },
+    ],
+  },
+  {
+    id: "tx-buy-copper-1",
+    trackingCode: "GRM-CU01",
+    type: "خرید",
+    instrument: "copper",
+    goldMg: 200_000,
+    amountRial: 520_000,
+    feeRial: 10_000,
+    pricePerGram: 2_550,
+    status: "تکمیل‌شده",
+    createdAt: "۱۴۰۴/۰۵/۰۹، ۱۲:۴۰",
+    timeline: [
+      { label: "سفارش ایجاد شد", done: true },
+      { label: "پرداخت", done: true },
+      { label: "تخصیص مس", done: true },
+      { label: "ثبت نهایی", done: true },
+    ],
+  },
 ];
 
+const emptyQuoteMeta = {
+  highToman: null as number | null,
+  lowToman: null as number | null,
+  changePercent: null as number | null,
+  source: "در حال دریافت...",
+  updatedAt: null as string | null,
+  stale: true,
+};
+
 const seed = {
-  goldMg: 3241,
-  rialAvailable: 12_500_000,
+  goldMg: 0,
+  silverMg: 0,
+  copperMg: 0,
+  rialAvailable: 0,
   rialPending: 0,
-  avgBuyPriceRial: 6_850_000,
-  marketPriceRial: 7_012_000,
+  avgBuyPriceRial: 0,
+  avgBuyPriceSilverRial: 0,
+  avgBuyPriceCopperRial: 0,
+  marketPriceRial: INSTRUMENTS.gold18.fallbackPriceToman,
+  marketPrices: {
+    gold18: INSTRUMENTS.gold18.fallbackPriceToman,
+    silver925: INSTRUMENTS.silver925.fallbackPriceToman,
+    copper: INSTRUMENTS.copper.fallbackPriceToman,
+  } as Record<InstrumentId, number>,
   marketStatus: "open" as const,
   marketSource: "در حال دریافت...",
   marketUpdatedAt: null as string | null,
@@ -254,6 +332,21 @@ const seed = {
   marketHighToman: null as number | null,
   marketLowToman: null as number | null,
   marketChangePercent: null as number | null,
+  marketQuotes: {
+    gold18: { ...emptyQuoteMeta },
+    silver925: { ...emptyQuoteMeta },
+    copper: { ...emptyQuoteMeta },
+  } as Record<
+    InstrumentId,
+    {
+      highToman: number | null;
+      lowToman: number | null;
+      changePercent: number | null;
+      source: string;
+      updatedAt: string | null;
+      stale: boolean;
+    }
+  >,
   pin: null as string | null,
   bankAccounts: [
     {
@@ -307,18 +400,38 @@ type Persisted = typeof seed;
 
 const LIVE_MARKET_KEYS = [
   "marketPriceRial",
+  "marketPrices",
   "marketSource",
   "marketUpdatedAt",
   "marketStale",
   "marketHighToman",
   "marketLowToman",
   "marketChangePercent",
+  "marketQuotes",
 ] as const;
 
 function stripLiveMarket(state: Persisted): Persisted {
   const next = { ...state };
   for (const key of LIVE_MARKET_KEYS) {
-    // keep seed defaults for these; live values come from API
+    (next as Record<string, unknown>)[key] = seed[key];
+  }
+  return next;
+}
+
+const FINANCIAL_KEYS = [
+  "goldMg",
+  "silverMg",
+  "copperMg",
+  "rialAvailable",
+  "rialPending",
+  "avgBuyPriceRial",
+  "avgBuyPriceSilverRial",
+  "avgBuyPriceCopperRial",
+] as const;
+
+function stripFinancial(state: Persisted): Persisted {
+  const next = stripLiveMarket(state);
+  for (const key of FINANCIAL_KEYS) {
     (next as Record<string, unknown>)[key] = seed[key];
   }
   return next;
@@ -339,22 +452,18 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           const { loadPlatformBundle } = await import("@/lib/db/platform-sync");
           const bundle = await loadPlatformBundle();
           if (bundle && !cancelled) {
-            const reconciledAvg =
-              bundle.avgBuyPriceRial > 0
-                ? bundle.avgBuyPriceRial
-                : averageBuyPriceFromTrades(
-                    bundle.transactions,
-                    // until market quote loads, keep 0; effect below can refine
-                    0
-                  );
             setLiveDb(true);
             setState((s) =>
               stripLiveMarket({
                 ...s,
                 goldMg: bundle.goldMg,
+                silverMg: bundle.silverMg,
+                copperMg: bundle.copperMg,
                 rialAvailable: bundle.rialAvailable,
                 rialPending: bundle.rialPending,
-                avgBuyPriceRial: reconciledAvg,
+                avgBuyPriceRial: bundle.avgBuyPriceRial,
+                avgBuyPriceSilverRial: bundle.avgBuyPriceSilverRial,
+                avgBuyPriceCopperRial: bundle.avgBuyPriceCopperRial,
                 bankAccounts: bundle.bankAccounts,
                 transactions: bundle.transactions,
                 goals: bundle.goals,
@@ -400,16 +509,22 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem("gram_demo_platform_v1");
         if (raw && !cancelled) {
           const parsed = JSON.parse(raw) as Partial<Persisted>;
-          const merged = stripLiveMarket({ ...seed, ...parsed });
-          if (merged.goldMg > 0 && merged.avgBuyPriceRial <= 0) {
-            merged.avgBuyPriceRial = averageBuyPriceFromTrades(
-              merged.transactions,
-              merged.marketPriceRial
-            );
-          }
+          const merged = stripFinancial({
+            ...seed,
+            ...parsed,
+            marketPrices: {
+              ...seed.marketPrices,
+              ...(parsed.marketPrices ?? {}),
+            },
+            marketQuotes: {
+              ...seed.marketQuotes,
+              ...(parsed.marketQuotes ?? {}),
+            },
+            transactions: seed.transactions,
+          });
           const plusRaw = localStorage.getItem("gram_plus_sandbox");
           if (plusRaw === "1") merged.plusActive = true;
           setState(merged);
@@ -455,80 +570,66 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated || liveDb) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stripLiveMarket(state)));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stripFinancial(state)));
   }, [state, hydrated, liveDb]);
 
   useEffect(() => {
     if (!hydrated || !liveDb) return;
-    void (async () => {
-      try {
-        const { persistWallet } = await import("@/lib/db/platform-sync");
-        await persistWallet({
-          goldMg: state.goldMg,
-          rialAvailable: state.rialAvailable,
-          rialPending: state.rialPending,
-          avgBuyPriceRial: state.avgBuyPriceRial,
-        });
-      } catch {
-        /* ignore sync errors */
-      }
-    })();
-  }, [
-    hydrated,
-    liveDb,
-    state.goldMg,
-    state.rialAvailable,
-    state.rialPending,
-    state.avgBuyPriceRial,
-  ]);
-
-  // If holdings exist but average cost is missing, rebuild from buys (or market).
-  useEffect(() => {
-    if (!hydrated) return;
-    if (state.goldMg <= 0 || state.avgBuyPriceRial > 0) return;
-    const fallback =
-      state.marketPriceRial > 0
-        ? state.marketPriceRial
-        : averageBuyPriceFromTrades(state.transactions, 0);
-    const next = averageBuyPriceFromTrades(state.transactions, fallback);
-    if (next > 0) {
-      setState((s) =>
-        s.avgBuyPriceRial > 0 ? s : { ...s, avgBuyPriceRial: next }
-      );
-    }
-  }, [
-    hydrated,
-    state.goldMg,
-    state.avgBuyPriceRial,
-    state.marketPriceRial,
-    state.transactions,
-  ]);
+    // Wallet balances are ledger projections. Never write wallets from the client.
+  }, [hydrated, liveDb]);
 
   const refreshMarketPrice = useCallback(async () => {
     try {
-      const res = await fetch("/api/market/price", { cache: "no-store" });
+      const res = await fetch("/api/market/price?all=1", { cache: "no-store" });
       if (!res.ok) return;
       const data = (await res.json()) as {
-        priceToman?: number;
-        source?: string;
-        updatedAt?: string;
-        stale?: boolean;
-        highToman?: number | null;
-        lowToman?: number | null;
-        changePercent?: number | null;
+        quotes?: Array<{
+          instrument?: string;
+          priceToman?: number;
+          source?: string;
+          updatedAt?: string;
+          stale?: boolean;
+          highToman?: number | null;
+          lowToman?: number | null;
+          changePercent?: number | null;
+        }>;
       };
-      if (!data.priceToman || data.priceToman < 100_000) return;
-      setState((s) => ({
-        ...s,
-        marketPriceRial: data.priceToman!,
-        marketSource: data.source ?? "بازار آزاد",
-        marketUpdatedAt: data.updatedAt ?? new Date().toISOString(),
-        marketStale: Boolean(data.stale),
-        marketHighToman: data.highToman ?? null,
-        marketLowToman: data.lowToman ?? null,
-        marketChangePercent: data.changePercent ?? null,
-        marketStatus: "open",
-      }));
+      const quotes = data.quotes ?? [];
+      if (!quotes.length) return;
+
+      setState((s) => {
+        const marketPrices = { ...s.marketPrices };
+        const marketQuotes = { ...s.marketQuotes };
+        for (const q of quotes) {
+          const id = parseInstrumentId(q.instrument);
+          if (!q.priceToman || q.priceToman < 1) continue;
+          // Gold sanity: reject absurdly low quotes
+          if (id === "gold18" && q.priceToman < 100_000) continue;
+          marketPrices[id] = q.priceToman;
+          marketQuotes[id] = {
+            highToman: q.highToman ?? null,
+            lowToman: q.lowToman ?? null,
+            changePercent: q.changePercent ?? null,
+            source: q.source ?? "بازار آزاد",
+            updatedAt: q.updatedAt ?? new Date().toISOString(),
+            stale: Boolean(q.stale),
+          };
+        }
+        const gold = marketQuotes.gold18;
+        return {
+          ...s,
+          marketPrices,
+          marketQuotes,
+          marketPriceRial: marketPrices.gold18,
+          marketSource: gold.source,
+          marketUpdatedAt: gold.updatedAt,
+          marketStale: gold.stale,
+          marketHighToman: gold.highToman,
+          marketLowToman: gold.lowToman,
+          marketChangePercent: gold.changePercent,
+          marketStatus: "open",
+        };
+      });
     } catch {
       /* keep last known price */
     }
@@ -543,227 +644,190 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearInterval(id);
   }, [hydrated, refreshMarketPrice]);
 
-  const buyGold = useCallback(
-    (rial: number) => {
-      if (state.marketStatus !== "open") {
-        return { ok: false, error: "بازار در حال حاضر باز نیست." };
-      }
-      if (rial < 500_000) return { ok: false, error: "حداقل مبلغ خرید ۵۰۰٬۰۰۰ تومان است." };
-      if (rial > state.rialAvailable) {
-        return { ok: false, error: "موجودی کیف پول کافی نیست." };
-      }
-      const fee = buyTradeFee(rial, state.plusActive, state.commerceSettings.fees);
-      const net = rial - fee;
-      if (net <= 0) return { ok: false, error: "مبلغ پس از کارمزد معتبر نیست." };
-      const goldMg = Math.floor((net / state.marketPriceRial) * 1000);
-      const txId =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : uid("tx");
-      const tx: DemoTransaction = {
-        id: txId,
-        trackingCode: tracking(),
-        type: "خرید",
-        goldMg,
-        amountRial: rial,
-        feeRial: fee,
-        pricePerGram: state.marketPriceRial,
-        status: "تکمیل‌شده",
-        createdAt: nowFa(),
-        paymentRef: `WALLET-${Date.now()}`,
-        timeline: [
-          { label: "سفارش ایجاد شد", done: true, at: "اکنون" },
-          { label: "تأیید معامله", done: true, at: "اکنون" },
-          { label: "پرداخت از کیف پول", done: true, at: "اکنون" },
-          { label: "تخصیص طلا", done: true, at: "اکنون" },
-          { label: "ثبت نهایی", done: true, at: "اکنون" },
-          { label: "صدور رسید", done: true, at: "اکنون" },
-        ],
-      };
-      const nextAvg = nextAverageBuyPrice({
-        prevGoldMg: state.goldMg,
-        prevAvg: state.avgBuyPriceRial,
-        boughtMg: goldMg,
-        buyPricePerGram: state.marketPriceRial,
-      });
+  const getMetalMg = useCallback(
+    (instrument: InstrumentId) => {
+      if (instrument === "silver925") return state.silverMg;
+      if (instrument === "copper") return state.copperMg;
+      return state.goldMg;
+    },
+    [state.goldMg, state.silverMg, state.copperMg]
+  );
+
+  const getAvgBuyPrice = useCallback(
+    (instrument: InstrumentId) => {
+      if (instrument === "silver925") return state.avgBuyPriceSilverRial;
+      if (instrument === "copper") return state.avgBuyPriceCopperRial;
+      return state.avgBuyPriceRial;
+    },
+    [state.avgBuyPriceRial, state.avgBuyPriceSilverRial, state.avgBuyPriceCopperRial]
+  );
+
+  const getMarketPrice = useCallback(
+    (instrument: InstrumentId) => state.marketPrices[instrument] ?? 0,
+    [state.marketPrices]
+  );
+
+  const refreshFinancial = useCallback(async () => {
+    try {
+      const readyRes = await fetch("/api/core/readiness", { cache: "no-store" });
+      if (!readyRes.ok) return;
+      const ready = (await readyRes.json()) as { databaseBacked?: boolean };
+      // Until the operational ledger is Postgres-backed and opening balances
+      // are migrated, keep the existing `wallets` table as the display source.
+      if (!ready.databaseBacked) return;
+
+      const { coreApi } = await import("@/lib/core-api");
+      const [walletRes, txRes] = await Promise.all([
+        coreApi.wallet(),
+        coreApi.transactions().catch(() => ({ ok: true as const, ui: [] })),
+      ]);
+      const ui = walletRes.wallet.ui;
       setState((s) => ({
         ...s,
-        rialAvailable: s.rialAvailable - rial,
-        goldMg: s.goldMg + goldMg,
-        avgBuyPriceRial: nextAvg,
-        transactions: [tx, ...s.transactions],
-        notifications: [
-          {
-            id: uid("n"),
-            type: "TRADE",
-            title: "خرید طلا انجام شد",
-            message: `${(goldMg / 1000).toFixed(3)} گرم به دارایی شما اضافه شد.`,
-            createdAt: nowFa(),
-            read: false,
-            href: `/app/transactions/${txId}`,
-          },
-          ...s.notifications,
-        ],
+        goldMg: ui.goldMg,
+        silverMg: ui.silverMg,
+        copperMg: ui.copperMg,
+        rialAvailable: ui.rialAvailable,
+        rialPending: ui.rialPending,
+        avgBuyPriceRial: walletRes.avgBuyTomanPerGram.gold18,
+        avgBuyPriceSilverRial: walletRes.avgBuyTomanPerGram.silver925,
+        avgBuyPriceCopperRial: walletRes.avgBuyTomanPerGram.copper,
+        transactions:
+          txRes.ui.length > 0
+            ? txRes.ui.map((t) => ({
+                ...t,
+                type: t.type as DemoTransaction["type"],
+                status: t.status as DemoTransaction["status"],
+                instrument: parseInstrumentId(t.instrument),
+              }))
+            : s.transactions.filter((t) => t.type !== "خرید" && t.type !== "فروش" && t.type !== "واریز"),
       }));
-      if (liveDb) {
-        void import("@/lib/db/platform-sync").then(({ persistTransaction }) =>
-          persistTransaction(tx)
-        );
+    } catch {
+      /* keep last known ledger projection */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void refreshFinancial();
+  }, [hydrated, refreshFinancial]);
+
+  const buyMetal = useCallback(
+    async (instrument: InstrumentId, rial: number) => {
+      try {
+        const { coreApi } = await import("@/lib/core-api");
+        const quoted = await coreApi.issueQuote({
+          instrument,
+          side: "BUY",
+          inputMode: "RIAL_AMOUNT",
+          requestedToman: rial,
+        });
+        const idem =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : uid("idem");
+        const traded = await coreApi.executeTrade(quoted.quote.id, idem);
+        await refreshFinancial();
+        return { ok: true, txId: traded.trade.id };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : "خطا در خرید",
+        };
       }
-      return { ok: true, txId };
     },
-    [state, liveDb]
+    [refreshFinancial]
+  );
+
+  const sellMetal = useCallback(
+    async (
+      instrument: InstrumentId,
+      metalMg: number,
+      destination: "wallet" | "bank"
+    ) => {
+      if (destination === "bank") {
+        return {
+          ok: false,
+          error: "تسویه بانکی در این نسخه فعال نیست. فروش به کیف پول گرم استفاده کنید.",
+        };
+      }
+      try {
+        const { coreApi } = await import("@/lib/core-api");
+        const quoted = await coreApi.issueQuote({
+          instrument,
+          side: "SELL",
+          inputMode: "METAL_WEIGHT",
+          requestedGrams: metalMg / 1000,
+        });
+        const idem =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : uid("idem");
+        const traded = await coreApi.executeTrade(quoted.quote.id, idem);
+        await refreshFinancial();
+        return { ok: true, txId: traded.trade.id };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : "خطا در فروش",
+        };
+      }
+    },
+    [refreshFinancial]
+  );
+
+  const buyGold = useCallback(
+    (rial: number) => buyMetal("gold18", rial),
+    [buyMetal]
   );
 
   const sellGold = useCallback(
-    (goldMg: number, destination: "wallet" | "bank") => {
-      if (state.marketStatus !== "open") {
-        return { ok: false, error: "بازار در حال حاضر باز نیست." };
-      }
-      if (destination === "bank" && !isKycVerified(state.kycStatus)) {
-        return { ok: false, error: KYC_REQUIRED_MESSAGE };
-      }
-      if (goldMg <= 0 || goldMg > state.goldMg) {
-        return { ok: false, error: "مقدار طلای قابل فروش کافی نیست." };
-      }
-      const gross = Math.floor((goldMg / 1000) * state.marketPriceRial);
-      const fee = sellTradeFee(gross, state.plusActive, state.commerceSettings.fees);
-      const net = gross - fee;
-      const txId =
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? crypto.randomUUID()
-          : uid("tx");
-      const pending = destination === "bank";
-      const tx: DemoTransaction = {
-        id: txId,
-        trackingCode: tracking(),
-        type: "فروش",
-        goldMg,
-        amountRial: net,
-        feeRial: fee,
-        pricePerGram: state.marketPriceRial,
-        status: pending ? "در انتظار تسویه" : "تکمیل‌شده",
-        createdAt: nowFa(),
-        timeline: [
-          { label: "سفارش ایجاد شد", done: true, at: "اکنون" },
-          { label: "رزرو طلا", done: true, at: "اکنون" },
-          {
-            label: destination === "wallet" ? "واریز به کیف پول" : "تسویه بانکی",
-            done: !pending,
-            at: pending ? undefined : "اکنون",
-          },
-          { label: "تکمیل", done: !pending },
-        ],
-        note: destination === "bank" ? "تسویه به حساب بانکی انتخاب‌شده" : "واریز به کیف پول گرم",
-      };
-      setState((s) => ({
-        ...s,
-        goldMg: s.goldMg - goldMg,
-        rialAvailable: pending ? s.rialAvailable : s.rialAvailable + net,
-        rialPending: pending ? s.rialPending + net : s.rialPending,
-        transactions: [tx, ...s.transactions],
-        notifications: [
-          {
-            id: uid("n"),
-            type: "TRADE",
-            title: pending ? "فروش ثبت شد — در انتظار تسویه" : "فروش تکمیل شد",
-            message: `مبلغ خالص ${net.toLocaleString("fa-IR")} تومان`,
-            createdAt: nowFa(),
-            read: false,
-            href: `/app/transactions/${txId}`,
-          },
-          ...s.notifications,
-        ],
-      }));
-      if (liveDb) {
-        void import("@/lib/db/platform-sync").then(({ persistTransaction }) =>
-          persistTransaction(tx)
-        );
-      }
-      return { ok: true, txId };
-    },
-    [state, liveDb]
+    (goldMg: number, destination: "wallet" | "bank") =>
+      sellMetal("gold18", goldMg, destination),
+    [sellMetal]
   );
 
-  const deposit = useCallback((rial: number) => {
-    setState((s) => ({
-      ...s,
-      rialAvailable: s.rialAvailable + rial,
-      transactions: [
-        {
-          id: uid("tx"),
-          trackingCode: tracking(),
-          type: "واریز",
-          goldMg: 0,
-          amountRial: rial,
-          feeRial: 0,
-          pricePerGram: s.marketPriceRial,
-          status: "تکمیل‌شده",
-          createdAt: nowFa(),
-          timeline: [
-            { label: "درخواست واریز", done: true },
-            { label: "تأیید درگاه (سندباکس)", done: true },
-            { label: "افزایش موجودی", done: true },
-          ],
-        },
-        ...s.transactions,
-      ],
-    }));
-  }, []);
-
-  const withdraw = useCallback(
-    (rial: number, bankId: string) => {
-      if (!isKycVerified(state.kycStatus)) {
-        return { ok: false, error: KYC_REQUIRED_MESSAGE };
-      }
-      if (!state.bankAccounts.find((b) => b.id === bankId)?.verified) {
-        return { ok: false, error: "حساب بانکی تأییدشده یافت نشد." };
-      }
-      const wFee = withdrawFee(state.plusActive, state.commerceSettings.fees);
-      const total = rial + wFee;
-      if (total > state.rialAvailable) {
+  const deposit = useCallback(
+    async (rial: number) => {
+      try {
+        const { coreApi } = await import("@/lib/core-api");
+        const idem =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : uid("idem");
+        await coreApi.sandboxDeposit(rial, idem);
+        await refreshFinancial();
+        return { ok: true as const };
+      } catch (err) {
         return {
-          ok: false,
-          error: `موجودی کافی نیست (شامل کارمزد برداشت ${wFee.toLocaleString("fa-IR")} تومان).`,
+          ok: false as const,
+          error: err instanceof Error ? err.message : "واریز سندباکس ممکن نیست",
         };
       }
-      setState((s) => ({
-        ...s,
-        rialAvailable: s.rialAvailable - total,
-        rialPending: s.rialPending + rial,
-        transactions: [
-          {
-            id: uid("tx"),
-            trackingCode: tracking(),
-            type: "برداشت",
-            goldMg: 0,
-            amountRial: rial,
-            feeRial: wFee,
-            pricePerGram: s.marketPriceRial,
-            status: "در انتظار تسویه",
-            createdAt: nowFa(),
-            timeline: [
-              { label: "درخواست برداشت", done: true },
-              { label: "بررسی امنیتی", done: true },
-              { label: "تسویه بانکی", done: false },
-            ],
-          },
-          ...s.transactions,
-        ],
-      }));
-      return { ok: true };
     },
-    [state]
+    [refreshFinancial]
   );
 
+  const withdraw = useCallback(async () => {
+    return {
+      ok: false,
+      error: "برداشت بانکی در این نسخه فعال نیست.",
+    };
+  }, []);
   const value = useMemo<DemoState>(
     () => ({
       hydrated,
       ...state,
+      buyMetal,
+      sellMetal,
       buyGold,
       sellGold,
+      getMetalMg,
+      getAvgBuyPrice,
+      getMarketPrice,
       deposit,
       withdraw,
+      refreshFinancial,
       addGoal: (goal) => {
         const id = newId();
         const next = { ...goal, id, currentRial: 0 };
@@ -778,77 +842,17 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         }
         return id;
       },
-      contributeGoal: (goalId, rial) => {
-        if (rial > state.rialAvailable) return { ok: false, error: "موجودی کافی نیست." };
-        const target = state.goals.find((g) => g.id === goalId);
-        setState((s) => ({
-          ...s,
-          rialAvailable: s.rialAvailable - rial,
-          goals: s.goals.map((g) =>
-            g.id === goalId ? { ...g, currentRial: g.currentRial + rial } : g
-          ),
-        }));
-        if (liveDb && target) {
-          void import("@/lib/db/platform-sync").then(({ persistGoal }) =>
-            persistGoal({
-              ...target,
-              currentRial: target.currentRial + rial,
-            })
-          );
-        }
-        return { ok: true };
+      contributeGoal: () => {
+        return {
+          ok: false,
+          error: "واریز به هدف فعلاً به دفترکل متصل نیست.",
+        };
       },
-      requestDelivery: ({ productId, productName, weightGrams, method, feeRial }) => {
-        if (!isKycVerified(state.kycStatus)) {
-          return { ok: false, error: KYC_REQUIRED_MESSAGE };
-        }
-        const needMg = Math.round(weightGrams * 1000);
-        if (needMg > state.goldMg) return { ok: false, error: "طلای قابل تحویل کافی نیست." };
-        if (feeRial > state.rialAvailable) return { ok: false, error: "موجودی ریالی برای کارمزد کافی نیست." };
-        const id = newId();
-        const delivery = {
-          id,
-          productId,
-          productName,
-          weightGrams,
-          status: "REQUESTED",
-          method,
-          createdAt: nowFa(),
-          feeRial,
+      requestDelivery: () => {
+        return {
+          ok: false,
+          error: "تحویل فیزیکی در این نسخه فعال نیست.",
         };
-        const tx: DemoTransaction = {
-          id: newId(),
-          trackingCode: tracking(),
-          type: "تحویل",
-          goldMg: needMg,
-          amountRial: feeRial,
-          feeRial,
-          pricePerGram: state.marketPriceRial,
-          status: "در حال پردازش",
-          createdAt: nowFa(),
-          timeline: [
-            { label: "ثبت درخواست", done: true },
-            { label: "بررسی", done: false },
-            { label: "آماده‌سازی", done: false },
-            { label: "تحویل", done: false },
-          ],
-        };
-        setState((s) => ({
-          ...s,
-          goldMg: s.goldMg - needMg,
-          rialAvailable: s.rialAvailable - feeRial,
-          deliveries: [delivery, ...s.deliveries],
-          transactions: [tx, ...s.transactions],
-        }));
-        if (liveDb) {
-          void import("@/lib/db/platform-sync").then(
-            ({ persistDelivery, persistTransaction }) => {
-              void persistDelivery(delivery);
-              void persistTransaction(tx);
-            }
-          );
-        }
-        return { ok: true, id };
       },
       setPin: (pin) => setState((s) => ({ ...s, pin })),
       addBankAccount: (iban, bank) => {
@@ -1045,7 +1049,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       },
       refreshMarketPrice,
     }),
-    [hydrated, state, liveDb, buyGold, sellGold, deposit, withdraw, refreshMarketPrice]
+    [hydrated, state, liveDb, buyMetal, sellMetal, buyGold, sellGold, getMetalMg, getAvgBuyPrice, getMarketPrice, deposit, withdraw, refreshMarketPrice, refreshFinancial]
   );
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;

@@ -28,8 +28,8 @@ export function NewsletterSection() {
                 از جدیدترین‌ها باخبر شوید
               </h2>
               <p className="mt-1 max-w-md text-[13px] leading-6 text-text-secondary">
-                اخبار، به‌روزرسانی‌ها و تحلیل‌های بازار طلا را در ایمیل خود دریافت
-                کنید.
+                اخبار، به‌روزرسانی‌ها و تحلیل بازار طلا، نقره و مس را در ایمیل خود
+                دریافت کنید.
               </p>
             </div>
           </div>

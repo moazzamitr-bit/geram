@@ -19,7 +19,7 @@ export function Footer() {
           <div className="sm:col-span-2 lg:col-span-1">
             <BrandLogo href="#home" size="md" />
             <p className="mt-4 max-w-xs text-[14px] leading-7 text-text-secondary">
-              پلتفرم خرید و فروش آنلاین طلا با پشتوانه واقعی، شفافیت کامل و
+              پلتفرم خرید و فروش طلا، نقره و مس — با قیمت لایو، کارمزد شفاف و
               تجربه‌ای مدرن برای مدیریت دارایی.
             </p>
             <div className="mt-5 flex items-center gap-2.5">

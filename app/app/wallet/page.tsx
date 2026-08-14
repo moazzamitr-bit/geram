@@ -61,9 +61,16 @@ export default function WalletPage() {
             type="button"
             className="mt-4 w-full"
             onClick={() => {
-              store.deposit(depositAmount);
-              setMsg("واریز سندباکس انجام شد.");
-              setErr("");
+              void (async () => {
+                const res = await store.deposit(depositAmount);
+                if (!res.ok) {
+                  setErr(res.error ?? "خطا در واریز سندباکس");
+                  setMsg("");
+                  return;
+                }
+                setMsg("واریز سندباکس انجام شد.");
+                setErr("");
+              })();
             }}
           >
             واریز
@@ -92,19 +99,21 @@ export default function WalletPage() {
             variant="secondary"
             className="mt-4 w-full"
             onClick={() => {
-              const bankId = store.bankAccounts[0]?.id;
-              if (!bankId) {
-                setErr("حساب بانکی ثبت نشده است.");
-                return;
-              }
-              const res = store.withdraw(withdrawAmount, bankId);
-              if (!res.ok) {
-                setErr(res.error ?? "خطا");
-                setMsg("");
-                return;
-              }
-              setMsg("درخواست برداشت ثبت شد.");
-              setErr("");
+              void (async () => {
+                const bankId = store.bankAccounts[0]?.id;
+                if (!bankId) {
+                  setErr("حساب بانکی ثبت نشده است.");
+                  return;
+                }
+                const res = await store.withdraw(withdrawAmount, bankId);
+                if (!res.ok) {
+                  setErr(res.error ?? "خطا");
+                  setMsg("");
+                  return;
+                }
+                setMsg("درخواست برداشت ثبت شد.");
+                setErr("");
+              })();
             }}
           >
             درخواست برداشت

@@ -6,12 +6,18 @@ import type {
   DemoTransaction,
   SupportTicket,
 } from "@/lib/app/demo-store";
+import type { InstrumentId } from "@/lib/market/instruments";
+import { parseInstrumentId } from "@/lib/market/instruments";
 
 export type PlatformBundle = {
   goldMg: number;
+  silverMg: number;
+  copperMg: number;
   rialAvailable: number;
   rialPending: number;
   avgBuyPriceRial: number;
+  avgBuyPriceSilverRial: number;
+  avgBuyPriceCopperRial: number;
   bankAccounts: { id: string; iban: string; bank: string; verified: boolean }[];
   transactions: DemoTransaction[];
   goals: DemoGoal[];
@@ -99,9 +105,13 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
 
   return {
     goldMg: Number(wallet.data?.gold_mg ?? 0),
+    silverMg: Number(wallet.data?.silver_mg ?? 0),
+    copperMg: Number(wallet.data?.copper_mg ?? 0),
     rialAvailable: Number(wallet.data?.toman_available ?? 0),
     rialPending: Number(wallet.data?.toman_pending ?? 0),
     avgBuyPriceRial: Number(wallet.data?.avg_buy_price_toman ?? 0),
+    avgBuyPriceSilverRial: Number(wallet.data?.avg_buy_price_silver_toman ?? 0),
+    avgBuyPriceCopperRial: Number(wallet.data?.avg_buy_price_copper_toman ?? 0),
     bankAccounts: (banks.data ?? []).map((b) => ({
       id: b.id,
       iban: b.iban,
@@ -112,6 +122,7 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
       id: tx.id,
       trackingCode: tx.tracking_code,
       type: tx.type,
+      instrument: parseInstrumentId(tx.instrument),
       goldMg: Number(tx.gold_mg),
       amountRial: Number(tx.amount_toman),
       feeRial: Number(tx.fee_toman),
@@ -186,31 +197,24 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
   };
 }
 
-export async function persistWallet(input: {
+export async function persistWallet(_input: {
   goldMg: number;
+  silverMg: number;
+  copperMg: number;
   rialAvailable: number;
   rialPending: number;
   avgBuyPriceRial: number;
+  avgBuyPriceSilverRial: number;
+  avgBuyPriceCopperRial: number;
 }) {
-  const auth = await authedClient();
-  if (!auth) return;
-  const { error } = await auth.supabase.from("wallets").upsert(
-    {
-      user_id: auth.user.id,
-      gold_mg: input.goldMg,
-      toman_available: input.rialAvailable,
-      toman_pending: input.rialPending,
-      avg_buy_price_toman: input.avgBuyPriceRial,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id" }
-  );
-  if (error) console.error("persistWallet", error.message);
+  // Ledger is the only wallet authority. Client/app must not upsert balances.
+  return;
 }
 
 export async function persistTransaction(tx: DemoTransaction) {
   const auth = await authedClient();
   if (!auth) return;
+  const instrument: InstrumentId = parseInstrumentId(tx.instrument);
   const row: Record<string, unknown> = {
     user_id: auth.user.id,
     tracking_code: tx.trackingCode,
@@ -226,9 +230,18 @@ export async function persistTransaction(tx: DemoTransaction) {
   };
   if (isUuid(tx.id)) row.id = tx.id;
 
-  const { error } = await auth.supabase.from("transactions").upsert(row, {
-    onConflict: isUuid(tx.id) ? "id" : "tracking_code",
-  });
+  let { error } = await auth.supabase.from("transactions").upsert(
+    { ...row, instrument },
+    { onConflict: isUuid(tx.id) ? "id" : "tracking_code" }
+  );
+  if (error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("instrument") || msg.includes("schema cache")) {
+      ({ error } = await auth.supabase.from("transactions").upsert(row, {
+        onConflict: isUuid(tx.id) ? "id" : "tracking_code",
+      }));
+    }
+  }
   if (error) console.error("persistTransaction", error.message);
 }
 

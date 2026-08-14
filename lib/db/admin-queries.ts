@@ -1,6 +1,7 @@
 import { isSupabaseConfigured } from "@/lib/db/types";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { roleFromProfileRole } from "@/lib/admin/rbac";
 
 async function getDb() {
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -196,7 +197,10 @@ export async function listPriceAlertOrders(limit = 50) {
   return data ?? [];
 }
 
-export async function requireAdmin() {
+export async function requireAdmin(): Promise<
+  | { ok: true; user: { id: string }; profile: { role: string; first_name: string | null; last_name: string | null; email: string | null } }
+  | { ok: false; reason: "not_configured" | "unauthenticated" | "forbidden" }
+> {
   if (!isSupabaseConfigured()) return { ok: false as const, reason: "not_configured" };
   const supabase = await createClient();
   const {
@@ -210,7 +214,7 @@ export async function requireAdmin() {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile || profile.role !== "admin") {
+  if (!profile || !roleFromProfileRole(profile.role)) {
     return { ok: false as const, reason: "forbidden" };
   }
   return { ok: true as const, user, profile };
