@@ -456,7 +456,16 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             setState((s) =>
               stripLiveMarket({
                 ...s,
+                goldMg: bundle.goldMg,
+                silverMg: bundle.silverMg,
+                copperMg: bundle.copperMg,
+                rialAvailable: bundle.rialAvailable,
+                rialPending: bundle.rialPending,
+                avgBuyPriceRial: bundle.avgBuyPriceRial,
+                avgBuyPriceSilverRial: bundle.avgBuyPriceSilverRial,
+                avgBuyPriceCopperRial: bundle.avgBuyPriceCopperRial,
                 bankAccounts: bundle.bankAccounts,
+                transactions: bundle.transactions,
                 goals: bundle.goals,
                 deliveries: bundle.deliveries,
                 notifications: bundle.notifications,
@@ -660,6 +669,13 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
 
   const refreshFinancial = useCallback(async () => {
     try {
+      const readyRes = await fetch("/api/core/readiness", { cache: "no-store" });
+      if (!readyRes.ok) return;
+      const ready = (await readyRes.json()) as { databaseBacked?: boolean };
+      // Until the operational ledger is Postgres-backed and opening balances
+      // are migrated, keep the existing `wallets` table as the display source.
+      if (!ready.databaseBacked) return;
+
       const { coreApi } = await import("@/lib/core-api");
       const [walletRes, txRes] = await Promise.all([
         coreApi.wallet(),
