@@ -172,7 +172,7 @@ describe("replenishment", () => {
 
 describe("customer buy/sell economics (unit)", () => {
   it("customer buy consumes inventory at WAC", () => {
-    let pool = applyPurchaseToWac(emptyWacPool("GOLD"), 5000, 50_000_000);
+    const pool = applyPurchaseToWac(emptyWacPool("GOLD"), 5000, 50_000_000);
     const lots = [
       createLotState("l1", {
         asset: "GOLD",
