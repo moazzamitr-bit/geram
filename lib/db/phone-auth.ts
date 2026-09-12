@@ -17,10 +17,9 @@ function phoneE164(digits: string) {
 }
 
 function phonePassword(phone: string) {
-  const pepper =
-    process.env.PHONE_AUTH_PEPPER ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.slice(0, 24) ||
-    "gram-dev-pepper";
+  // Stable sandbox pepper — never derive from service-role (rotating it
+  // would invalidate every phone user's password).
+  const pepper = process.env.PHONE_AUTH_PEPPER || "gram-dev-pepper";
   return `gram-${pepper}-${phone.replace(/\D/g, "")}`;
 }
 
@@ -42,10 +41,19 @@ async function signInWithPhoneOrEmail(
   });
   if (byEmail.data.user) return byEmail;
 
-  return supabase.auth.signInWithPassword({
+  const byPhone = await supabase.auth.signInWithPassword({
     phone: creds.e164,
     password: creds.password,
   });
+  // Phone provider is off in this project; keep email result so callers
+  // can fall through to sign-up / service-role provisioning.
+  if (
+    byPhone.error &&
+    /phone logins are disabled/i.test(byPhone.error.message)
+  ) {
+    return byEmail;
+  }
+  return byPhone;
 }
 
 async function ensureWithServiceRole(
