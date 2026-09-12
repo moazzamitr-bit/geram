@@ -87,6 +87,27 @@ async function ensureWithServiceRole(
     throw createError;
   }
 
+  // If the user already existed with an older pepper/password, sync it.
+  if (createError && /already|exists|registered/i.test(createError.message)) {
+    const { data: listed, error: listError } =
+      await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+    if (listError) throw listError;
+    const found = listed.users.find((u) => u.email === email);
+    if (found) {
+      const { error: updateError } = await admin.auth.admin.updateUserById(
+        found.id,
+        {
+          password,
+          email_confirm: true,
+          phone: e164,
+          phone_confirm: true,
+          user_metadata: { phone: digits },
+        }
+      );
+      if (updateError) throw updateError;
+    }
+  }
+
   const after = await signInWithPhoneOrEmail(supabase, {
     email,
     password,
