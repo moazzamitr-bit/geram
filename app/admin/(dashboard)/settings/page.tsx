@@ -1,8 +1,10 @@
 import {
   AdminBadge,
+  AdminGuide,
   AdminPageHeader,
 } from "@/components/admin/AdminUI";
 import { CommerceSettingsForm } from "@/components/admin/CommerceSettingsForm";
+import { adminPageGuides } from "@/lib/admin/page-guides";
 import { hasSupabaseEnv } from "@/lib/supabase/client";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { loadCommerceSettings } from "@/lib/commerce/settings-server";
@@ -15,6 +17,7 @@ export default async function AdminSettingsPage() {
   const settings = envOk
     ? await loadCommerceSettings().catch(() => DEFAULT_COMMERCE_SETTINGS)
     : DEFAULT_COMMERCE_SETTINGS;
+  const guide = adminPageGuides.settings;
 
   if (envOk && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     try {
@@ -29,8 +32,13 @@ export default async function AdminSettingsPage() {
   return (
     <div>
       <AdminPageHeader
-        title="تنظیمات"
-        description="کارمزد، درآمد و وضعیت اتصال سوپابیس."
+        title={guide.title}
+        description="کارمزد، پلن Plus، پاداش رفرال و سلامت اتصال دیتابیس."
+      />
+      <AdminGuide
+        purpose={guide.purpose}
+        whenToUse={guide.whenToUse}
+        sandboxNote={guide.sandboxNote}
       />
 
       <div className="space-y-6">
@@ -38,6 +46,10 @@ export default async function AdminSettingsPage() {
 
         <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5">
           <h2 className="font-bold">اتصال دیتابیس</h2>
+          <p className="mt-2 text-[13px] leading-6 text-white/45">
+            اگر متغیرهای عمومی یا Service Role ناقص باشد، ورود لایو، کرون درآمد و
+            ذخیره قیمت درست کار نمی‌کند.
+          </p>
           <dl className="mt-4 space-y-3 text-[14px]">
             <div className="flex items-center justify-between gap-4">
               <dt className="text-white/55">متغیرهای عمومی</dt>
@@ -66,7 +78,7 @@ export default async function AdminSettingsPage() {
             </div>
           </dl>
           <p className="mt-4 text-[13px] text-white/45">
-            Cron درآمد:{" "}
+            Cron درآمد (DCA و هشدار قیمت):{" "}
             <code className="rounded bg-white/5 px-1 text-[12px]" dir="ltr">
               GET /api/cron/revenue
             </code>

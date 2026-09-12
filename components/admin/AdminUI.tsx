@@ -60,6 +60,45 @@ export function AdminPageHeader({
   );
 }
 
+/** باکس راهنما زیر عنوان — کاربرد بخش برای اپراتور ادمین */
+export function AdminGuide({
+  purpose,
+  whenToUse,
+  sandboxNote,
+}: {
+  purpose: string;
+  whenToUse: readonly string[];
+  sandboxNote?: string;
+}) {
+  return (
+    <section
+      className="mb-6 rounded-2xl border border-white/10 bg-gradient-to-l from-gold/[0.06] to-[#0F1724] p-5 md:mb-8"
+      aria-label="راهنمای این بخش"
+    >
+      <p className="text-[14px] leading-7 text-white/75">{purpose}</p>
+      {whenToUse.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[12px] font-bold text-gold/90">چه زمانی از این صفحه استفاده کنید</p>
+          <ul className="mt-2 space-y-1.5 text-[13px] leading-6 text-white/55">
+            {whenToUse.map((item) => (
+              <li key={item} className="flex gap-2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-gold/70" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {sandboxNote && (
+        <p className="mt-4 rounded-xl border border-warning/20 bg-warning/5 px-3 py-2.5 text-[12px] leading-6 text-warning/90">
+          <span className="font-bold">نکته سندباکس: </span>
+          {sandboxNote}
+        </p>
+      )}
+    </section>
+  );
+}
+
 export function AdminTable({
   headers,
   children,

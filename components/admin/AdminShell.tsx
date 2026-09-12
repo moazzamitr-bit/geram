@@ -78,9 +78,20 @@ export function AdminShell({
                     ? "bg-gold/15 text-gold"
                     : "text-white/65 hover:bg-white/[0.04] hover:text-white"
                 )}
+                title={item.hint}
               >
-                <Icon size={18} strokeWidth={1.7} />
-                {item.label}
+                <Icon size={18} strokeWidth={1.7} className="shrink-0" />
+                <span className="min-w-0">
+                  <span className="block leading-5">{item.label}</span>
+                  <span
+                    className={cn(
+                      "mt-0.5 block truncate text-[11px] leading-4",
+                      active ? "text-gold/55" : "text-white/35"
+                    )}
+                  >
+                    {item.hint}
+                  </span>
+                </span>
               </Link>
             );
           })}

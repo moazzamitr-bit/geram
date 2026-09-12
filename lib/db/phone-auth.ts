@@ -42,10 +42,19 @@ async function signInWithPhoneOrEmail(
   });
   if (byEmail.data.user) return byEmail;
 
-  return supabase.auth.signInWithPassword({
+  const byPhone = await supabase.auth.signInWithPassword({
     phone: creds.e164,
     password: creds.password,
   });
+  // Phone provider is often off in sandbox; keep email result so callers
+  // can fall through to sign-up / service-role provisioning.
+  if (
+    byPhone.error &&
+    /phone logins are disabled/i.test(byPhone.error.message)
+  ) {
+    return byEmail;
+  }
+  return byPhone;
 }
 
 async function ensureWithServiceRole(

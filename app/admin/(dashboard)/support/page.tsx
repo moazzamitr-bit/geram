@@ -1,18 +1,26 @@
 import {
   AdminBadge,
+  AdminGuide,
   AdminPageHeader,
   AdminTable,
 } from "@/components/admin/AdminUI";
+import { adminPageGuides } from "@/lib/admin/page-guides";
 import { listTickets } from "@/lib/db/admin-queries";
 
 export default async function AdminSupportPage() {
   const rows = await listTickets(100);
+  const guide = adminPageGuides.support;
 
   return (
     <div>
       <AdminPageHeader
-        title="پشتیبانی"
-        description="تیکت‌های کاربران و وضعیت رسیدگی."
+        title={guide.title}
+        description="تیکت‌های ثبت‌شده از اپ کاربر و وضعیت رسیدگی."
+      />
+      <AdminGuide
+        purpose={guide.purpose}
+        whenToUse={guide.whenToUse}
+        sandboxNote={guide.sandboxNote}
       />
       <AdminTable
         headers={["موضوع", "دسته", "کاربر", "وضعیت", "به‌روزرسانی"]}

@@ -1,19 +1,27 @@
 import {
   AdminBadge,
+  AdminGuide,
   AdminPageHeader,
   AdminTable,
 } from "@/components/admin/AdminUI";
+import { adminPageGuides } from "@/lib/admin/page-guides";
 import { listTransactions } from "@/lib/db/admin-queries";
 import { formatToman } from "@/lib/utils";
 
 export default async function AdminTransactionsPage() {
   const rows = await listTransactions(100);
+  const guide = adminPageGuides.transactions;
 
   return (
     <div>
       <AdminPageHeader
-        title="تراکنش‌ها"
-        description="همه خرید، فروش، واریز، برداشت و تحویل."
+        title={guide.title}
+        description="لاگ خرید، فروش، واریز، برداشت و تحویل با کد پیگیری."
+      />
+      <AdminGuide
+        purpose={guide.purpose}
+        whenToUse={guide.whenToUse}
+        sandboxNote={guide.sandboxNote}
       />
       <AdminTable
         headers={["کد", "نوع", "کاربر", "طلا", "مبلغ", "وضعیت", "زمان"]}

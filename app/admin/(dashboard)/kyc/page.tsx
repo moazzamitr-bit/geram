@@ -1,18 +1,26 @@
 import {
   AdminBadge,
+  AdminGuide,
   AdminPageHeader,
   AdminTable,
 } from "@/components/admin/AdminUI";
+import { adminPageGuides } from "@/lib/admin/page-guides";
 import { listProfiles } from "@/lib/db/admin-queries";
 
 export default async function AdminKycPage() {
   const rows = await listProfiles(200);
+  const guide = adminPageGuides.kyc;
 
   return (
     <div>
       <AdminPageHeader
-        title="احراز هویت"
-        description="وضعیت KYC کاربران برای تأیید دستی."
+        title={guide.title}
+        description="وضعیت مدارک هویت کاربران برای بررسی عملیاتی."
+      />
+      <AdminGuide
+        purpose={guide.purpose}
+        whenToUse={guide.whenToUse}
+        sandboxNote={guide.sandboxNote}
       />
       <AdminTable
         headers={["کاربر", "تماس", "وضعیت", "تاریخ"]}

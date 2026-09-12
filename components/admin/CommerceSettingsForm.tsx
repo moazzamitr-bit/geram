@@ -113,8 +113,10 @@ export function CommerceSettingsForm({ initial }: Props) {
     <div className="space-y-5">
       <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5">
         <h2 className="font-bold">کارمزد معامله</h2>
-        <p className="mt-1 text-[13px] text-white/45">
-          درصد را به‌صورت اعشاری وارد کنید — مثلاً ۰٫۷٪ = <span dir="ltr">0.007</span>
+        <p className="mt-1 text-[13px] leading-6 text-white/45">
+          درآمد پلتفرم از خرید، فروش، برداشت و هر اجرای DCA. مقادیر «رایگان» برای
+          کاربر عادی و «پلاس» برای مشترک گرم‌پلاس اعمال می‌شود. درصد را اعشاری
+          وارد کنید — مثلاً ۰٫۷٪ = <span dir="ltr">0.007</span>
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="درصد کارمزد خرید — رایگان">
@@ -209,6 +211,10 @@ export function CommerceSettingsForm({ initial }: Props) {
 
       <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5">
         <h2 className="font-bold">گرم پلاس</h2>
+        <p className="mt-1 text-[13px] leading-6 text-white/45">
+          اشتراک ویژه با کارمزد کمتر و سقف بالاتر برای برنامه‌های خرید خودکار
+          (DCA). قیمت ماهانه و محدودیت تعداد برنامه اینجا تنظیم می‌شود.
+        </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="قیمت ماهانه (تومان)">
             <NumberInput
@@ -243,6 +249,10 @@ export function CommerceSettingsForm({ initial }: Props) {
 
       <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5">
         <h2 className="font-bold">پاداش دعوت دوستان</h2>
+        <p className="mt-1 text-[13px] leading-6 text-white/45">
+          وقتی کاربر جدید با کد معرف ثبت‌نام کند، این مبالغ به‌صورت رویداد رفرال
+          ثبت می‌شود. وضعیت پرداخت را در بخش «رفرال» ببینید.
+        </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="پاداش دعوت‌کننده (تومان)">
             <NumberInput

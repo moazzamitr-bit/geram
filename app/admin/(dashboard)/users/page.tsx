@@ -1,18 +1,26 @@
 import {
   AdminBadge,
+  AdminGuide,
   AdminPageHeader,
   AdminTable,
 } from "@/components/admin/AdminUI";
+import { adminPageGuides } from "@/lib/admin/page-guides";
 import { listProfiles } from "@/lib/db/admin-queries";
 
 export default async function AdminUsersPage() {
   const rows = await listProfiles(100);
+  const guide = adminPageGuides.users;
 
   return (
     <div>
       <AdminPageHeader
-        title="کاربران"
-        description="لیست پروفایل‌های ثبت‌شده در سوپابیس."
+        title={guide.title}
+        description="پروفایل‌های ثبت‌شده، نقش و وضعیت هویت."
+      />
+      <AdminGuide
+        purpose={guide.purpose}
+        whenToUse={guide.whenToUse}
+        sandboxNote={guide.sandboxNote}
       />
       <AdminTable
         headers={["نام", "تلفن/ایمیل", "نقش", "KYC", "عضویت"]}

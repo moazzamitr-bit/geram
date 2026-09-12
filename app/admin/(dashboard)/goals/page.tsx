@@ -1,15 +1,26 @@
-import { AdminPageHeader, AdminTable } from "@/components/admin/AdminUI";
+import {
+  AdminGuide,
+  AdminPageHeader,
+  AdminTable,
+} from "@/components/admin/AdminUI";
+import { adminPageGuides } from "@/lib/admin/page-guides";
 import { listGoals } from "@/lib/db/admin-queries";
 import { formatToman } from "@/lib/utils";
 
 export default async function AdminGoalsPage() {
   const rows = await listGoals(100);
+  const guide = adminPageGuides.goals;
 
   return (
     <div>
       <AdminPageHeader
-        title="اهداف پس‌انداز"
-        description="اهداف پس‌انداز کاربران و پیشرفت آن‌ها."
+        title={guide.title}
+        description="اهدافی که کاربران برای پس‌انداز طلا یا تومان ساخته‌اند."
+      />
+      <AdminGuide
+        purpose={guide.purpose}
+        whenToUse={guide.whenToUse}
+        sandboxNote={guide.sandboxNote}
       />
       <AdminTable
         headers={["عنوان", "کاربر", "هدف", "پیشرفت", "ماهانه"]}

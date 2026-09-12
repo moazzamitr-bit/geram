@@ -1,19 +1,27 @@
 import {
   AdminBadge,
+  AdminGuide,
   AdminPageHeader,
   AdminTable,
 } from "@/components/admin/AdminUI";
+import { adminPageGuides } from "@/lib/admin/page-guides";
 import { listWallets } from "@/lib/db/admin-queries";
 import { formatToman } from "@/lib/utils";
 
 export default async function AdminWalletsPage() {
   const rows = await listWallets(100);
+  const guide = adminPageGuides.wallets;
 
   return (
     <div>
       <AdminPageHeader
-        title="کیف پول‌ها"
-        description="موجودی طلا و تومان هر کاربر."
+        title={guide.title}
+        description="موجودی طلا و تومان هر کاربر در دیتابیس."
+      />
+      <AdminGuide
+        purpose={guide.purpose}
+        whenToUse={guide.whenToUse}
+        sandboxNote={guide.sandboxNote}
       />
       <AdminTable
         headers={["کاربر", "KYC", "طلا (گرم)", "قابل استفاده", "در انتظار"]}

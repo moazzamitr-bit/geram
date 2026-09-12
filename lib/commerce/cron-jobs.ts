@@ -163,6 +163,23 @@ export async function runDcaCron(): Promise<CronRunSummary["dca"]> {
       `${(goldMg / 1000).toFixed(3)} گرم طلا خریداری شد.`,
       `/app/transactions/${txId}`
     );
+
+    try {
+      const { bookCustomerBuy } = await import("@/lib/treasury/service");
+      await bookCustomerBuy({
+        asset: "GOLD",
+        weightMg: goldMg,
+        midPriceTomanPerGram: price,
+        customerPriceTomanPerGram: price,
+        feeRevenueToman: totalFee,
+        transactionId: txId,
+        userId,
+        allowShortInventory: true,
+      });
+    } catch (e) {
+      console.error("treasury DCA book", e);
+    }
+
     summary.success += 1;
   }
 
@@ -312,6 +329,22 @@ export async function runAlertsCron(): Promise<
       `${(goldMg / 1000).toFixed(3)} گرم طلا پس از هشدار قیمت خریداری شد.`,
       `/app/transactions/${txId}`
     );
+
+    try {
+      const { bookCustomerBuy } = await import("@/lib/treasury/service");
+      await bookCustomerBuy({
+        asset: "GOLD",
+        weightMg: goldMg,
+        midPriceTomanPerGram: price,
+        customerPriceTomanPerGram: price,
+        feeRevenueToman: fee,
+        transactionId: txId,
+        userId,
+        allowShortInventory: true,
+      });
+    } catch (e) {
+      console.error("treasury alert-buy book", e);
+    }
   }
 
   return { alerts: summary };

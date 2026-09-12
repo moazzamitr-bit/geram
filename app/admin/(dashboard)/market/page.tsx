@@ -1,8 +1,10 @@
 import {
   AdminBadge,
+  AdminGuide,
   AdminPageHeader,
   AdminTable,
 } from "@/components/admin/AdminUI";
+import { adminPageGuides } from "@/lib/admin/page-guides";
 import { listMarketPrices } from "@/lib/db/admin-queries";
 import { formatToman } from "@/lib/utils";
 import { GoldButton } from "@/components/ui/GoldButton";
@@ -10,12 +12,13 @@ import Link from "next/link";
 
 export default async function AdminMarketPage() {
   const rows = await listMarketPrices(40);
+  const guide = adminPageGuides.market;
 
   return (
     <div>
       <AdminPageHeader
-        title="بازار و قیمت"
-        description="تاریخچه قیمت طلای ۱۸ عیار ذخیره‌شده در سوپابیس."
+        title={guide.title}
+        description="تاریخچه قیمت طلای ۱۸ عیار ذخیره‌شده به‌عنوان مرجع پلتفرم."
         action={
           <Link href="/api/market/price?persist=1">
             <GoldButton type="button" size="sm">
@@ -23,6 +26,11 @@ export default async function AdminMarketPage() {
             </GoldButton>
           </Link>
         }
+      />
+      <AdminGuide
+        purpose={guide.purpose}
+        whenToUse={guide.whenToUse}
+        sandboxNote={guide.sandboxNote}
       />
       <AdminTable
         headers={["قیمت", "تغییر", "منبع", "زمان"]}

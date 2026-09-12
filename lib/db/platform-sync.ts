@@ -229,7 +229,29 @@ export async function persistTransaction(tx: DemoTransaction) {
   const { error } = await auth.supabase.from("transactions").upsert(row, {
     onConflict: isUuid(tx.id) ? "id" : "tracking_code",
   });
-  if (error) console.error("persistTransaction", error.message);
+  if (error) {
+    console.error("persistTransaction", error.message);
+    return;
+  }
+
+  // Treasury bookkeeping — fire-and-forget; never blocks customer UX
+  if (tx.type === "خرید" || tx.type === "فروش") {
+    void fetch("/api/treasury/book-trade", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        side: tx.type === "خرید" ? "CUSTOMER_BUY" : "CUSTOMER_SELL",
+        asset: "GOLD",
+        weightMg: tx.goldMg,
+        midPriceTomanPerGram: tx.pricePerGram,
+        customerPriceTomanPerGram: tx.pricePerGram,
+        feeRevenueToman: tx.feeRial,
+        customerNetToman: tx.type === "فروش" ? tx.amountRial : undefined,
+        transactionId: isUuid(tx.id) ? tx.id : undefined,
+        userId: auth.user.id,
+      }),
+    }).catch((e) => console.error("treasury book-trade", e));
+  }
 }
 
 export async function persistGoal(goal: DemoGoal) {

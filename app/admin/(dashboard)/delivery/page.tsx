@@ -1,19 +1,27 @@
 import {
   AdminBadge,
+  AdminGuide,
   AdminPageHeader,
   AdminTable,
 } from "@/components/admin/AdminUI";
+import { adminPageGuides } from "@/lib/admin/page-guides";
 import { listDeliveries } from "@/lib/db/admin-queries";
 import { formatToman } from "@/lib/utils";
 
 export default async function AdminDeliveryPage() {
   const rows = await listDeliveries(100);
+  const guide = adminPageGuides.delivery;
 
   return (
     <div>
       <AdminPageHeader
-        title="درخواست‌های تحویل"
-        description="پیگیری تحویل فیزیکی طلا به مشتریان."
+        title={guide.title}
+        description="صف درخواست تبدیل موجودی دیجیتال به طلای فیزیکی."
+      />
+      <AdminGuide
+        purpose={guide.purpose}
+        whenToUse={guide.whenToUse}
+        sandboxNote={guide.sandboxNote}
       />
       <AdminTable
         headers={["کاربر", "محصول", "وزن", "روش", "کارمزد", "وضعیت", "زمان"]}

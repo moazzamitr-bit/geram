@@ -1,19 +1,27 @@
 import {
   AdminBadge,
+  AdminGuide,
   AdminPageHeader,
   AdminTable,
 } from "@/components/admin/AdminUI";
+import { adminPageGuides } from "@/lib/admin/page-guides";
 import { listReferralEvents } from "@/lib/db/admin-queries";
 import { formatToman } from "@/lib/utils";
 
 export default async function AdminReferralsPage() {
   const rows = await listReferralEvents(100);
+  const guide = adminPageGuides.referrals;
 
   return (
     <div>
       <AdminPageHeader
-        title="دعوت دوستان"
-        description="رویدادهای رفرال، پاداش‌ها و وضعیت پرداخت."
+        title={guide.title}
+        description="رویدادهای دعوت، مبلغ پاداش و وضعیت تسویه."
+      />
+      <AdminGuide
+        purpose={guide.purpose}
+        whenToUse={guide.whenToUse}
+        sandboxNote={guide.sandboxNote}
       />
       <AdminTable
         headers={[
