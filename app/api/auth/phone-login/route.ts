@@ -65,9 +65,18 @@ export async function POST(request: Request) {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "auth_failed";
+    const raw = err instanceof Error ? err.message : "auth_failed";
+    const message = /failed to fetch|fetch failed|networkerror|econnrefused|enotfound/i.test(
+      raw
+    )
+      ? "fetch failed"
+      : raw;
     const status =
-      /rate limit/i.test(message) ? 429 : /invalid_otp|invalid_phone/i.test(message) ? 400 : 500;
+      /rate limit/i.test(message)
+        ? 429
+        : /invalid_otp|invalid_phone/i.test(message)
+          ? 400
+          : 500;
     return NextResponse.json({ ok: false, error: message }, { status });
   }
 }
