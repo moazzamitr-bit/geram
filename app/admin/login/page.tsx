@@ -29,10 +29,13 @@ export default function AdminLoginPage() {
           password,
         });
       if (signError) {
+        const msg = signError.message || "";
         setError(
-          signError.message.includes("Invalid login credentials")
+          /invalid login credentials/i.test(msg)
             ? "ایمیل یا رمز عبور اشتباه است."
-            : signError.message
+            : /failed to fetch|networkerror|fetch failed/i.test(msg)
+              ? "اتصال به سرور احراز هویت برقرار نشد. پروژه سوپابیس را از حالت Pause خارج کنید و دوباره تلاش کنید."
+              : msg
         );
         setLoading(false);
         return;
@@ -57,7 +60,12 @@ export default function AdminLoginPage() {
       router.replace("/admin");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "خطا در ورود");
+      const msg = err instanceof Error ? err.message : "خطا در ورود";
+      setError(
+        /failed to fetch|networkerror|fetch failed/i.test(msg)
+          ? "اتصال به سرور احراز هویت برقرار نشد. پروژه سوپابیس را از حالت Pause خارج کنید و دوباره تلاش کنید."
+          : msg
+      );
       setLoading(false);
     }
   };

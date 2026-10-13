@@ -30,6 +30,12 @@ npm run dev
 1. هر شماره معتبر `09xxxxxxxxx`
 2. کد OTP سندباکس: `123456`
 
+### پنل ادمین
+
+- مسیر: `/admin/login`
+- حساب باید در `profiles.role = 'admin'` باشد (ایمیل پیش‌فرض: `admin@geram.ir`)
+- اگر ورود با خطای شبکه/`fetch failed` شکست خورد، در داشبورد Supabase پروژه `wlxlobhetjbrhbfpsmzp` را از حالت **Paused / Inactive** خارج (Restore) کنید — پلن رایگان بعد از بی‌استفادگی پروژه را Pause می‌کند.
+
 ## نکات مهم
 
 - فعلاً حالت **DEMO / SANDBOX** است؛ درگاه بانکی، SMS واقعی و دفترکل سروری وجود ندارد.
