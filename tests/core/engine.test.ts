@@ -206,3 +206,33 @@ describe("outbox", () => {
     expect((await store.listPendingOutbox(20)).length).toBe(0);
   });
 });
+
+describe("per-user fee schedule", () => {
+  it("charges the caller's fee snapshot instead of the engine default", async () => {
+    const { core } = makeCore();
+    const user = "user-plus";
+    await core.sandboxDeposit(user, tomanToIrr(10_000_000), "dep-plus");
+    const amount = tomanToIrr(1_000_000);
+
+    const standard = await core.issueQuote({
+      userId: user,
+      asset: "GOLD",
+      side: "BUY",
+      inputMode: "RIAL_AMOUNT",
+      requestedIrr: amount,
+    });
+    const plus = await core.issueQuote({
+      userId: user,
+      asset: "GOLD",
+      side: "BUY",
+      inputMode: "RIAL_AMOUNT",
+      requestedIrr: amount,
+      fees: { buyFeeBps: 35n, buyFeeMinIrr: 0n, sellFeeBps: 35n, sellFeeMinIrr: 0n },
+    });
+
+    // 0.35% of the ticket, no minimum-fee floor, and cheaper than the default.
+    expect(plus.feeIrr).toBe((amount * 35n) / 10_000n);
+    expect(plus.feeIrr).toBeLessThan(standard.feeIrr);
+    expect(JSON.parse(plus.feeSnapshotJson).buyFeeBps).toBe("35");
+  });
+});

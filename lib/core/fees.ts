@@ -13,10 +13,10 @@ export type SpreadSnapshot = {
 };
 
 export const DEFAULT_FEE_SNAPSHOT: FeeSnapshot = {
-  buyFeeBps: 70n, // 0.70%
-  buyFeeMinIrr: 500_000n, // 50_000 toman
+  buyFeeBps: 50n, // 0.50%
+  buyFeeMinIrr: 0n,
   sellFeeBps: 50n,
-  sellFeeMinIrr: 300_000n,
+  sellFeeMinIrr: 0n,
 };
 
 export const DEFAULT_SPREAD_SNAPSHOT: SpreadSnapshot = {

@@ -34,14 +34,16 @@ export type CommerceSettings = {
 
 export const DEFAULT_COMMERCE_SETTINGS: CommerceSettings = {
   fees: {
-    buyFeePercentFree: 0.007,
-    buyFeeMinTomanFree: 50_000,
-    buyFeePercentPlus: 0.004,
-    buyFeeMinTomanPlus: 25_000,
+    // Competitive with Wallgold/Gerami (~0.5%, no punitive floor): a fixed
+    // minimum fee made small tickets cost 10–50%.
+    buyFeePercentFree: 0.005,
+    buyFeeMinTomanFree: 0,
+    buyFeePercentPlus: 0.0035,
+    buyFeeMinTomanPlus: 0,
     sellFeePercentFree: 0.005,
-    sellFeeMinTomanFree: 30_000,
-    sellFeePercentPlus: 0.003,
-    sellFeeMinTomanPlus: 15_000,
+    sellFeeMinTomanFree: 0,
+    sellFeePercentPlus: 0.0035,
+    sellFeeMinTomanPlus: 0,
     withdrawFeeTomanFree: 15_000,
     withdrawFeeTomanPlus: 0,
     dcaFeeTomanFree: 25_000,

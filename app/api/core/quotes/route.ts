@@ -3,6 +3,7 @@ import { getFinancialCore } from "@/lib/core/runtime";
 import { serializeQuote } from "@/lib/core/adapters";
 import { isAssetCode, uiInstrumentToAsset } from "@/lib/core/assets";
 import { gramsToUg, tomanToIrr } from "@/lib/core/money";
+import { resolveUserFeeSnapshot } from "@/lib/core/user-fees";
 import { CoreError, type InputMode, type QuoteSide } from "@/lib/core/types";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
       inputMode,
       requestedIrr,
       requestedWeightUg,
+      fees: await resolveUserFeeSnapshot(userId),
     });
     return Response.json({ ok: true, quote: serializeQuote(quote) });
   } catch (err) {
