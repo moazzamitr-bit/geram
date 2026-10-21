@@ -1,23 +1,33 @@
 import { cookies } from "next/headers";
-import { getExecutionMode } from "@/lib/core/mode";
+import { getExecutionMode, isDeployedEnvironment } from "@/lib/core/mode";
 import { CoreError } from "@/lib/core/types";
 import { isSupabaseConfigured } from "@/lib/db/types";
 
+/**
+ * The unauthenticated `geram_sandbox_uid` cookie is client-controlled, so it is
+ * only honoured on a local SANDBOX without Supabase. Anywhere else it would let
+ * a caller act as any user id.
+ */
+export function sandboxCookieIdentityAllowed() {
+  return (
+    !isSupabaseConfigured() &&
+    !isDeployedEnvironment() &&
+    getExecutionMode() === "SANDBOX"
+  );
+}
+
 export async function requireCoreUserId(): Promise<string> {
   if (isSupabaseConfigured()) {
-    try {
-      const { createClient } = await import("@/lib/supabase/server");
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user?.id) return user.id;
-    } catch {
-      /* sandbox fallback below */
-    }
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user?.id) return user.id;
+    throw new CoreError("unauthorized", "Authentication required", 401);
   }
 
-  if (getExecutionMode() === "PRODUCTION") {
+  if (!sandboxCookieIdentityAllowed()) {
     throw new CoreError("unauthorized", "Authentication required", 401);
   }
 
@@ -32,8 +42,11 @@ export function jsonError(err: unknown) {
       { status: err.httpStatus }
     );
   }
-  const message = err instanceof Error ? err.message : "internal_error";
-  return Response.json({ ok: false, error: "internal_error", message }, { status: 500 });
+  console.error("core_api_error", err);
+  return Response.json(
+    { ok: false, error: "internal_error", message: "خطای داخلی سرور" },
+    { status: 500 }
+  );
 }
 
 export function readIdempotencyKey(request: Request, bodyKey?: string) {

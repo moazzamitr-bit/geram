@@ -34,5 +34,6 @@ function mergeSettings(rows: { key: string; value: unknown }[]): CommerceSetting
       ...DEFAULT_COMMERCE_SETTINGS.referral,
       ...(map.referral as object),
     },
+    limits: { ...DEFAULT_COMMERCE_SETTINGS.limits, ...(map.limits as object) },
   };
 }

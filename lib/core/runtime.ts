@@ -176,5 +176,10 @@ export function readinessSnapshot() {
     sandboxSeedEnabled: flags.SANDBOX_SEED_ENABLED && mode === "SANDBOX",
     marketDataProductionApproved,
     financialWritesAllowed,
+    // Presence flags only — never values — so ops can see why login/trading fails.
+    serviceRoleConfigured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    phoneAuthReady:
+      Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY) ||
+      (process.env.PHONE_AUTH_PEPPER?.length ?? 0) >= 32,
   };
 }

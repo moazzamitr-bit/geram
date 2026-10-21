@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   FileText,
   Fingerprint,
+  Gauge,
   Lock,
   MonitorSmartphone,
   Scale,
@@ -22,6 +23,7 @@ import { useState } from "react";
 
 const links = [
   { href: "/app/profile/kyc", label: "احراز هویت", desc: "سطح دسترسی و سقف‌ها", icon: Fingerprint },
+  { href: "/app/profile/limits", label: "سقف تراکنش‌ها", desc: "خرید، فروش و برداشت امروز", icon: Gauge },
   { href: "/app/profile/security", label: "امنیت حساب", desc: "ورود و اعلان‌ها", icon: Lock },
   { href: "/app/profile/bank-accounts", label: "حساب‌های بانکی", desc: "واریز و برداشت", icon: Building2 },
   { href: "/app/profile/sessions", label: "نشست‌های فعال", desc: "دستگاه‌ها و ورودها", icon: MonitorSmartphone },
@@ -78,6 +80,15 @@ export default function ProfilePage() {
             <span dir="ltr" className="font-mono text-gold">
               {store.referralCode}
             </span>
+          </p>
+        )}
+        {store.commerceSettings.referral.feeSharePercent > 0 && (
+          <p className="mt-2 text-[13px] text-muted-app">
+            با معرفی دوستان،{" "}
+            <span className="text-gold">
+              {Math.round(store.commerceSettings.referral.feeSharePercent * 100).toLocaleString("fa-IR")}٪
+            </span>{" "}
+            از کارمزد خرید و فروش آن‌ها سهم شما می‌شود.
           </p>
         )}
         {!store.plusActive && (

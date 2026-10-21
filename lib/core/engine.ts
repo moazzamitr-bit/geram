@@ -57,6 +57,8 @@ export type IssueQuoteInput = {
   inputMode: InputMode;
   requestedIrr?: Irr;
   requestedWeightUg?: Microgram;
+  /** Per-user fee schedule (admin settings × plan tier); defaults to the engine's. */
+  fees?: FeeSnapshot;
 };
 
 export type WalletView = {
@@ -437,6 +439,22 @@ export class FinancialCore {
     );
   }
 
+  /**
+   * Expiry is otherwise lazy: an abandoned BUY quote would keep its inventory
+   * in PLATFORM_RESERVED until someone read it. Sweep before reserving more.
+   */
+  async releaseExpiredReservations(asset: AssetCode, limit = 50): Promise<number> {
+    const stale = await this.deps.store.listExpiredOpenQuotes(
+      asset,
+      this.now().toISOString(),
+      limit
+    );
+    for (const quote of stale) {
+      await this.expireQuoteIfNeeded(quote);
+    }
+    return stale.length;
+  }
+
   async issueQuote(input: IssueQuoteInput): Promise<Quote> {
     const spec = ASSET_SPECS[input.asset];
     if (!spec) throw new CoreError("unknown_asset", "Unknown asset");
@@ -462,6 +480,9 @@ export class FinancialCore {
 
     await this.bootstrap();
     await ensureUserAccounts(this.deps.store, input.userId);
+    if (input.side === "BUY") {
+      await this.releaseExpiredReservations(input.asset);
+    }
 
     const price = await this.deps.prices.getExecutable(input.asset);
     if (price.health === "UNAVAILABLE" || price.health === "PARSE_ERROR") {
@@ -481,6 +502,7 @@ export class FinancialCore {
       );
     }
 
+    const fees = input.fees ?? this.fees();
     const execution = applySpread(price.irrPerGram, input.side, this.spread());
     const requestedIrr =
       input.inputMode === "RIAL_AMOUNT" ? (input.requestedIrr ?? null) : null;
@@ -498,7 +520,7 @@ export class FinancialCore {
       requestedIrr: requestedIrr ?? 0n,
       requestedWeightUg: requestedWeightUg ?? 0n,
       executionPriceIrrPerGram: execution,
-      fees: this.fees(),
+      fees,
     });
 
     if (computed.weightUg < spec.minTradeUg || computed.weightUg > spec.maxTradeUg) {
@@ -526,10 +548,10 @@ export class FinancialCore {
       netIrr: computed.netIrr,
       weightUg: computed.weightUg,
       feeSnapshotJson: JSON.stringify({
-        buyFeeBps: this.fees().buyFeeBps.toString(),
-        buyFeeMinIrr: this.fees().buyFeeMinIrr.toString(),
-        sellFeeBps: this.fees().sellFeeBps.toString(),
-        sellFeeMinIrr: this.fees().sellFeeMinIrr.toString(),
+        buyFeeBps: fees.buyFeeBps.toString(),
+        buyFeeMinIrr: fees.buyFeeMinIrr.toString(),
+        sellFeeBps: fees.sellFeeBps.toString(),
+        sellFeeMinIrr: fees.sellFeeMinIrr.toString(),
       }),
       spreadSnapshotJson: JSON.stringify({
         buySpreadBps: this.spread().buySpreadBps.toString(),

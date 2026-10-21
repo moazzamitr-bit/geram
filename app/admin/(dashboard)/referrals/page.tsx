@@ -8,9 +8,14 @@ import {
 import { listReferralEvents } from "@/lib/db/admin-queries";
 import { formatToman } from "@/lib/utils";
 import { getExecutionMode, getFeatureFlags } from "@/lib/core/mode";
+import { loadCommerceSettings } from "@/lib/commerce/settings-server";
 
 export default async function AdminReferralsPage() {
-  const rows = await listReferralEvents(100);
+  const [rows, settings] = await Promise.all([
+    listReferralEvents(100),
+    loadCommerceSettings(),
+  ]);
+  const share = settings.referral.feeSharePercent;
   let enabled = false;
   try {
     enabled = getFeatureFlags(getExecutionMode()).REFERRAL_ENABLED;
@@ -22,7 +27,7 @@ export default async function AdminReferralsPage() {
     <div>
       <AdminPageHeader
         title="دعوت دوستان"
-        description="پرداخت پاداش به دفترکل تولید از جاب دمو انجام نمی‌شود."
+        description={`مدل سهم از کارمزد: ${Math.round(share * 100)}٪ کارمزد معاملات دعوت‌شده به دعوت‌کننده تعلق می‌گیرد. پرداخت هنوز به دفترکل متصل نیست.`}
       />
       <OpsBadge state={enabled ? "SANDBOX" : "NOT_READY"} />
       <AdminNotice title="REFERRAL_ENABLED">{String(enabled)}</AdminNotice>
@@ -32,6 +37,8 @@ export default async function AdminReferralsPage() {
           "دعوت‌شده",
           "پاداش دعوت‌کننده",
           "پاداش دعوت‌شده",
+          "کارمزد معاملات دعوت‌شده",
+          "سهم دعوت‌کننده",
           "وضعیت",
           "تاریخ",
         ]}
@@ -57,6 +64,12 @@ export default async function AdminReferralsPage() {
               </td>
               <td className="px-4 py-3 tabular-nums text-[13px]">
                 {formatToman(Number(r.invitee_bonus_toman))}
+              </td>
+              <td className="px-4 py-3 tabular-nums text-[13px]">
+                {formatToman(r.inviteeFeesToman)}
+              </td>
+              <td className="px-4 py-3 tabular-nums text-[13px] text-gold">
+                {formatToman(Math.floor(r.inviteeFeesToman * share))}
               </td>
               <td className="px-4 py-3">
                 <AdminBadge

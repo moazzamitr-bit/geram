@@ -1,6 +1,7 @@
 "use client";
 
 import type { KycStatus } from "@/lib/auth/auth-context";
+import type { UiQuote } from "@/lib/core-api";
 import {
   DEFAULT_COMMERCE_SETTINGS,
   type CommerceSettings,
@@ -148,6 +149,14 @@ type DemoState = {
     instrument: InstrumentId,
     rial: number
   ) => Promise<{ ok: boolean; error?: string; txId?: string }>;
+  /** Server-locked quote the user reviews before confirming (price, fee, expiry). */
+  requestQuote: (input: {
+    instrument: InstrumentId;
+    side: "BUY" | "SELL";
+    toman?: number;
+    metalMg?: number;
+  }) => Promise<{ ok: boolean; error?: string; quote?: UiQuote }>;
+  executeQuote: (quoteId: string) => Promise<{ ok: boolean; error?: string; txId?: string }>;
   sellMetal: (
     instrument: InstrumentId,
     metalMg: number,
@@ -776,6 +785,62 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     [refreshFinancial]
   );
 
+  const requestQuote = useCallback(
+    async (input: {
+      instrument: InstrumentId;
+      side: "BUY" | "SELL";
+      toman?: number;
+      metalMg?: number;
+    }) => {
+      try {
+        const { coreApi } = await import("@/lib/core-api");
+        const res = await coreApi.issueQuote(
+          input.side === "BUY"
+            ? {
+                instrument: input.instrument,
+                side: "BUY",
+                inputMode: "RIAL_AMOUNT",
+                requestedToman: input.toman ?? 0,
+              }
+            : {
+                instrument: input.instrument,
+                side: "SELL",
+                inputMode: "METAL_WEIGHT",
+                requestedGrams: (input.metalMg ?? 0) / 1000,
+              }
+        );
+        return { ok: true, quote: res.quote.ui };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : "دریافت قیمت ممکن نشد",
+        };
+      }
+    },
+    []
+  );
+
+  const executeQuote = useCallback(
+    async (quoteId: string) => {
+      try {
+        const { coreApi } = await import("@/lib/core-api");
+        const idem =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : uid("idem");
+        const traded = await coreApi.executeTrade(quoteId, idem);
+        await refreshFinancial();
+        return { ok: true, txId: traded.trade.id };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : "ثبت معامله ممکن نشد",
+        };
+      }
+    },
+    [refreshFinancial]
+  );
+
   const buyGold = useCallback(
     (rial: number) => buyMetal("gold18", rial),
     [buyMetal]
@@ -820,6 +885,8 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       ...state,
       buyMetal,
       sellMetal,
+      requestQuote,
+      executeQuote,
       buyGold,
       sellGold,
       getMetalMg,
@@ -856,7 +923,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       },
       setPin: (pin) => setState((s) => ({ ...s, pin })),
       addBankAccount: (iban, bank) => {
-        const next = { id: newId(), iban, bank, verified: true };
+        const next = { id: newId(), iban, bank, verified: false };
         setState((s) => ({
           ...s,
           bankAccounts: [...s.bankAccounts, next],
@@ -958,14 +1025,11 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           ),
         }));
         if (liveDb) {
-          void import("@/lib/db/platform-sync").then(({ persistTicketReply }) => {
-            void persistTicketReply(id, text, "user");
-            void persistTicketReply(
-              id,
-              "پیام شما دریافت شد. تیم پشتیبانی به‌زودی پاسخ می‌دهد.",
-              "support"
-            );
-          });
+          // Only the user's own message is persisted; the acknowledgement above
+          // is local UI, not a real support reply.
+          void import("@/lib/db/platform-sync").then(({ persistTicketReply }) =>
+            persistTicketReply(id, text, "user")
+          );
         }
       },
       addScheduledPurchase: (amountRial, cadence) => {
@@ -1049,7 +1113,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       },
       refreshMarketPrice,
     }),
-    [hydrated, state, liveDb, buyMetal, sellMetal, buyGold, sellGold, getMetalMg, getAvgBuyPrice, getMarketPrice, deposit, withdraw, refreshMarketPrice, refreshFinancial]
+    [hydrated, state, liveDb, buyMetal, sellMetal, requestQuote, executeQuote, buyGold, sellGold, getMetalMg, getAvgBuyPrice, getMarketPrice, deposit, withdraw, refreshMarketPrice, refreshFinancial]
   );
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;

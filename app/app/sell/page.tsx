@@ -8,6 +8,7 @@ import { TradeSuccessSheet } from "@/components/app/TradeSuccessSheet";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { sellQuote } from "@/lib/commerce/fees";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
+import type { UiQuote } from "@/lib/core-api";
 import {
   INSTRUMENTS,
   type InstrumentId,
@@ -39,6 +40,9 @@ function SellPageInner() {
   const [error, setError] = useState("");
   const [doneTx, setDoneTx] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Only the server quote can be confirmed; the summary card is an estimate.
+  const [locked, setLocked] = useState<UiQuote | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const meta = INSTRUMENTS[instrument];
   const price = store.getMarketPrice(instrument);
@@ -46,7 +50,19 @@ function SellPageInner() {
 
   useEffect(() => {
     setInstrument(parseInstrumentId(searchParams.get("instrument")));
+    setLocked(null);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!locked) return;
+    const t = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(t);
+  }, [locked]);
+
+  const secondsLeft = locked
+    ? Math.max(0, Math.ceil((new Date(locked.expiresAt).getTime() - now) / 1000))
+    : 0;
+  const lockedExpired = Boolean(locked) && secondsLeft === 0;
 
   const metalMg = useMemo(() => {
     if (mode === "weight") return Math.round(grams * 1000);
@@ -61,28 +77,52 @@ function SellPageInner() {
 
   const resetForm = () => {
     setDoneTx(null);
+    setLocked(null);
   };
 
   const onInstrumentChange = (id: InstrumentId) => {
     setInstrument(id);
     setError("");
+    setLocked(null);
     router.replace(`/app/sell?instrument=${id}`);
   };
 
-  const onConfirm = () => {
+  const onRequestQuote = async () => {
     setError("");
+    if (dest === "bank") {
+      setError("تسویه بانکی در این نسخه فعال نیست. فروش به کیف پول گرم استفاده کنید.");
+      return;
+    }
+    if (metalMg <= 0 || metalMg > heldMg) {
+      setError(`مقدار ${meta.label} قابل فروش کافی نیست.`);
+      return;
+    }
     setLoading(true);
-    setTimeout(() => {
-      void (async () => {
-        const res = await store.sellMetal(instrument, metalMg, dest);
-        setLoading(false);
-        if (!res.ok) {
-          setError(res.error ?? "خطا");
-          return;
-        }
-        setDoneTx(res.txId ?? null);
-      })();
-    }, 700);
+    const res = await store.requestQuote({ instrument, side: "SELL", metalMg });
+    setLoading(false);
+    if (!res.ok || !res.quote) {
+      setError(res.error ?? "دریافت قیمت ممکن نشد");
+      return;
+    }
+    setNow(Date.now());
+    setLocked(res.quote);
+  };
+
+  const onConfirm = async () => {
+    setError("");
+    if (!locked || lockedExpired) {
+      setError("اعتبار قیمت تمام شد. قیمت جدید بگیرید.");
+      return;
+    }
+    setLoading(true);
+    const res = await store.executeQuote(locked.id);
+    setLoading(false);
+    if (!res.ok) {
+      setError(res.error ?? "خطا");
+      setLocked(null);
+      return;
+    }
+    setDoneTx(res.txId ?? null);
   };
 
   return (
@@ -146,7 +186,10 @@ function SellPageInner() {
                 step="0.001"
                 min={0}
                 value={grams}
-                onChange={(e) => setGrams(Number(e.target.value))}
+                onChange={(e) => {
+                  setGrams(Number(e.target.value));
+                  setLocked(null);
+                }}
                 className="mt-2 h-14 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-left text-[24px] font-bold tabular-nums text-text outline-none focus:border-gold"
               />
             </label>
@@ -157,9 +200,10 @@ function SellPageInner() {
                 dir="ltr"
                 inputMode="numeric"
                 value={rialTarget}
-                onChange={(e) =>
-                  setRialTarget(Number(e.target.value.replace(/\D/g, "") || 0))
-                }
+                onChange={(e) => {
+                  setRialTarget(Number(e.target.value.replace(/\D/g, "") || 0));
+                  setLocked(null);
+                }}
                 className="mt-2 h-14 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-left text-[24px] font-bold tabular-nums text-text outline-none focus:border-gold"
               />
             </label>
@@ -171,7 +215,8 @@ function SellPageInner() {
         </AppCard>
 
         <AppCard>
-          <h2 className="text-[15px] font-bold text-text">خلاصه فروش</h2>
+          <h2 className="text-[15px] font-bold text-text">برآورد فروش</h2>
+          <p className="mt-1 text-[12px] text-muted-app">تخمینی — قیمت قطعی در مرحله بعد</p>
           <dl className="mt-4 space-y-3 text-[13px] tabular-nums">
             <div className="flex justify-between">
               <dt className="text-muted-app">وزن</dt>
@@ -220,19 +265,60 @@ function SellPageInner() {
               ? "تسویه بانکی معمولاً تا یک روز کاری (در سندباکس: وضعیت در انتظار)."
               : "واریز آنی به موجودی قابل استفاده کیف پول."}
           </p>
+          {locked && (
+            <div className="mt-4 rounded-xl border border-gold/30 bg-gold/5 p-4">
+              <div className="flex items-center justify-between text-[12px]">
+                <span className="font-bold text-gold">قیمت قطعی</span>
+                <span className={lockedExpired ? "text-negative" : "text-warning"}>
+                  {lockedExpired
+                    ? "منقضی شد"
+                    : `معتبر تا ${secondsLeft.toLocaleString("fa-IR")} ثانیه`}
+                </span>
+              </div>
+              <dl className="mt-3 space-y-2 text-[13px] tabular-nums">
+                <div className="flex justify-between">
+                  <dt className="text-muted-app">قیمت هر گرم</dt>
+                  <dd>{formatToman(locked.pricePerGram)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-app">وزن</dt>
+                  <dd>{mgToGramsLabel(locked.goldMg)} گرم</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-app">کارمزد</dt>
+                  <dd>{formatToman(locked.fee)}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted-app">واریز به کیف پول</dt>
+                  <dd className="font-bold text-gold">{formatToman(locked.net)}</dd>
+                </div>
+              </dl>
+            </div>
+          )}
           {error && (
             <p className="mt-3 text-[13px] text-negative" role="alert">
               {error}
             </p>
           )}
-          <GoldButton
-            type="button"
-            className="mt-5 w-full"
-            disabled={loading}
-            onClick={onConfirm}
-          >
-            {loading ? "در حال ثبت..." : `تأیید و فروش ${meta.label}`}
-          </GoldButton>
+          {!locked || lockedExpired ? (
+            <GoldButton
+              type="button"
+              className="mt-5 w-full"
+              disabled={loading}
+              onClick={() => void onRequestQuote()}
+            >
+              {loading ? "در حال دریافت قیمت..." : lockedExpired ? "دریافت قیمت جدید" : "دریافت قیمت قطعی"}
+            </GoldButton>
+          ) : (
+            <GoldButton
+              type="button"
+              className="mt-5 w-full"
+              disabled={loading}
+              onClick={() => void onConfirm()}
+            >
+              {loading ? "در حال ثبت..." : `تأیید و فروش ${meta.label}`}
+            </GoldButton>
+          )}
         </AppCard>
       </div>
     </div>

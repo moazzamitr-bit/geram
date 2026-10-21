@@ -10,14 +10,26 @@ on:
 jobs:
   migrate:
     runs-on: ubuntu-latest
-    if: ${{ secrets.SUPABASE_DB_URL != '' }}
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     steps:
+      # `secrets` is not allowed in a job-level `if`, which made this workflow
+      # invalid. Check the secret at step level instead.
+      - name: Check secret
+        id: check
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::SUPABASE_DB_URL is not set; skipping migrations."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
+        if: steps.check.outputs.skip == 'false'
       - uses: supabase/setup-cli@v1
+        if: steps.check.outputs.skip == 'false'
         with:
           version: latest
       - name: Apply migrations
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          supabase db push --db-url "$SUPABASE_DB_URL" --include-all
+        if: steps.check.outputs.skip == 'false'
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --include-all

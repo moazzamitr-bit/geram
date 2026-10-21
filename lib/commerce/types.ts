@@ -24,38 +24,57 @@ export type ReferralSettings = {
   inviterBonusToman: number;
   inviteeBonusToman: number;
   minKycForPayout: boolean;
+  /** Share of each invitee's trade fees credited to the inviter (Gerami model). */
+  feeSharePercent: number;
+};
+
+/** Per-user daily caps, shown to users like Milli's limits sheet. */
+export type LimitSettings = {
+  dailyBuyToman: number;
+  dailySellToman: number;
+  dailyWithdrawToman: number;
 };
 
 export type CommerceSettings = {
   fees: FeeSettings;
   plus: PlusSettings;
   referral: ReferralSettings;
+  limits: LimitSettings;
 };
 
 export const DEFAULT_COMMERCE_SETTINGS: CommerceSettings = {
   fees: {
-    buyFeePercentFree: 0.007,
-    buyFeeMinTomanFree: 50_000,
-    buyFeePercentPlus: 0.004,
-    buyFeeMinTomanPlus: 25_000,
+    // Competitive with Wallgold/Gerami (~0.5%, no punitive floor): a fixed
+    // minimum fee made small tickets cost 10–50%.
+    buyFeePercentFree: 0.005,
+    buyFeeMinTomanFree: 0,
+    buyFeePercentPlus: 0.0035,
+    buyFeeMinTomanPlus: 0,
     sellFeePercentFree: 0.005,
-    sellFeeMinTomanFree: 30_000,
-    sellFeePercentPlus: 0.003,
-    sellFeeMinTomanPlus: 15_000,
-    withdrawFeeTomanFree: 15_000,
+    sellFeeMinTomanFree: 0,
+    sellFeePercentPlus: 0.0035,
+    sellFeeMinTomanPlus: 0,
+    // Competitors don't charge for withdrawals or scheduled buys beyond the trade fee.
+    withdrawFeeTomanFree: 0,
     withdrawFeeTomanPlus: 0,
-    dcaFeeTomanFree: 25_000,
-    dcaFeeTomanPlus: 10_000,
+    dcaFeeTomanFree: 0,
+    dcaFeeTomanPlus: 0,
   },
   plus: {
-    monthlyPriceToman: 99_000,
-    maxDcaFree: 1,
+    monthlyPriceToman: 49_000,
+    maxDcaFree: 3,
     maxDcaPlus: 10,
     smsAlertsPlusOnly: true,
   },
   referral: {
-    inviterBonusToman: 100_000,
-    inviteeBonusToman: 50_000,
+    inviterBonusToman: 0,
+    inviteeBonusToman: 0,
     minKycForPayout: true,
+    feeSharePercent: 0.15,
+  },
+  limits: {
+    dailyBuyToman: 1_000_000_000,
+    dailySellToman: 500_000_000,
+    dailyWithdrawToman: 50_000_000,
   },
 };

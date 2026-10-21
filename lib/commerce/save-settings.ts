@@ -32,12 +32,20 @@ const referralSchema = z.object({
   inviterBonusToman: z.number().int().min(0).max(100_000_000),
   inviteeBonusToman: z.number().int().min(0).max(100_000_000),
   minKycForPayout: z.boolean(),
+  feeSharePercent: z.number().min(0).max(0.5),
+});
+
+const limitsSchema = z.object({
+  dailyBuyToman: z.number().int().min(0).max(100_000_000_000),
+  dailySellToman: z.number().int().min(0).max(100_000_000_000),
+  dailyWithdrawToman: z.number().int().min(0).max(100_000_000_000),
 });
 
 export const commerceSettingsSchema = z.object({
   fees: feeSchema,
   plus: plusSchema,
   referral: referralSchema,
+  limits: limitsSchema,
 });
 
 export function parseCommerceSettings(input: unknown): CommerceSettings {
@@ -56,6 +64,7 @@ export async function saveCommerceSettings(
       value: settings.referral,
       updated_at: new Date().toISOString(),
     },
+    { key: "limits", value: settings.limits, updated_at: new Date().toISOString() },
   ];
 
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -86,5 +95,6 @@ export function mergeWithDefaults(
       ...DEFAULT_COMMERCE_SETTINGS.referral,
       ...(partial.referral ?? {}),
     },
+    limits: { ...DEFAULT_COMMERCE_SETTINGS.limits, ...(partial.limits ?? {}) },
   };
 }

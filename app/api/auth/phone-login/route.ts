@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getExecutionMode } from "@/lib/core/mode";
 import { ensurePhoneUser } from "@/lib/db/phone-auth";
 import { isSupabaseConfigured } from "@/lib/db/types";
 
@@ -13,10 +14,25 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = (await request.json()) as { phone?: string; otp?: string };
+  // There is no SMS provider yet: the fixed demo code is a sandbox-only
+  // convenience and must never authenticate users in CLOSED_BETA/PRODUCTION.
+  let mode: string;
+  try {
+    mode = getExecutionMode();
+  } catch {
+    mode = "UNKNOWN";
+  }
+  if (mode !== "SANDBOX") {
+    return NextResponse.json(
+      { ok: false, error: "otp_provider_not_configured" },
+      { status: 503 }
+    );
+  }
+
+  const body = (await request.json().catch(() => ({}))) as { phone?: string; otp?: string };
   const phone = (body.phone ?? "").replace(/\D/g, "").replace(/^98/, "0");
   const otp = body.otp ?? "";
-  const demoOtp = process.env.NEXT_PUBLIC_DEMO_OTP || "123456";
+  const demoOtp = process.env.DEMO_OTP || process.env.NEXT_PUBLIC_DEMO_OTP || "123456";
 
   if (!/^09\d{9}$/.test(phone)) {
     return NextResponse.json({ ok: false, error: "invalid_phone" }, { status: 400 });
@@ -37,10 +53,8 @@ export async function POST(request: Request) {
       password,
     });
     if (error || !data.session) {
-      return NextResponse.json(
-        { ok: false, error: error?.message ?? "sign_in_failed" },
-        { status: 500 }
-      );
+      console.error("phone_login_sign_in", error?.message);
+      return NextResponse.json({ ok: false, error: "sign_in_failed" }, { status: 500 });
     }
 
     const { data: profile } = await supabase
@@ -66,8 +80,13 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "auth_failed";
-    const status =
-      /rate limit/i.test(message) ? 429 : /invalid_otp|invalid_phone/i.test(message) ? 400 : 500;
-    return NextResponse.json({ ok: false, error: message }, { status });
+    console.error("phone_login", message);
+    if (/rate limit/i.test(message)) {
+      return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
+    }
+    if (/invalid_otp|invalid_phone/i.test(message)) {
+      return NextResponse.json({ ok: false, error: "invalid_phone" }, { status: 400 });
+    }
+    return NextResponse.json({ ok: false, error: "auth_failed" }, { status: 500 });
   }
 }

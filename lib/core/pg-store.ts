@@ -398,6 +398,16 @@ export class PostgresCoreStore implements CoreStore {
     return big(rows[0]?.q);
   }
 
+  async listExpiredOpenQuotes(asset: AssetCode, nowIso: string, limit: number) {
+    const { rows } = await this.sql().query(
+      `select * from core_quotes
+       where asset=$1 and side='BUY' and status='ACTIVE' and expires_at <= $2
+       order by expires_at asc limit $3`,
+      [asset, nowIso, limit]
+    );
+    return rows.map(mapQuote);
+  }
+
   async insertTrade(trade: Trade) {
     try {
       await this.sql().exec(

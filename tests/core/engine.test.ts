@@ -206,3 +206,61 @@ describe("outbox", () => {
     expect((await store.listPendingOutbox(20)).length).toBe(0);
   });
 });
+
+describe("per-user fee schedule", () => {
+  it("charges the caller's fee snapshot instead of the engine default", async () => {
+    const { core } = makeCore();
+    const user = "user-plus";
+    await core.sandboxDeposit(user, tomanToIrr(10_000_000), "dep-plus");
+    const amount = tomanToIrr(1_000_000);
+
+    const standard = await core.issueQuote({
+      userId: user,
+      asset: "GOLD",
+      side: "BUY",
+      inputMode: "RIAL_AMOUNT",
+      requestedIrr: amount,
+    });
+    const plus = await core.issueQuote({
+      userId: user,
+      asset: "GOLD",
+      side: "BUY",
+      inputMode: "RIAL_AMOUNT",
+      requestedIrr: amount,
+      fees: { buyFeeBps: 35n, buyFeeMinIrr: 0n, sellFeeBps: 35n, sellFeeMinIrr: 0n },
+    });
+
+    // 0.35% of the ticket, no minimum-fee floor, and cheaper than the default.
+    expect(plus.feeIrr).toBe((amount * 35n) / 10_000n);
+    expect(plus.feeIrr).toBeLessThan(standard.feeIrr);
+    expect(JSON.parse(plus.feeSnapshotJson).buyFeeBps).toBe("35");
+  });
+});
+
+describe("abandoned buy quotes", () => {
+  it("release their inventory reservation when a new buy quote is issued", async () => {
+    let clock = new Date("2026-10-21T10:00:00Z");
+    // 1 g of gold in inventory; each quote reserves ~0.7 g, so two cannot coexist.
+    const { core } = makeCore({ now: () => clock, inventory: gramsToUg(1) });
+    const user = "user-abandon";
+    await core.sandboxDeposit(user, tomanToIrr(20_000_000), "dep-abandon");
+
+    const request = () =>
+      core.issueQuote({
+        userId: user,
+        asset: "GOLD",
+        side: "BUY",
+        inputMode: "RIAL_AMOUNT",
+        requestedIrr: tomanToIrr(5_000_000),
+      });
+
+    const abandoned = await request();
+    await expect(request()).rejects.toMatchObject({ code: "insufficient_inventory" });
+
+    clock = new Date(clock.getTime() + 60_000);
+    const fresh = await request();
+    expect(fresh.status).toBe("ACTIVE");
+    const expired = await core.getQuoteForUser(user, abandoned.id);
+    expect(expired?.status).toBe("EXPIRED");
+  });
+});

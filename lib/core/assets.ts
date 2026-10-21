@@ -41,7 +41,7 @@ export const ASSET_SPECS: Record<AssetCode, AssetSpec> = {
     priceInstrument: "IRAN_GOLD_18K_IRR_PER_GRAM",
     minTradeUg: UG_PER_GRAM / 1000n, // 1 mg
     maxTradeUg: UG_PER_GRAM * 10_000n,
-    minTradeIrr: 5_000_000n, // 500_000 toman
+    minTradeIrr: 1_000_000n, // 100_000 toman
     quoteTtlMs: 30_000,
     buyEnabled: true,
     sellEnabled: true,
@@ -59,7 +59,7 @@ export const ASSET_SPECS: Record<AssetCode, AssetSpec> = {
     priceInstrument: "IRAN_SILVER_999_IRR_PER_GRAM",
     minTradeUg: UG_PER_GRAM / 1000n,
     maxTradeUg: UG_PER_GRAM * 50_000n,
-    minTradeIrr: 2_000_000n, // 200_000 toman
+    minTradeIrr: 1_000_000n, // 100_000 toman
     quoteTtlMs: 30_000,
     buyEnabled: true,
     sellEnabled: true,

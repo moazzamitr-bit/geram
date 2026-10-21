@@ -56,6 +56,7 @@ export function CommerceSettingsForm({ initial }: Props) {
   const [fees, setFees] = useState(initial.fees);
   const [plus, setPlus] = useState(initial.plus);
   const [referral, setReferral] = useState(initial.referral);
+  const [limits, setLimits] = useState(initial.limits);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -86,7 +87,7 @@ export function CommerceSettingsForm({ initial }: Props) {
       const res = await fetch("/api/admin/commerce-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fees, plus, referral, reason }),
+        body: JSON.stringify({ fees, plus, referral, limits, reason }),
       });
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (!res.ok || !data.ok) {
@@ -106,6 +107,7 @@ export function CommerceSettingsForm({ initial }: Props) {
     setFees(initial.fees);
     setPlus(initial.plus);
     setReferral(initial.referral);
+    setLimits(initial.limits);
     setMsg("");
     setErr("");
   };
@@ -245,6 +247,16 @@ export function CommerceSettingsForm({ initial }: Props) {
       <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5">
         <h2 className="font-bold">پاداش دعوت دوستان</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field label="سهم دعوت‌کننده از کارمزد دوستان" hint="اعشاری — ۱۵٪ = 0.15">
+            <NumberInput
+              value={referral.feeSharePercent}
+              step="0.01"
+              onChange={(n) => setReferral((r) => ({ ...r, feeSharePercent: n }))}
+            />
+          </Field>
+          <div className="self-end pb-2 text-[12px] text-white/40">
+            مدل درآمد مشترک؛ پاداش ثابت را صفر بگذارید مگر برای کمپین.
+          </div>
           <Field label="پاداش دعوت‌کننده (تومان)">
             <NumberInput
               value={referral.inviterBonusToman}
@@ -274,6 +286,30 @@ export function CommerceSettingsForm({ initial }: Props) {
             />
             واریز پاداش فقط پس از احراز هویت
           </label>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5">
+        <h2 className="font-bold">سقف تراکنش روزانه هر کاربر</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <Field label="سقف خرید روزانه (تومان)">
+            <NumberInput
+              value={limits.dailyBuyToman}
+              onChange={(n) => setLimits((l) => ({ ...l, dailyBuyToman: n }))}
+            />
+          </Field>
+          <Field label="سقف فروش روزانه (تومان)">
+            <NumberInput
+              value={limits.dailySellToman}
+              onChange={(n) => setLimits((l) => ({ ...l, dailySellToman: n }))}
+            />
+          </Field>
+          <Field label="سقف برداشت روزانه (تومان)">
+            <NumberInput
+              value={limits.dailyWithdrawToman}
+              onChange={(n) => setLimits((l) => ({ ...l, dailyWithdrawToman: n }))}
+            />
+          </Field>
         </div>
       </div>
 
