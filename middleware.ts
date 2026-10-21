@@ -3,8 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const isAdmin = pathname.startsWith("/admin");
+  const isApp = pathname === "/app" || pathname.startsWith("/app/");
 
-  if (!pathname.startsWith("/admin")) {
+  if (!isAdmin && !isApp) {
     return NextResponse.next();
   }
 
@@ -49,8 +51,10 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user) {
+    // /app used to be gated only in the browser; enforce it on the server too.
     const login = request.nextUrl.clone();
-    login.pathname = "/admin/login";
+    login.pathname = isAdmin ? "/admin/login" : "/auth/login";
+    login.search = "";
     return NextResponse.redirect(login);
   }
 
@@ -58,5 +62,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/app", "/app/:path*"],
 };

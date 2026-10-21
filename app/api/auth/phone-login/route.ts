@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getExecutionMode } from "@/lib/core/mode";
+import { otpMode, verifyOtp } from "@/lib/auth/otp";
 import { ensurePhoneUser } from "@/lib/db/phone-auth";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { isSupabaseConfigured } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
@@ -14,31 +15,31 @@ export async function POST(request: Request) {
     );
   }
 
-  // There is no SMS provider yet: the fixed demo code is a sandbox-only
-  // convenience and must never authenticate users in CLOSED_BETA/PRODUCTION.
-  let mode: string;
-  try {
-    mode = getExecutionMode();
-  } catch {
-    mode = "UNKNOWN";
-  }
-  if (mode !== "SANDBOX") {
+  // Real SMS OTP when a provider is configured; the fixed demo code only in
+  // SANDBOX. Without either, login is refused (see lib/auth/otp.ts).
+  if (otpMode() === "unavailable") {
     return NextResponse.json(
       { ok: false, error: "otp_provider_not_configured" },
       { status: 503 }
     );
   }
 
+  const ipLimit = rateLimit(`login:ip:${clientIp(request)}`, 20, 10 * 60 * 1000);
+  if (!ipLimit.ok) return tooManyRequests(ipLimit.retryAfterSec);
+
   const body = (await request.json().catch(() => ({}))) as { phone?: string; otp?: string };
   const phone = (body.phone ?? "").replace(/\D/g, "").replace(/^98/, "0");
-  const otp = body.otp ?? "";
-  const demoOtp = process.env.DEMO_OTP || process.env.NEXT_PUBLIC_DEMO_OTP || "123456";
+  const otp = (body.otp ?? "").replace(/\D/g, "");
 
   if (!/^09\d{9}$/.test(phone)) {
     return NextResponse.json({ ok: false, error: "invalid_phone" }, { status: 400 });
   }
-  if (otp !== demoOtp) {
-    return NextResponse.json({ ok: false, error: "invalid_otp" }, { status: 401 });
+  const phoneLimit = rateLimit(`login:phone:${phone}`, 8, 10 * 60 * 1000);
+  if (!phoneLimit.ok) return tooManyRequests(phoneLimit.retryAfterSec);
+
+  const verified = await verifyOtp(phone, otp);
+  if (!verified.ok) {
+    return NextResponse.json({ ok: false, error: verified.error }, { status: 401 });
   }
 
   try {
