@@ -7,10 +7,8 @@ export const maxDuration = 60;
 function authorized(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
-  const header = request.headers.get("authorization");
-  if (header === `Bearer ${secret}`) return true;
-  const url = new URL(request.url);
-  return url.searchParams.get("secret") === secret;
+  // Header only: a secret in the query string ends up in access logs.
+  return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 export async function GET(request: Request) {

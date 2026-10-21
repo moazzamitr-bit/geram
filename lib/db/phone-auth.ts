@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { createClient as createBrowserOrServer } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/db/types";
@@ -16,11 +17,21 @@ function phoneE164(digits: string) {
   return `+98${normalized.slice(1)}`;
 }
 
-function phonePassword(phone: string) {
-  // Stable sandbox pepper — never derive from service-role (rotating it
-  // would invalidate every phone user's password).
-  const pepper = process.env.PHONE_AUTH_PEPPER || "gram-dev-pepper";
+/**
+ * Anon-only fallback (no service role). The password is derivable from the
+ * pepper, so the pepper must be a real secret: there is deliberately no default.
+ */
+function pepperedPassword(phone: string) {
+  const pepper = process.env.PHONE_AUTH_PEPPER;
+  if (!pepper || pepper.length < 32) {
+    throw new Error("phone_auth_misconfigured");
+  }
   return `gram-${pepper}-${phone.replace(/\D/g, "")}`;
+}
+
+/** One-time password for this sign-in; never stored or derivable. */
+function randomPassword() {
+  return randomBytes(32).toString("base64url");
 }
 
 function anonClient() {
@@ -31,48 +42,37 @@ function anonClient() {
   });
 }
 
-async function signInWithPhoneOrEmail(
-  supabase: ReturnType<typeof anonClient>,
-  creds: { email: string; password: string; e164: string }
-) {
-  const byEmail = await supabase.auth.signInWithPassword({
-    email: creds.email,
-    password: creds.password,
-  });
-  if (byEmail.data.user) return byEmail;
+async function findUserIdByEmail(
+  admin: ReturnType<typeof createServiceClient>,
+  email: string
+): Promise<string | null> {
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+  if (profile?.id) return profile.id as string;
 
-  const byPhone = await supabase.auth.signInWithPassword({
-    phone: creds.e164,
-    password: creds.password,
-  });
-  // Phone provider is off in this project; keep email result so callers
-  // can fall through to sign-up / service-role provisioning.
-  if (
-    byPhone.error &&
-    /phone logins are disabled/i.test(byPhone.error.message)
-  ) {
-    return byEmail;
+  // Profiles can lag auth.users (trigger failures); page through instead of
+  // only checking the first page.
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+    const found = data.users.find((u) => u.email === email);
+    if (found) return found.id;
+    if (data.users.length < 1000) break;
   }
-  return byPhone;
+  return null;
 }
 
-async function ensureWithServiceRole(
-  digits: string,
-  email: string,
-  password: string,
-  e164: string
-) {
+/**
+ * Service-role path: rotate the auth password to a fresh random value on every
+ * verified login, so knowing the phone number (or any server secret) is never
+ * enough to sign in directly against Supabase.
+ */
+async function ensureWithServiceRole(digits: string, email: string, e164: string) {
   const admin = createServiceClient();
-  const supabase = anonClient();
-
-  const existing = await signInWithPhoneOrEmail(supabase, {
-    email,
-    password,
-    e164,
-  });
-  if (existing.data.user) {
-    return { email, password, phone: digits };
-  }
+  const password = randomPassword();
 
   const { error: createError } = await admin.auth.admin.createUser({
     email,
@@ -83,61 +83,27 @@ async function ensureWithServiceRole(
     user_metadata: { phone: digits },
   });
 
-  if (createError && !/already|exists|registered/i.test(createError.message)) {
-    throw createError;
-  }
-
-  // If the user already existed with an older pepper/password, sync it.
-  if (createError && /already|exists|registered/i.test(createError.message)) {
-    const { data: listed, error: listError } =
-      await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    if (listError) throw listError;
-    const found = listed.users.find((u) => u.email === email);
-    if (found) {
-      const { error: updateError } = await admin.auth.admin.updateUserById(
-        found.id,
-        {
-          password,
-          email_confirm: true,
-          phone: e164,
-          phone_confirm: true,
-          user_metadata: { phone: digits },
-        }
-      );
-      if (updateError) throw updateError;
+  if (createError) {
+    if (!/already|exists|registered/i.test(createError.message)) {
+      throw createError;
     }
+    const userId = await findUserIdByEmail(admin, email);
+    if (!userId) throw new Error("phone_user_lookup_failed");
+    const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
+      password,
+      email_confirm: true,
+    });
+    if (updateError) throw updateError;
   }
-
-  const after = await signInWithPhoneOrEmail(supabase, {
-    email,
-    password,
-    e164,
-  });
-  if (after.error || !after.data.user) {
-    throw after.error ?? new Error("phone_sign_in_failed");
-  }
-
-  await admin
-    .from("profiles")
-    .update({ phone: digits })
-    .eq("id", after.data.user.id);
 
   return { email, password, phone: digits };
 }
 
-async function ensureWithAnon(
-  digits: string,
-  email: string,
-  password: string,
-  e164: string
-) {
+async function ensureWithAnon(digits: string, email: string) {
   const supabase = anonClient();
+  const password = pepperedPassword(digits);
 
-  const signIn = await signInWithPhoneOrEmail(supabase, {
-    email,
-    password,
-    e164,
-  });
+  const signIn = await supabase.auth.signInWithPassword({ email, password });
   if (signIn.data.user) {
     return { email, password, phone: digits };
   }
@@ -151,24 +117,10 @@ async function ensureWithAnon(
     throw signUp.error;
   }
 
-  const again = await signInWithPhoneOrEmail(supabase, {
-    email,
-    password,
-    e164,
-  });
-  if (again.error || !again.data.user) {
-    throw again.error ?? new Error("phone_sign_in_failed");
-  }
-
-  await supabase
-    .from("profiles")
-    .update({ phone: digits })
-    .eq("id", again.data.user.id);
-
   return { email, password, phone: digits };
 }
 
-/** Ensure a phone-backed auth user exists (server-only). */
+/** Ensure a phone-backed auth user exists (server-only). Call only after OTP verification. */
 export async function ensurePhoneUser(phone: string) {
   if (!isSupabaseConfigured()) {
     throw new Error("Supabase not configured");
@@ -176,12 +128,11 @@ export async function ensurePhoneUser(phone: string) {
 
   const digits = phone.replace(/\D/g, "").replace(/^98/, "0");
   const email = phoneEmail(digits);
-  const password = phonePassword(digits);
   const e164 = phoneE164(digits);
 
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return ensureWithServiceRole(digits, email, password, e164);
+    return ensureWithServiceRole(digits, email, e164);
   }
 
-  return ensureWithAnon(digits, email, password, e164);
+  return ensureWithAnon(digits, email);
 }

@@ -228,11 +228,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(next);
       if (live) {
         try {
-          const supabase = createClient();
-          await supabase
-            .from("profiles")
-            .update({ kyc_status: status })
-            .eq("id", user.id);
+          await fetch("/api/sandbox/kyc", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status }),
+          });
         } catch {
           /* ignore */
         }

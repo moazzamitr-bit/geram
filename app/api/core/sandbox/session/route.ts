@@ -1,10 +1,10 @@
 import { cookies } from "next/headers";
-import { getExecutionMode } from "@/lib/core/mode";
+import { sandboxCookieIdentityAllowed } from "@/lib/core/http";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (getExecutionMode() === "PRODUCTION") {
+  if (!sandboxCookieIdentityAllowed()) {
     return Response.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
   const body = (await request.json().catch(() => ({}))) as { userId?: string };

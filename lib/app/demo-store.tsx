@@ -856,7 +856,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       },
       setPin: (pin) => setState((s) => ({ ...s, pin })),
       addBankAccount: (iban, bank) => {
-        const next = { id: newId(), iban, bank, verified: true };
+        const next = { id: newId(), iban, bank, verified: false };
         setState((s) => ({
           ...s,
           bankAccounts: [...s.bankAccounts, next],
@@ -958,14 +958,11 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           ),
         }));
         if (liveDb) {
-          void import("@/lib/db/platform-sync").then(({ persistTicketReply }) => {
-            void persistTicketReply(id, text, "user");
-            void persistTicketReply(
-              id,
-              "پیام شما دریافت شد. تیم پشتیبانی به‌زودی پاسخ می‌دهد.",
-              "support"
-            );
-          });
+          // Only the user's own message is persisted; the acknowledgement above
+          // is local UI, not a real support reply.
+          void import("@/lib/db/platform-sync").then(({ persistTicketReply }) =>
+            persistTicketReply(id, text, "user")
+          );
         }
       },
       addScheduledPurchase: (amountRial, cadence) => {
