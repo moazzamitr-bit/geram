@@ -1,5 +1,6 @@
 "use client";
 
+import { PriceTicker } from "@/components/app/PriceTicker";
 import { AppShellSkeleton } from "@/components/app/Skeleton";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import {
@@ -173,18 +174,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               />
               {marketLabel}
             </span>
-            <span className="hidden truncate text-[12px] text-muted-app sm:inline">
-              قیمت:{" "}
-              <span className="tabular-nums text-text-secondary">
-                {store.marketPriceRial.toLocaleString("fa-IR")}
-              </span>{" "}
-              تومان
-              {store.marketUpdatedAt && (
-                <span className="mr-2 text-[11px] opacity-80">
-                  · {store.marketStale ? "ذخیره‌شده" : "لایو"} · {store.marketSource}
-                </span>
-              )}
-            </span>
+            <PriceTicker className="hidden min-w-0 md:flex" />
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -222,6 +212,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
         </header>
+        <div className="border-b border-white/[0.05] px-4 py-2 md:hidden">
+          <PriceTicker />
+        </div>
 
         <main id="main" className="px-4 py-5 pb-28 md:px-6 md:py-7 lg:pb-8">
           {children}

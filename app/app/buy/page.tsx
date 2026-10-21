@@ -1,5 +1,6 @@
 "use client";
 
+import { AmountKeypad } from "@/components/app/AmountKeypad";
 import { AppCard } from "@/components/app/AppCard";
 import { InstrumentTabs } from "@/components/app/InstrumentTabs";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -44,6 +45,12 @@ function BuyPageInner() {
   // above it is computed client-side and may differ.
   const [locked, setLocked] = useState<UiQuote | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // Touch devices get the in-page keypad instead of the system keyboard.
+  const [isTouch, setIsTouch] = useState(false);
+
+  useEffect(() => {
+    setIsTouch(window.matchMedia("(pointer: coarse)").matches);
+  }, []);
 
   const meta = INSTRUMENTS[instrument];
   const price = store.getMarketPrice(instrument);
@@ -170,11 +177,13 @@ function BuyPageInner() {
             <input
               dir="ltr"
               inputMode="numeric"
-              value={rial}
+              readOnly={isTouch}
+              value={rial.toLocaleString("en-US")}
               onChange={(e) => onAmountChange(Number(e.target.value.replace(/\D/g, "") || 0))}
               className="mt-2 h-14 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-left text-[24px] font-bold tabular-nums text-text outline-none focus:border-gold"
             />
           </label>
+          {isTouch && <AmountKeypad value={rial} onChange={onAmountChange} className="mt-3" />}
           <p className="mt-2 text-[13px] tabular-nums text-muted-app">
             تقریباً {mgToGramsLabel(quote.goldMg)} گرم · حداقل خرید{" "}
             {formatToman(meta.minBuyToman)}

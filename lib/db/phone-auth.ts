@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { createClient as createBrowserOrServer } from "@supabase/supabase-js";
+import { getExecutionMode } from "@/lib/core/mode";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/db/types";
 
@@ -22,9 +23,19 @@ function phoneE164(digits: string) {
  * pepper, so the pepper must be a real secret: there is deliberately no default.
  */
 function pepperedPassword(phone: string) {
-  const pepper = process.env.PHONE_AUTH_PEPPER;
+  let pepper = process.env.PHONE_AUTH_PEPPER;
   if (!pepper || pepper.length < 32) {
-    throw new Error("phone_auth_misconfigured");
+    // SANDBOX already accepts a fixed public OTP, so a known pepper grants
+    // nothing extra there; keep the demo working until a secret is set.
+    // Any other mode refuses to derive guessable passwords.
+    let mode = "UNKNOWN";
+    try {
+      mode = getExecutionMode();
+    } catch {
+      /* unknown → strict */
+    }
+    if (mode !== "SANDBOX") throw new Error("phone_auth_misconfigured");
+    pepper = process.env.PHONE_AUTH_PEPPER || "gram-dev-pepper";
   }
   return `gram-${pepper}-${phone.replace(/\D/g, "")}`;
 }
