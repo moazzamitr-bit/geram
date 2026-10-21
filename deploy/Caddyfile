@@ -1,0 +1,10 @@
+# HTTPS certificates are issued automatically once the domain's DNS points here.
+{$GERAM_DOMAIN}, www.{$GERAM_DOMAIN} {
+	encode gzip
+	reverse_proxy app:3000
+}
+
+# Reachable by IP before DNS is connected (plain HTTP).
+:80 {
+	reverse_proxy app:3000
+}

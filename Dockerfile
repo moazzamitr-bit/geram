@@ -5,8 +5,11 @@
 
 FROM node:22-alpine AS deps
 WORKDIR /app
+# Override when registry.npmjs.org is unreachable (e.g. an Iranian mirror).
+ARG NPM_REGISTRY=https://registry.npmjs.org/
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm config set registry "$NPM_REGISTRY" \
+ && npm ci --no-audit --no-fund
 
 FROM node:22-alpine AS build
 WORKDIR /app
