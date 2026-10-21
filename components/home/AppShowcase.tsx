@@ -117,17 +117,10 @@ export function AppShowcase() {
             — برای تصمیم‌گیری سریع و مطمئن.
           </p>
 
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <StoreButton store="bazaar" label="دریافت از بازار" />
-            <StoreButton store="myket" label="دریافت از مایکت" />
-
-            <div className="flex items-center gap-3 rounded-2xl border border-white/[0.07] bg-card px-3 py-2.5">
-              <QrPlaceholder />
-              <p className="max-w-[110px] text-[11px] leading-5 text-text-muted">
-                برای دانلود اپلیکیشن اسکن کنید
-              </p>
-            </div>
-          </div>
+          {/* Store buttons return once the app is actually published on Bazaar/Myket. */}
+          <p className="mt-8 max-w-md rounded-2xl border border-white/[0.07] bg-card px-4 py-3 text-[13px] leading-7 text-text-secondary">
+            نسخه وب گرم روی گوشی مثل اپلیکیشن نصب می‌شود: در مرورگر گزینه «افزودن به صفحه اصلی» را بزنید.
+          </p>
 
           <Link
             href="/auth/login"
@@ -155,56 +148,5 @@ export function AppShowcase() {
         </div>
       </div>
     </section>
-  );
-}
-
-function StoreButton({
-  store,
-  label,
-}: {
-  store: "bazaar" | "myket";
-  label: string;
-}) {
-  return (
-    <a
-      href="#"
-      aria-label={label}
-      className="inline-flex min-w-[148px] items-center gap-3 rounded-xl border border-white/[0.08] bg-[#0A0C0E] px-4 py-3 transition-all duration-250 hover:-translate-y-0.5 hover:border-gold/35"
-    >
-      <span
-        className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold-gradient text-[11px] font-extrabold text-[#0A0C0E]"
-        aria-hidden
-      >
-        {store === "bazaar" ? "ب" : "م"}
-      </span>
-      <span className="text-right">
-        <span className="block text-[10px] text-text-muted">دانلود از</span>
-        <span className="block text-[13px] font-bold text-text">
-          {store === "bazaar" ? "بازار" : "مایکت"}
-        </span>
-      </span>
-    </a>
-  );
-}
-
-function QrPlaceholder() {
-  return (
-    <div
-      className="grid h-14 w-14 grid-cols-5 gap-px rounded-md bg-text p-1"
-      aria-hidden
-    >
-      {Array.from({ length: 25 }).map((_, i) => (
-        <span
-          key={i}
-          className={
-            [0, 1, 2, 4, 5, 6, 8, 10, 12, 14, 16, 18, 19, 20, 22, 23, 24].includes(
-              i
-            )
-              ? "bg-[#0A0C0E]"
-              : "bg-transparent"
-          }
-        />
-      ))}
-    </div>
   );
 }

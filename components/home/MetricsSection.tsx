@@ -26,7 +26,7 @@ export function MetricsSection() {
                   اعتماد روی فلزات واقعی
                 </h2>
                 <p className="mt-1 text-[13px] leading-6 text-text-secondary">
-                  طلا، نقره و مس — با شفافیت قیمت و پشتوانه قابل پیگیری
+                  طلا، نقره و مس — با قیمت لحظه‌ای و کارمزد شفاف
                 </p>
               </div>
             </div>
