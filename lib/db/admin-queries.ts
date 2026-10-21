@@ -179,10 +179,30 @@ export async function listReferralEvents(limit = 100) {
     .select("id, first_name, last_name, phone, referral_code, kyc_status")
     .in("id", ids);
   const byId = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]));
+
+  // Revenue-share model: the inviter earns a share of each invitee's settled
+  // trade fees. core_trades has no RLS policies, so this needs the service role.
+  const feesByInvitee: Record<string, number> = {};
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const { data: trades } = await createServiceClient()
+      .from("core_trades")
+      .select("user_id, fee_irr")
+      .eq("status", "SETTLED")
+      .in(
+        "user_id",
+        data.map((r) => r.invitee_id as string)
+      );
+    for (const t of trades ?? []) {
+      const id = t.user_id as string;
+      feesByInvitee[id] = (feesByInvitee[id] ?? 0) + Math.floor(Number(t.fee_irr) / 10);
+    }
+  }
+
   return data.map((r) => ({
     ...r,
     inviter: byId[r.inviter_id as string],
     invitee: byId[r.invitee_id as string],
+    inviteeFeesToman: feesByInvitee[r.invitee_id as string] ?? 0,
   }));
 }
 

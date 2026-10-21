@@ -2,7 +2,9 @@ import { jsonError, requireCoreUserId } from "@/lib/core/http";
 import { getFinancialCore } from "@/lib/core/runtime";
 import { serializeQuote } from "@/lib/core/adapters";
 import { isAssetCode, uiInstrumentToAsset } from "@/lib/core/assets";
-import { gramsToUg, tomanToIrr } from "@/lib/core/money";
+import { gramsToUg, irrToSafeTomanNumber, tomanToIrr } from "@/lib/core/money";
+import { assertWithinDailyLimit } from "@/lib/core/limits";
+import { loadCommerceSettings } from "@/lib/commerce/settings-server";
 import { resolveUserFeeSnapshot } from "@/lib/core/user-fees";
 import { CoreError, type InputMode, type QuoteSide } from "@/lib/core/types";
 
@@ -44,6 +46,18 @@ export async function POST(request: Request) {
           ? gramsToUg(body.requestedGrams)
           : undefined;
     const core = getFinancialCore();
+    if (side === "BUY" && requestedIrr != null) {
+      // Early check so users hear about the cap before a quote reserves metal;
+      // the trade route re-checks with the exact quote amount.
+      const settings = await loadCommerceSettings();
+      await assertWithinDailyLimit({
+        core,
+        userId,
+        side,
+        requestedToman: irrToSafeTomanNumber(requestedIrr),
+        limits: settings.limits,
+      });
+    }
     const quote = await core.issueQuote({
       userId,
       asset,

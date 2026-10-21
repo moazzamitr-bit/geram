@@ -24,12 +24,22 @@ export type ReferralSettings = {
   inviterBonusToman: number;
   inviteeBonusToman: number;
   minKycForPayout: boolean;
+  /** Share of each invitee's trade fees credited to the inviter (Gerami model). */
+  feeSharePercent: number;
+};
+
+/** Per-user daily caps, shown to users like Milli's limits sheet. */
+export type LimitSettings = {
+  dailyBuyToman: number;
+  dailySellToman: number;
+  dailyWithdrawToman: number;
 };
 
 export type CommerceSettings = {
   fees: FeeSettings;
   plus: PlusSettings;
   referral: ReferralSettings;
+  limits: LimitSettings;
 };
 
 export const DEFAULT_COMMERCE_SETTINGS: CommerceSettings = {
@@ -44,20 +54,27 @@ export const DEFAULT_COMMERCE_SETTINGS: CommerceSettings = {
     sellFeeMinTomanFree: 0,
     sellFeePercentPlus: 0.0035,
     sellFeeMinTomanPlus: 0,
-    withdrawFeeTomanFree: 15_000,
+    // Competitors don't charge for withdrawals or scheduled buys beyond the trade fee.
+    withdrawFeeTomanFree: 0,
     withdrawFeeTomanPlus: 0,
-    dcaFeeTomanFree: 25_000,
-    dcaFeeTomanPlus: 10_000,
+    dcaFeeTomanFree: 0,
+    dcaFeeTomanPlus: 0,
   },
   plus: {
-    monthlyPriceToman: 99_000,
-    maxDcaFree: 1,
+    monthlyPriceToman: 49_000,
+    maxDcaFree: 3,
     maxDcaPlus: 10,
     smsAlertsPlusOnly: true,
   },
   referral: {
-    inviterBonusToman: 100_000,
-    inviteeBonusToman: 50_000,
+    inviterBonusToman: 0,
+    inviteeBonusToman: 0,
     minKycForPayout: true,
+    feeSharePercent: 0.15,
+  },
+  limits: {
+    dailyBuyToman: 1_000_000_000,
+    dailySellToman: 500_000_000,
+    dailyWithdrawToman: 50_000_000,
   },
 };
