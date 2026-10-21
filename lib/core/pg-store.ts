@@ -398,6 +398,13 @@ export class PostgresCoreStore implements CoreStore {
     return big(rows[0]?.q);
   }
 
+  async listKillSwitches() {
+    const { rows } = await this.sql().query(`select key, enabled from core_kill_switches`);
+    const out: Record<string, boolean> = {};
+    for (const r of rows) out[String(r.key)] = Boolean(r.enabled);
+    return out;
+  }
+
   async listExpiredOpenQuotes(asset: AssetCode, nowIso: string, limit: number) {
     const { rows } = await this.sql().query(
       `select * from core_quotes

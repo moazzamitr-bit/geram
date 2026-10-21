@@ -6,6 +6,7 @@ import {
   OpsBadge,
 } from "@/components/admin/AdminUI";
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
+import { InventoryRequestForm } from "@/components/admin/InventoryRequestForm";
 import { probeTable } from "@/lib/admin/probe";
 
 export default async function AdminApprovalsPage() {
@@ -24,6 +25,9 @@ export default async function AdminApprovalsPage() {
         ایجاد اصلاح مالی صف تأیید می‌سازد. Execute وقتی دفترکل عملیاتی نباشد رد می‌شود و wallets را عوض نمی‌کند.
       </AdminNotice>
       <div className="mb-6 max-w-lg">
+        <InventoryRequestForm />
+      </div>
+      <div className="mb-6 max-w-lg">
         <AdminActionForm
           action="create"
           endpoint="/api/admin/approvals"
@@ -35,7 +39,15 @@ export default async function AdminApprovalsPage() {
         <AdminTable headers={["نوع", "وضعیت", "maker", "checker", "زمان", "اقدام"]} empty={rows.rows.length === 0}>
           {rows.rows.map((r) => (
             <tr key={String(r.id)} className="border-b border-white/5 align-top">
-              <td className="px-4 py-3">{String(r.kind)}</td>
+              <td className="px-4 py-3">
+                {String(r.kind)}
+                {r.kind === "INVENTORY_ADJUSTMENT" && (
+                  <span className="block text-[11px] text-white/50" dir="ltr">
+                    {String((r.payload as { asset?: string })?.asset ?? "")}{" "}
+                    {String((r.payload as { amount?: string })?.amount ?? "")}
+                  </span>
+                )}
+              </td>
               <td className="px-4 py-3"><AdminBadge>{String(r.status)}</AdminBadge></td>
               <td className="px-4 py-3 font-mono text-[12px]">{String(r.maker_id ?? "—").slice(0, 8)}</td>
               <td className="px-4 py-3 font-mono text-[12px]">{String(r.checker_id ?? "—").slice(0, 8)}</td>

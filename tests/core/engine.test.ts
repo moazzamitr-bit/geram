@@ -264,3 +264,43 @@ describe("abandoned buy quotes", () => {
     expect(expired?.status).toBe("EXPIRED");
   });
 });
+
+describe("admin kill switches", () => {
+  it("a switch persisted by the admin stops quotes and open-quote execution", async () => {
+    const store = new MemoryCoreStore();
+    const { core } = makeMemoryCore({ store });
+    const user = "user-kill";
+    await core.sandboxDeposit(user, tomanToIrr(10_000_000), "dep-kill");
+    const quote = await core.issueQuote({
+      userId: user,
+      asset: "GOLD",
+      side: "BUY",
+      inputMode: "RIAL_AMOUNT",
+      requestedIrr: tomanToIrr(1_000_000),
+    });
+
+    store.killSwitches = { GOLD_BUY_ENABLED: false };
+
+    await expect(
+      core.executeTrade({ userId: user, quoteId: quote.id, idempotencyKey: "kill-1" })
+    ).rejects.toMatchObject({ code: "kill_switch" });
+    await expect(
+      core.issueQuote({
+        userId: user,
+        asset: "GOLD",
+        side: "BUY",
+        inputMode: "RIAL_AMOUNT",
+        requestedIrr: tomanToIrr(1_000_000),
+      })
+    ).rejects.toMatchObject({ code: "kill_switch" });
+    // Other assets keep trading.
+    const silver = await core.issueQuote({
+      userId: user,
+      asset: "SILVER",
+      side: "BUY",
+      inputMode: "RIAL_AMOUNT",
+      requestedIrr: tomanToIrr(1_000_000),
+    });
+    expect(silver.status).toBe("ACTIVE");
+  });
+});

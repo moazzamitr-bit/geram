@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { adminGate, readActionBody } from "@/lib/admin/auth";
 import { writeAudit } from "@/lib/admin/audit";
 import { createServiceClient } from "@/lib/supabase/admin";
+import type { AdminRole } from "@/lib/admin/rbac";
+import { PRODUCTION_ASSETS, type AssetCode } from "@/lib/core/assets";
+import { gramsToUg, tomanToIrr } from "@/lib/core/money";
+import { getFinancialCore } from "@/lib/core/runtime";
 
 const KINDS = new Set([
   "FINANCIAL_ADJUSTMENT",
@@ -126,6 +130,9 @@ export async function POST(request: Request) {
     if (row.status !== "APPROVED") {
       return NextResponse.json({ ok: false, error: "فقط درخواست APPROVED قابل اجراست." }, { status: 400 });
     }
+    if (row.kind === "INVENTORY_ADJUSTMENT") {
+      return executeOpeningInventory({ db, row, reason, ctx: gate.ctx });
+    }
     if (row.kind === "FINANCIAL_ADJUSTMENT") {
       await writeAudit({
         actorId: gate.ctx.userId,
@@ -155,4 +162,89 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: false, error: "unknown_action" }, { status: 400 });
+}
+
+/**
+ * Posts an approved opening balance to the ledger: physical metal the platform
+ * really holds (PLATFORM_AVAILABLE) or operating cash (PLATFORM_CASH_CONTROL),
+ * against PLATFORM_OPENING. Without this, inventory is 0 and every buy fails.
+ * The request is claimed (APPROVED → EXECUTED) before posting so a double
+ * click cannot post twice; the journal refId is the approval id.
+ */
+async function executeOpeningInventory(input: {
+  db: ReturnType<typeof createServiceClient>;
+  row: Record<string, unknown>;
+  reason: string;
+  ctx: { userId: string; role: AdminRole };
+}) {
+  const { db, row, reason, ctx } = input;
+  const id = String(row.id);
+  const payload = (row.payload ?? {}) as { asset?: string; amount?: string; direction?: string };
+  const asset = String(payload.asset ?? "");
+  const amount = Number(payload.amount ?? 0);
+
+  const isCash = asset === "IRR";
+  if ((!isCash && !PRODUCTION_ASSETS.includes(asset as AssetCode)) || !(amount > 0)) {
+    return NextResponse.json({ ok: false, error: "دارایی یا مقدار نامعتبر است." }, { status: 400 });
+  }
+  if (payload.direction && payload.direction !== "IN") {
+    return NextResponse.json(
+      { ok: false, error: "فقط افزایش موجودی اولیه پشتیبانی می‌شود." },
+      { status: 400 }
+    );
+  }
+
+  const { data: claimed } = await db
+    .from("admin_approval_requests")
+    .update({ status: "EXECUTED", updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "APPROVED")
+    .select("id")
+    .maybeSingle();
+  if (!claimed) {
+    return NextResponse.json({ ok: false, error: "این درخواست قبلاً اجرا شده است." }, { status: 409 });
+  }
+
+  try {
+    const core = getFinancialCore();
+    const journalId = await core.postOpening({
+      accountCode: isCash ? "PLATFORM_CASH_CONTROL" : "PLATFORM_AVAILABLE",
+      asset: isCash ? "IRR" : (asset as AssetCode),
+      // Metal is entered in grams, cash in toman.
+      amount: isCash ? tomanToIrr(Math.floor(amount)) : gramsToUg(amount),
+      refType: "APPROVED_OPENING_BALANCE",
+      reason: "APPROVED_OPENING",
+      refId: `approval:${id}`,
+    });
+    await writeAudit({
+      actorId: ctx.userId,
+      role: ctx.role,
+      action: "approval.execute",
+      entity: "approval_request",
+      entityId: id,
+      reason,
+      result: "ok",
+      meta: { kind: "INVENTORY_ADJUSTMENT", asset, amount, journalId },
+    });
+    return NextResponse.json({ ok: true, message: `در دفترکل ثبت شد (${journalId}).` });
+  } catch (err) {
+    await db
+      .from("admin_approval_requests")
+      .update({ status: "APPROVED", updated_at: new Date().toISOString() })
+      .eq("id", id);
+    await writeAudit({
+      actorId: ctx.userId,
+      role: ctx.role,
+      action: "approval.execute",
+      entity: "approval_request",
+      entityId: id,
+      reason,
+      result: "error",
+      meta: { error: err instanceof Error ? err.message : "post_failed" },
+    });
+    return NextResponse.json(
+      { ok: false, error: "ثبت در دفترکل ناموفق بود. اتصال دیتابیس معاملات را بررسی کنید." },
+      { status: 500 }
+    );
+  }
 }

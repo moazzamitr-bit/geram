@@ -32,12 +32,14 @@ export async function POST(request: Request) {
     updated_at: new Date().toISOString(),
   });
 
+  let engineError: string | null = null;
   if (!error) {
-    await db.from("core_kill_switches").upsert({
+    const res = await db.from("core_kill_switches").upsert({
       key,
       enabled,
       updated_at: new Date().toISOString(),
     });
+    engineError = res.error?.message ?? null;
   }
 
   await writeAudit({
@@ -51,16 +53,15 @@ export async function POST(request: Request) {
     meta: {
       enabled,
       error: error?.message ?? null,
-      note: "Trading engine still reads env getKillSwitches() until wired. Postgres is intended authority.",
+      note: "Engine combines env and core_kill_switches; a disabled switch in either stops the flow.",
     },
   });
 
-  if (error) {
+  if (error || engineError) {
     return NextResponse.json(
       {
         ok: false,
-        error:
-          "جدول admin_kill_switches آماده نیست. سوئیچ‌ها هنوز از env خوانده می‌شوند. NOT READY.",
+        error: "ثبت سوئیچ در دیتابیس ناموفق بود؛ موتور معامله تغییری نمی‌بیند.",
       },
       { status: 503 }
     );
@@ -68,7 +69,8 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    message:
-      "در Postgres ثبت شد. موتور معامله هنوز env را می‌خواند تا سیم‌کشی کامل شود — وضعیت DEGRADED.",
+    message: enabled
+      ? "سوئیچ فعال شد (اگر در env خاموش باشد همچنان خاموش می‌ماند)."
+      : "متوقف شد. معاملات جدید و تأیید quoteهای باز فوراً رد می‌شوند.",
   });
 }
