@@ -78,6 +78,8 @@ export interface CoreStore {
     to: ReservationStatus
   ): Promise<MetalSoftReservation>;
   openReservationQuantityUg(asset: AssetCode): Promise<bigint>;
+  /** ACTIVE quotes past expiry whose BUY reservation still holds inventory. */
+  listExpiredOpenQuotes(asset: AssetCode, nowIso: string, limit: number): Promise<Quote[]>;
   insertTrade(trade: Trade): Promise<void>;
   getTrade(id: string): Promise<Trade | null>;
   getSettledTradeByQuote(quoteId: string): Promise<Trade | null>;
@@ -388,6 +390,19 @@ export class MemoryCoreStore implements CoreStore {
       if (r.asset === asset && r.status === "OPEN") sum += r.quantityUg;
     }
     return sum;
+  }
+
+  async listExpiredOpenQuotes(asset: AssetCode, nowIso: string, limit: number): Promise<Quote[]> {
+    const now = new Date(nowIso).getTime();
+    return [...this.quotes.values()]
+      .filter(
+        (q) =>
+          q.asset === asset &&
+          q.side === "BUY" &&
+          q.status === "ACTIVE" &&
+          new Date(q.expiresAt).getTime() <= now
+      )
+      .slice(0, limit);
   }
 
   async insertTrade(trade: Trade): Promise<void> {

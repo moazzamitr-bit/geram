@@ -236,3 +236,31 @@ describe("per-user fee schedule", () => {
     expect(JSON.parse(plus.feeSnapshotJson).buyFeeBps).toBe("35");
   });
 });
+
+describe("abandoned buy quotes", () => {
+  it("release their inventory reservation when a new buy quote is issued", async () => {
+    let clock = new Date("2026-10-21T10:00:00Z");
+    // 1 g of gold in inventory; each quote reserves ~0.7 g, so two cannot coexist.
+    const { core } = makeCore({ now: () => clock, inventory: gramsToUg(1) });
+    const user = "user-abandon";
+    await core.sandboxDeposit(user, tomanToIrr(20_000_000), "dep-abandon");
+
+    const request = () =>
+      core.issueQuote({
+        userId: user,
+        asset: "GOLD",
+        side: "BUY",
+        inputMode: "RIAL_AMOUNT",
+        requestedIrr: tomanToIrr(5_000_000),
+      });
+
+    const abandoned = await request();
+    await expect(request()).rejects.toMatchObject({ code: "insufficient_inventory" });
+
+    clock = new Date(clock.getTime() + 60_000);
+    const fresh = await request();
+    expect(fresh.status).toBe("ACTIVE");
+    const expired = await core.getQuoteForUser(user, abandoned.id);
+    expect(expired?.status).toBe("EXPIRED");
+  });
+});
