@@ -9,13 +9,22 @@ const MAX_SENDS_PER_HOUR = 5;
 
 export type OtpMode = "sms" | "sandbox" | "unavailable";
 
+export type SmsProvider = "smsir" | "kavenegar";
+
+/** First configured provider; sms.ir wins when both are set. */
+export function smsProvider(): SmsProvider | null {
+  if (process.env.SMSIR_API_KEY && process.env.SMSIR_TEMPLATE_ID) return "smsir";
+  if (process.env.KAVENEGAR_API_KEY && process.env.KAVENEGAR_OTP_TEMPLATE) return "kavenegar";
+  return null;
+}
+
 /**
- * "sms": a real provider is configured (Kavenegar verify/lookup template).
+ * "sms": a real provider is configured (sms.ir verify or Kavenegar lookup).
  * "sandbox": no provider, SANDBOX mode — the fixed demo code is accepted.
  * "unavailable": no provider outside SANDBOX — login must be refused.
  */
 export function otpMode(): OtpMode {
-  if (process.env.KAVENEGAR_API_KEY && process.env.KAVENEGAR_OTP_TEMPLATE) {
+  if (smsProvider()) {
     return process.env.SUPABASE_SERVICE_ROLE_KEY ? "sms" : "unavailable";
   }
   try {
@@ -29,6 +38,32 @@ function hashCode(phone: string, code: string) {
   // Salted with a server secret so a leaked table cannot be brute-forced offline.
   const salt = process.env.OTP_HASH_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
   return createHash("sha256").update(`${salt}:${phone}:${code}`).digest("hex");
+}
+
+/**
+ * sms.ir Verify API (https://app.sms.ir/developer/help/verify).
+ * Template 123456 is sms.ir's sandbox template: it only delivers to the panel
+ * owner's own number. Real users need an approved template (requires eNamad).
+ */
+export async function sendSmsIr(phone: string, code: string) {
+  const res = await fetch("https://api.sms.ir/v1/send/verify", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "x-api-key": process.env.SMSIR_API_KEY!,
+    },
+    body: JSON.stringify({
+      mobile: phone,
+      templateId: Number(process.env.SMSIR_TEMPLATE_ID),
+      parameters: [{ name: process.env.SMSIR_PARAM_NAME || "Code", value: code }],
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  const data = (await res.json().catch(() => null)) as { status?: number; message?: string } | null;
+  if (!res.ok || data?.status !== 1) {
+    throw new Error(`smsir_${res.status}_${data?.status ?? "x"}_${data?.message ?? ""}`);
+  }
 }
 
 async function sendKavenegar(phone: string, code: string) {
@@ -98,7 +133,8 @@ export async function requestOtp(phone: string): Promise<RequestOtpResult> {
   }
 
   try {
-    await sendKavenegar(phone, code);
+    if (smsProvider() === "smsir") await sendSmsIr(phone, code);
+    else await sendKavenegar(phone, code);
   } catch (err) {
     console.error("otp_send", err instanceof Error ? err.message : err);
     return { ok: false, error: "send_failed" };
