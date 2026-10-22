@@ -3,6 +3,10 @@ import { requireAdmin } from "@/lib/db/admin-queries";
 import { isSupabaseConfigured } from "@/lib/db/types";
 import { redirect } from "next/navigation";
 
+// Admin pages need cookies + service-role at request time; never prerender
+// them into the Docker image (build has public Supabase URL but no secrets).
+export const dynamic = "force-dynamic";
+
 export default async function AdminDashboardLayout({
   children,
 }: {

@@ -45,7 +45,7 @@ export async function loadDashboardOps() {
     process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || process.env.POSTGRES_URL
   );
 
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return { connected: false as const, mode, flags, kills, ledgerReady };
   }
 
