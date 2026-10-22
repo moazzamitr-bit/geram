@@ -106,9 +106,16 @@ ok "Docker ready: $(docker --version)"
 # ---------------------------------------------------------------- 3. code + config
 say "Fetching Geram ($BRANCH)"
 if [ -d "$APP_DIR/.git" ]; then
-  git -C "$APP_DIR" fetch -q origin "$BRANCH"
-  git -C "$APP_DIR" checkout -q "$BRANCH"
-  git -C "$APP_DIR" reset -q --hard "origin/$BRANCH"
+  # The server must run exactly what is on GitHub: drop any edits made on the
+  # box (they previously broke the root layout), keep settings and markers.
+  if [ -n "$(git -C "$APP_DIR" status --porcelain --untracked-files=no)" ]; then
+    warn "Discarding local code edits on the server (they are not on GitHub)"
+    git -C "$APP_DIR" diff --stat | tail -5 || true
+  fi
+  git -C "$APP_DIR" reset -q --hard
+  git -C "$APP_DIR" clean -fdq -e .installed -e .env.production
+  git -C "$APP_DIR" fetch -q origin "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+  git -C "$APP_DIR" checkout -q -B "$BRANCH" "origin/$BRANCH"
 else
   rm -rf "$APP_DIR"
   git clone -q --branch "$BRANCH" "$REPO" "$APP_DIR"
