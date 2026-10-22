@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
+import { authMethod } from "@/lib/auth/method";
 import { requestOtp } from "@/lib/auth/otp";
 import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  if (authMethod() !== "otp") {
+    return NextResponse.json({ ok: false, error: "method_disabled" }, { status: 403 });
+  }
   const ip = rateLimit(`otp-req:ip:${clientIp(request)}`, 10, 10 * 60 * 1000);
   if (!ip.ok) return tooManyRequests(ip.retryAfterSec);
 

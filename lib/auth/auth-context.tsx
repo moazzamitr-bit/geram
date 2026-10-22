@@ -33,6 +33,13 @@ type AuthState = {
   isAuthenticated: boolean;
   live: boolean;
   login: (phone: string, otp?: string) => Promise<{ ok: boolean; error?: string }>;
+  loginWithPassword: (phone: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  register: (input: {
+    phone: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
   completeOnboarding: () => Promise<void>;
   logout: () => Promise<void>;
   setKycStatus: (status: KycStatus) => Promise<void>;
@@ -190,6 +197,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [live, persistLocal]
   );
 
+  /** POST to a password auth route and adopt the returned Supabase session. */
+  const passwordAuth = useCallback(
+    async (path: string, body: Record<string, string>, fallback: DemoUser) => {
+      const digits = body.phone.replace(/\D/g, "").replace(/^98/, "0");
+      if (!live) {
+        // Offline demo (no Supabase): keep the local sandbox behaviour.
+        persistLocal({ ...fallback, phone: digits });
+        return { ok: true };
+      }
+      try {
+        const res = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...body, phone: digits }),
+        });
+        const data = (await res.json()) as {
+          ok: boolean;
+          error?: string;
+          session?: { access_token: string; refresh_token: string };
+          profile?: Parameters<typeof profileToUser>[0];
+        };
+        if (!data.ok || !data.session || !data.profile) {
+          return { ok: false, error: data.error ?? "login_failed" };
+        }
+        const supabase = createClient();
+        await supabase.auth.setSession(data.session);
+        localStorage.removeItem(STORAGE_KEY);
+        setUser(profileToUser(data.profile, digits));
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : "login_failed" };
+      }
+    },
+    [live, persistLocal]
+  );
+
+  const loginWithPassword = useCallback(
+    (phone: string, password: string) =>
+      passwordAuth("/api/auth/password-login", { phone, password }, {
+        id: "demo-user-1",
+        firstName: "کاربر",
+        lastName: "گرم",
+        phone,
+        kycStatus: "UNVERIFIED",
+        onboardingDone: true,
+        hasPin: false,
+      }),
+    [passwordAuth]
+  );
+
+  const register = useCallback(
+    (input: { phone: string; password: string; firstName: string; lastName: string }) =>
+      passwordAuth("/api/auth/register", input, {
+        id: "demo-user-1",
+        firstName: input.firstName,
+        lastName: input.lastName,
+        phone: input.phone,
+        kycStatus: "UNVERIFIED",
+        onboardingDone: false,
+        hasPin: false,
+      }),
+    [passwordAuth]
+  );
+
   const completeOnboarding = useCallback(async () => {
     if (!user) return;
     const next = { ...user, onboardingDone: true };
@@ -260,6 +331,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: Boolean(user),
       live,
       login,
+      loginWithPassword,
+      register,
       completeOnboarding,
       logout,
       setKycStatus,
@@ -270,6 +343,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hydrated,
       live,
       login,
+      loginWithPassword,
+      register,
       completeOnboarding,
       logout,
       setKycStatus,

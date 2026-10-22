@@ -95,3 +95,18 @@ describe("sms.ir provider", () => {
     await expect(sendSmsIr("09120000000", "1")).rejects.toThrow(/smsir_200_0/);
   });
 });
+
+describe("auth method", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("defaults to password and switches to otp only when asked", async () => {
+    const { authMethod, isValidPhone, normalizePhone } = await import("@/lib/auth/method");
+    vi.stubEnv("AUTH_METHOD", "");
+    expect(authMethod()).toBe("password");
+    vi.stubEnv("AUTH_METHOD", "otp");
+    expect(authMethod()).toBe("otp");
+    expect(normalizePhone("+98 912 000 0001")).toBe("09120000001");
+    expect(isValidPhone("09120000001")).toBe(true);
+    expect(isValidPhone("0912000")).toBe(false);
+  });
+});

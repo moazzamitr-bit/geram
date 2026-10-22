@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { authMethod } from "@/lib/auth/method";
 import { otpMode, verifyOtp } from "@/lib/auth/otp";
 import { ensurePhoneUser } from "@/lib/db/phone-auth";
 import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -15,6 +16,9 @@ export async function POST(request: Request) {
     );
   }
 
+  if (authMethod() !== "otp") {
+    return NextResponse.json({ ok: false, error: "method_disabled" }, { status: 403 });
+  }
   // Real SMS OTP when a provider is configured; the fixed demo code only in
   // SANDBOX. Without either, login is refused (see lib/auth/otp.ts).
   if (otpMode() === "unavailable") {

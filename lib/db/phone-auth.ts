@@ -5,7 +5,7 @@ import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/db/types";
 
 /** Synthetic email — must use a real domain Supabase accepts (not .local / example.com). */
-function phoneEmail(phone: string) {
+export function phoneEmail(phone: string) {
   const digits = phone.replace(/\D/g, "");
   return `p${digits}@geram.vercel.app`;
 }
@@ -146,4 +146,82 @@ export async function ensurePhoneUser(phone: string) {
   }
 
   return ensureWithAnon(digits, email);
+}
+
+export type PhoneSession = {
+  session: { access_token: string; refresh_token: string };
+  profile: {
+    id: string;
+    phone: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    kyc_status: string | null;
+    onboarding_done: boolean | null;
+  };
+};
+
+/** Sign in with the synthetic email + password and return tokens for the browser. */
+export async function signInPhoneSession(phone: string, password: string): Promise<PhoneSession | null> {
+  const supabase = anonClient();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: phoneEmail(phone),
+    password,
+  });
+  if (error || !data.session || !data.user) return null;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, phone, first_name, last_name, kyc_status, onboarding_done")
+    .eq("id", data.user.id)
+    .maybeSingle();
+  return {
+    session: {
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    },
+    profile: profile ?? {
+      id: data.user.id,
+      phone,
+      first_name: "",
+      last_name: "",
+      kyc_status: "UNVERIFIED",
+      onboarding_done: false,
+    },
+  };
+}
+
+export type RegisterResult =
+  | { ok: true }
+  | { ok: false; error: "already_registered" | "service_unavailable" | "register_failed" };
+
+/**
+ * Password sign-up without phone verification (pre-launch). Requires the
+ * service role so the account is created already confirmed. An existing
+ * number is never overwritten — that would let anyone take over an account.
+ */
+export async function registerPhoneUser(input: {
+  phone: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}): Promise<RegisterResult> {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { ok: false, error: "service_unavailable" };
+  const admin = createServiceClient();
+  const { error } = await admin.auth.admin.createUser({
+    email: phoneEmail(input.phone),
+    password: input.password,
+    email_confirm: true,
+    user_metadata: {
+      phone: input.phone,
+      first_name: input.firstName,
+      last_name: input.lastName,
+    },
+  });
+  if (error) {
+    if (/already|exists|registered/i.test(error.message)) {
+      return { ok: false, error: "already_registered" };
+    }
+    console.error("register_phone_user", error.message);
+    return { ok: false, error: "register_failed" };
+  }
+  return { ok: true };
 }
