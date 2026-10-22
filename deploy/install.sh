@@ -158,6 +158,16 @@ else
   ok "Keeping existing settings in $ENV_FILE"
 fi
 
+# ---------------------------------------------------------------- self-hosted supabase
+# A self-hosted gateway on http://IP:8000 cannot be called from the https site
+# (mixed content). Serve it through Caddy at https://DOMAIN/sb instead.
+SB_CURRENT=$(grep '^NEXT_PUBLIC_SUPABASE_URL=' "$ENV_FILE" | cut -d= -f2-)
+if printf '%s' "$SB_CURRENT" | grep -Eq '^http://[^/]+:8000/?$'; then
+  DOMAIN_NOW=$(grep '^GERAM_DOMAIN=' "$ENV_FILE" | cut -d= -f2-)
+  sed -i "s#^NEXT_PUBLIC_SUPABASE_URL=.*#NEXT_PUBLIC_SUPABASE_URL=https://$DOMAIN_NOW/sb#" "$ENV_FILE"
+  ok "Self-hosted Supabase now served at https://$DOMAIN_NOW/sb (was $SB_CURRENT)"
+fi
+
 # ---------------------------------------------------------------- network checks
 say "Checking outside services from this server"
 if ! grep -q '^NPM_REGISTRY=' "$ENV_FILE"; then

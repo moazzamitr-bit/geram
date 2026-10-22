@@ -24,6 +24,9 @@ services:
       - "443:443"
     environment:
       GERAM_DOMAIN: ${GERAM_DOMAIN}
+    # Lets Caddy reach the self-hosted Supabase gateway published on the host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

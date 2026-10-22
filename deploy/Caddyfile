@@ -1,10 +1,29 @@
 # HTTPS certificates are issued automatically once the domain's DNS points here.
+#
+# /sb/* is the self-hosted Supabase API (gateway on the host's port 8000),
+# served on the site's own HTTPS origin: browsers block an https:// page from
+# calling a plain http://IP:8000 API. Only API paths are exposed; Studio stays
+# off the public domain.
+(supabase_api) {
+	@supabase path /sb/auth/* /sb/rest/* /sb/storage/* /sb/realtime/* /sb/functions/*
+	handle @supabase {
+		uri strip_prefix /sb
+		reverse_proxy host.docker.internal:8000
+	}
+}
+
 {$GERAM_DOMAIN}, www.{$GERAM_DOMAIN} {
 	encode gzip
-	reverse_proxy app:3000
+	import supabase_api
+	handle {
+		reverse_proxy app:3000
+	}
 }
 
 # Reachable by IP before DNS is connected (plain HTTP).
 :80 {
-	reverse_proxy app:3000
+	import supabase_api
+	handle {
+		reverse_proxy app:3000
+	}
 }
