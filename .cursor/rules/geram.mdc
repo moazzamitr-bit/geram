@@ -1,0 +1,20 @@
+---
+description: Geram project guardrails (always on)
+alwaysApply: true
+---
+
+Read `AGENTS.md` at the repo root before any change. Non-negotiable:
+
+- Never edit files on the server (80.91.208.136) or run builds there by hand. Change the repo,
+  run `npx tsc --noEmit`, `npx eslint app lib components tests`, `npm test` (and `npm run build`
+  for routes/layouts), commit, push to `fix/p0-security`. The owner deploys with `deploy/install.sh`.
+- Never commit secrets; the repo is public. Settings go to `.env.example` (empty) + server `.env.production`.
+- Never update balances or `wallets` directly; money moves only through ledger journals
+  (`lib/core/ledger.ts` `postJournal`) and the maker-checker approvals flow.
+- Every new table: RLS on, user writes limited to safe columns; reuse `public.is_privileged()`.
+  New migration file per change; never edit applied migrations.
+- Docker WORKDIR stays `/srv/geram` (not `/app`). No `next/font/google` or other build-time
+  downloads (server is in Iran).
+- Don't silence errors to make a build pass; fix the cause.
+- Ask the owner before merging to `main`, changing `AUTH_METHOD`, or anything touching real money.
+- Reply to the owner in Persian, simply.
