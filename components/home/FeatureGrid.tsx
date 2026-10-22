@@ -55,7 +55,7 @@ export function FeatureGrid() {
           </h2>
           <p className="mt-3 text-[14px] leading-7 text-text-secondary md:text-[15px]">
             قیمت لایو، کارمزد شفاف، بدون اجرت — به‌همراه اهداف، خرید دوره‌ای و
-            تحویل فیزیکی.
+            قیمت قطعی قبل از تأیید.
           </p>
         </div>
 

@@ -280,9 +280,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// Signed-out, not-yet-hydrated state for trees rendered outside the provider.
+// The Linux production build prerendered /_not-found without the provider and
+// the old `throw` aborted the whole build; consumers already treat
+// `hydrated: false` as "show a skeleton".
+const SIGNED_OUT: AuthState = {
+  user: null,
+  hydrated: false,
+  isAuthenticated: false,
+  live: false,
+  login: async () => ({ ok: false, error: "auth_unavailable" }),
+  completeOnboarding: async () => undefined,
+  logout: async () => undefined,
+  setKycStatus: async () => undefined,
+  setHasPin: () => undefined,
+};
+
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  if (!ctx) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("useAuth called outside AuthProvider");
+    }
+    return SIGNED_OUT;
+  }
   return ctx;
 }
 

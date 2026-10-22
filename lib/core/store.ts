@@ -78,6 +78,8 @@ export interface CoreStore {
     to: ReservationStatus
   ): Promise<MetalSoftReservation>;
   openReservationQuantityUg(asset: AssetCode): Promise<bigint>;
+  /** Operator kill switches persisted by the admin console (key → enabled). */
+  listKillSwitches(): Promise<Record<string, boolean>>;
   /** ACTIVE quotes past expiry whose BUY reservation still holds inventory. */
   listExpiredOpenQuotes(asset: AssetCode, nowIso: string, limit: number): Promise<Quote[]>;
   insertTrade(trade: Trade): Promise<void>;
@@ -390,6 +392,12 @@ export class MemoryCoreStore implements CoreStore {
       if (r.asset === asset && r.status === "OPEN") sum += r.quantityUg;
     }
     return sum;
+  }
+
+  killSwitches: Record<string, boolean> = {};
+
+  async listKillSwitches(): Promise<Record<string, boolean>> {
+    return { ...this.killSwitches };
   }
 
   async listExpiredOpenQuotes(asset: AssetCode, nowIso: string, limit: number): Promise<Quote[]> {

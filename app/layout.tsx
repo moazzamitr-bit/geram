@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Vazirmatn } from "next/font/google";
+import localFont from "next/font/local";
 import { AuthProvider } from "@/lib/auth/auth-context";
 import "./globals.css";
 
-const vazirmatn = Vazirmatn({
-  subsets: ["arabic"],
-  weight: ["300", "400", "500", "600", "700", "800"],
+// Bundled locally: next/font/google downloads at build time, and Google Fonts
+// is unreachable from Iranian servers, which broke the production build there.
+const vazirmatn = localFont({
+  src: "./fonts/Vazirmatn-Variable.woff2",
+  weight: "100 900",
   variable: "--font-vazirmatn",
   display: "swap",
 });

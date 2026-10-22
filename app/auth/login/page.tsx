@@ -17,7 +17,8 @@ export default function LoginPage() {
   const { login, isAuthenticated, hydrated, user } = useAuth();
   const router = useRouter();
   const [step, setStep] = useState<Step>("phone");
-  const [phone, setPhone] = useState("09121234567");
+  const [phone, setPhone] = useState("");
+  const [sandbox, setSandbox] = useState(false);
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,7 +45,42 @@ export default function LoginPage() {
     [phone]
   );
 
-  const onSubmitPhone = (e: FormEvent) => {
+  const sendCode = async (): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/auth/otp/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: normalizedPhone }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        sandbox?: boolean;
+        resendInSec?: number;
+        retryAfterSec?: number;
+      };
+      if (!data.ok) {
+        setError(
+          data.error === "cooldown" || data.error === "too_many"
+            ? `برای ارسال دوباره ${(data.retryAfterSec ?? 60).toLocaleString("fa-IR")} ثانیه صبر کنید.`
+            : data.error === "unavailable"
+              ? "ورود موقتاً در دسترس نیست."
+              : "ارسال پیامک ناموفق بود. دوباره تلاش کنید."
+        );
+        return false;
+      }
+      setSandbox(Boolean(data.sandbox));
+      setSeconds(data.resendInSec ?? 60);
+      return true;
+    } catch {
+      // Offline demo (no server auth): the local sandbox flow still works.
+      setSandbox(true);
+      setSeconds(60);
+      return true;
+    }
+  };
+
+  const onSubmitPhone = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     if (!/^09\d{9}$/.test(normalizedPhone)) {
@@ -52,13 +88,12 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      setStep("otp");
-      setSeconds(60);
-      setAttempts(0);
-      setOtp("");
-    }, 600);
+    const sent = await sendCode();
+    setLoading(false);
+    if (!sent) return;
+    setStep("otp");
+    setAttempts(0);
+    setOtp("");
   };
 
   const onSubmitOtp = async (e: FormEvent) => {
@@ -80,6 +115,12 @@ export default function LoginPage() {
       setError(
         result.error === "invalid_otp"
           ? "کد تأیید نادرست است."
+          : result.error === "expired"
+            ? "کد منقضی شده است. کد جدید بگیرید."
+            : result.error === "too_many_attempts" || result.error === "rate_limited"
+              ? "تعداد تلاش بیش از حد مجاز است. کمی بعد دوباره تلاش کنید."
+              : result.error === "otp_provider_not_configured"
+                ? "ورود موقتاً در دسترس نیست."
           : result.error === "supabase_not_configured"
             ? "اتصال به سرور آماده نیست. دوباره تلاش کنید یا حالت نمایشی را بدون کلید سوپابیس استفاده کنید."
             : /rate limit/i.test(result.error ?? "")
@@ -109,9 +150,11 @@ export default function LoginPage() {
         </div>
 
         <div className="rounded-2xl border border-white/[0.07] bg-card-app p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)] md:p-8">
-          <div className="mb-2 inline-flex rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-[11px] text-warning">
-            حالت سندباکس
-          </div>
+          {sandbox && (
+            <div className="mb-2 inline-flex rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-[11px] text-warning">
+              حالت سندباکس
+            </div>
+          )}
 
           {step === "phone" ? (
             <form onSubmit={onSubmitPhone} className="space-y-5">
@@ -154,9 +197,11 @@ export default function LoginPage() {
                 <p className="mt-2 text-[14px] leading-7 text-muted-app">
                   کد تأیید به شماره {formatMaskedPhone(normalizedPhone)} ارسال شد.
                 </p>
-                <p className="mt-2 text-[12px] text-warning">
-                  در سندباکس کد ثابت است: {DEMO_OTP}
-                </p>
+                {sandbox && (
+                  <p className="mt-2 text-[12px] text-warning">
+                    در سندباکس کد ثابت است: {DEMO_OTP}
+                  </p>
+                )}
               </div>
 
               <label className="block">
@@ -208,8 +253,8 @@ export default function LoginPage() {
                   )}
                   onClick={() => {
                     if (!canResend) return;
-                    setSeconds(60);
                     setError("");
+                    void sendCode();
                   }}
                 >
                   {canResend ? "ارسال مجدد" : `ارسال مجدد (${seconds})`}

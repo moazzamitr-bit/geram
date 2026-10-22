@@ -125,6 +125,25 @@ export class FinancialCore {
     return this.deps.kills ?? getKillSwitches();
   }
 
+  /**
+   * Effective switches: env (deploy-time) AND the admin console (Postgres).
+   * Either side can stop a flow; neither can re-enable what the other stopped.
+   */
+  async effectiveKills(): Promise<KillSwitches> {
+    const base = this.kills();
+    let persisted: Record<string, boolean> = {};
+    try {
+      persisted = await this.deps.store.listKillSwitches();
+    } catch {
+      // Table missing/unreachable: fall back to env rather than failing open on DB state.
+    }
+    const out = { ...base };
+    for (const key of Object.keys(out) as (keyof KillSwitches)[]) {
+      if (persisted[key] === false) out[key] = false;
+    }
+    return out;
+  }
+
   fees(): FeeSnapshot {
     return this.deps.fees ?? DEFAULT_FEE_SNAPSHOT;
   }
@@ -221,7 +240,7 @@ export class FinancialCore {
         403
       );
     }
-    if (!this.kills().DEPOSIT_ENABLED) {
+    if (!(await this.effectiveKills()).DEPOSIT_ENABLED) {
       throw new CoreError("deposit_disabled", "Deposits are disabled", 403);
     }
     await this.bootstrap();
@@ -465,7 +484,7 @@ export class FinancialCore {
       throw new CoreError("asset_disabled", "Sell disabled for asset", 403);
     }
     try {
-      assertAssetSideEnabled(this.kills(), input.asset, input.side);
+      assertAssetSideEnabled(await this.effectiveKills(), input.asset, input.side);
     } catch {
       throw new CoreError("kill_switch", "Trading is disabled for this asset/side", 403);
     }
@@ -638,6 +657,16 @@ export class FinancialCore {
   }): Promise<Trade> {
     await this.bootstrap();
     await ensureUserAccounts(this.deps.store, input.userId);
+
+    // A switch flipped after the quote was issued must still stop execution.
+    const pending = await this.deps.store.getQuote(input.quoteId);
+    if (pending && pending.userId === input.userId) {
+      try {
+        assertAssetSideEnabled(await this.effectiveKills(), pending.asset, pending.side);
+      } catch {
+        throw new CoreError("kill_switch", "Trading is disabled for this asset/side", 403);
+      }
+    }
 
     const requestHash = hashPayload({
       operation: "TRADE_EXECUTE",

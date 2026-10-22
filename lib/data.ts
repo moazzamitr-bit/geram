@@ -6,21 +6,23 @@ export const navItems = [
   { label: "درباره ما", href: "#about" },
 ] as const;
 
+// Only claims the product can back today. Insurance, custody and licence
+// badges come back when the contracts/licence actually exist.
 export const heroTrustItems = [
   {
-    title: "بیمه سراسری",
-    caption: "برای دارایی شما",
+    title: "قیمت قطعی",
+    caption: "قبل از تأیید، بدون تغییر",
     icon: "shield",
   },
   {
-    title: "پشتوانه واقعی",
-    caption: "نگهداری در خزانه معتبر",
-    icon: "vault",
+    title: "کارمزد ۰٫۵٪",
+    caption: "بدون حداقل کارمزد",
+    icon: "badge",
   },
   {
-    title: "مجوز رسمی",
-    caption: "فعالیت در چارچوب قانونی",
-    icon: "badge",
+    title: "از ۱۰۰ هزار تومان",
+    caption: "حداقل خرید هر سه فلز",
+    icon: "vault",
   },
 ] as const;
 
@@ -54,10 +56,10 @@ export const features = [
     icon: "target",
   },
   {
-    id: "physical-delivery",
-    title: "تحویل فیزیکی",
+    id: "firm-quote",
+    title: "قیمت قطعی",
     description:
-      "در صورت نیاز، دارایی خود را به‌صورت فیزیکی تحویل بگیرید.",
+      "قبل از خرید یا فروش، قیمت قطعی با شمارش معکوس می‌گیرید و همان را تأیید می‌کنید.",
     icon: "package",
   },
 ] as const;
@@ -76,8 +78,8 @@ export const metrics = [
     label: "بدون هزینه ساخت",
   },
   {
-    value: "۲۴/۷",
-    label: "دسترسی به بازار",
+    value: "۰٫۵٪",
+    label: "کارمزد معامله",
   },
 ] as const;
 
@@ -97,7 +99,7 @@ export const footerGroups = [
     links: [
       { label: "پرتفوی چندفلزی", href: "/app/portfolio" },
       { label: "پس‌انداز هدفمند", href: "/app/goals" },
-      { label: "تحویل فیزیکی", href: "/app/delivery" },
+      { label: "سقف تراکنش‌ها", href: "/app/profile/limits" },
       { label: "اپلیکیشن", href: "#app" },
       { label: "مرکز اعتماد", href: "/app/trust" },
     ],
