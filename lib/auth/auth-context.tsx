@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { withTimeout } from "@/lib/auth/timeout";
 import { createClient, hasSupabaseEnv } from "@/lib/supabase/client";
 
 export type KycStatus =
@@ -33,6 +34,16 @@ type AuthState = {
   isAuthenticated: boolean;
   live: boolean;
   login: (phone: string, otp?: string) => Promise<{ ok: boolean; error?: string }>;
+  loginWithPassword: (
+    phone: string,
+    password: string
+  ) => Promise<{ ok: boolean; error?: string; onboardingDone?: boolean }>;
+  register: (input: {
+    phone: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }) => Promise<{ ok: boolean; error?: string; onboardingDone?: boolean }>;
   completeOnboarding: () => Promise<void>;
   logout: () => Promise<void>;
   setKycStatus: (status: KycStatus) => Promise<void>;
@@ -83,44 +94,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
+    function finish(next: DemoUser | null) {
+      if (cancelled) return;
+      setUser(next);
+      setHydrated(true);
+    }
+
     async function hydrate() {
-      if (live) {
+      // Demo sessions live only in localStorage. A live deploy must not treat
+      // that as a Supabase session — middleware would bounce /app back here
+      // and the login screen would never settle.
+      if (!live) {
         try {
-          const supabase = createClient();
-          const {
-            data: { user: authUser },
-          } = await supabase.auth.getUser();
-          if (authUser && !cancelled) {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select(
-                "id, phone, first_name, last_name, kyc_status, onboarding_done"
-              )
-              .eq("id", authUser.id)
-              .maybeSingle();
-            if (profile) {
-              setUser(
-                profileToUser(
-                  profile,
-                  (authUser.user_metadata?.phone as string) || ""
-                )
-              );
-              setHydrated(true);
-              return;
-            }
-          }
+          const raw = localStorage.getItem(STORAGE_KEY);
+          finish(raw ? (JSON.parse(raw) as DemoUser) : null);
         } catch {
-          /* fall through to local */
+          localStorage.removeItem(STORAGE_KEY);
+          finish(null);
         }
+        return;
       }
 
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw && !cancelled) setUser(JSON.parse(raw) as DemoUser);
-      } catch {
+        const supabase = createClient();
+        const { data } = await withTimeout(supabase.auth.getUser(), 5_000, "auth_timeout");
+        const authUser = data.user;
+        if (!authUser) {
+          localStorage.removeItem(STORAGE_KEY);
+          finish(null);
+          return;
+        }
+        const { data: profile } = await withTimeout(
+          supabase
+            .from("profiles")
+            .select("id, phone, first_name, last_name, kyc_status, onboarding_done")
+            .eq("id", authUser.id)
+            .maybeSingle(),
+          5_000,
+          "auth_timeout"
+        );
         localStorage.removeItem(STORAGE_KEY);
-      } finally {
-        if (!cancelled) setHydrated(true);
+        if (profile) {
+          finish(profileToUser(profile, (authUser.user_metadata?.phone as string) || ""));
+          return;
+        }
+        finish({
+          id: authUser.id,
+          firstName: "کاربر",
+          lastName: "گرم",
+          phone: (authUser.user_metadata?.phone as string) || "",
+          kycStatus: "UNVERIFIED",
+          onboardingDone: false,
+          hasPin: false,
+        });
+      } catch {
+        finish(null);
       }
     }
 
@@ -188,6 +216,104 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { ok: true };
     },
     [live, persistLocal]
+  );
+
+  const exchangePassword = useCallback(
+    async (
+      url: string,
+      body: Record<string, string>,
+      demo: DemoUser
+    ): Promise<{ ok: boolean; error?: string; onboardingDone?: boolean }> => {
+      const digits = (body.phone || "").replace(/\D/g, "").replace(/^98/, "0");
+      if (!live) {
+        persistLocal({ ...demo, phone: digits });
+        return { ok: true, onboardingDone: demo.onboardingDone };
+      }
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          credentials: "same-origin",
+          body: JSON.stringify({ ...body, phone: digits }),
+          signal: AbortSignal.timeout(12_000),
+        });
+        const data = (await res.json()) as {
+          ok: boolean;
+          error?: string;
+          session?: { access_token: string; refresh_token: string };
+          profile?: {
+            id: string;
+            phone?: string | null;
+            first_name?: string | null;
+            last_name?: string | null;
+            kyc_status?: string | null;
+            onboarding_done?: boolean | null;
+          };
+        };
+        if (!data.ok || !data.profile) {
+          return { ok: false, error: data.error ?? "login_failed" };
+        }
+        if (data.session?.access_token && data.session.refresh_token) {
+          try {
+            const supabase = createClient();
+            await withTimeout(supabase.auth.setSession(data.session), 4_000, "auth_timeout");
+          } catch {
+            // The route already set the cookies middleware reads.
+          }
+        }
+        localStorage.removeItem(STORAGE_KEY);
+        setUser(profileToUser(data.profile, digits));
+        return { ok: true, onboardingDone: Boolean(data.profile.onboarding_done) };
+      } catch (err) {
+        const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.message === "auth_timeout");
+        return { ok: false, error: timedOut ? "timeout" : "network" };
+      }
+    },
+    [live, persistLocal]
+  );
+
+  const loginWithPassword = useCallback(
+    (phone: string, password: string) =>
+      exchangePassword(
+        "/api/auth/password-login",
+        { phone, password },
+        {
+          id: "demo-user-1",
+          firstName: "کاربر",
+          lastName: "گرم",
+          phone,
+          kycStatus: "UNVERIFIED",
+          onboardingDone: true,
+          hasPin: false,
+        }
+      ),
+    [exchangePassword]
+  );
+
+  const register = useCallback(
+    (input: { phone: string; password: string; firstName: string; lastName: string }) =>
+      exchangePassword(
+        "/api/auth/register",
+        {
+          phone: input.phone,
+          password: input.password,
+          firstName: input.firstName,
+          lastName: input.lastName,
+        },
+        {
+          id: "demo-user-1",
+          firstName: input.firstName,
+          lastName: input.lastName,
+          phone: input.phone,
+          kycStatus: "UNVERIFIED",
+          onboardingDone: false,
+          hasPin: false,
+        }
+      ),
+    [exchangePassword]
   );
 
   const completeOnboarding = useCallback(async () => {
@@ -260,6 +386,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: Boolean(user),
       live,
       login,
+      loginWithPassword,
+      register,
       completeOnboarding,
       logout,
       setKycStatus,
@@ -270,6 +398,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hydrated,
       live,
       login,
+      loginWithPassword,
+      register,
       completeOnboarding,
       logout,
       setKycStatus,
@@ -290,6 +420,8 @@ const SIGNED_OUT: AuthState = {
   isAuthenticated: false,
   live: false,
   login: async () => ({ ok: false, error: "auth_unavailable" }),
+  loginWithPassword: async () => ({ ok: false, error: "auth_unavailable" }),
+  register: async () => ({ ok: false, error: "auth_unavailable" }),
   completeOnboarding: async () => undefined,
   logout: async () => undefined,
   setKycStatus: async () => undefined,
