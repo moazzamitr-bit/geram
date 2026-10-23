@@ -7,6 +7,7 @@ import {
 } from "@/components/admin/AdminUI";
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
 import { InventoryRequestForm } from "@/components/admin/InventoryRequestForm";
+import { WalletCreditForm } from "@/components/admin/WalletCreditForm";
 import { probeTable } from "@/lib/admin/probe";
 
 export default async function AdminApprovalsPage() {
@@ -18,22 +19,20 @@ export default async function AdminApprovalsPage() {
     <div>
       <AdminPageHeader
         title="تأیید دو مرحله‌ای"
-        description="سازنده نمی‌تواند درخواست خودش را تأیید کند. اجرای اصلاح مالی فقط از ژورنال — هرگز mutation مستقیم موجودی."
+        description="سازنده نمی‌تواند درخواست خودش را تأیید کند. اجرا فقط از ژورنال — هرگز mutation مستقیم موجودی."
       />
       {!rows.ready ? <OpsBadge state="NOT_READY" /> : <OpsBadge state="SANDBOX" />}
-      <AdminNotice title="AdjustmentRequest">
-        ایجاد اصلاح مالی صف تأیید می‌سازد. Execute وقتی دفترکل عملیاتی نباشد رد می‌شود و wallets را عوض نمی‌کند.
+      <AdminNotice title="موجودی اولیه خزانه">
+        ثبت موجودی اولیه فلز یا نقدینگی عملیاتی صف تأیید می‌سازد. Execute ژورنال APPROVED_OPENING_BALANCE را به PLATFORM_AVAILABLE یا PLATFORM_CASH_CONTROL پست می‌کند.
+      </AdminNotice>
+      <AdminNotice title="شارژ کیف پول">
+        FINANCIAL_ADJUSTMENT موجودی قابل استفاده کاربر را با ژورنال APPROVED_OPENING_BALANCE زیاد می‌کند. سازنده نمی‌تواند درخواست خودش را تأیید کند. جدول wallets عوض نمی‌شود.
       </AdminNotice>
       <div className="mb-6 max-w-lg">
         <InventoryRequestForm />
       </div>
       <div className="mb-6 max-w-lg">
-        <AdminActionForm
-          action="create"
-          endpoint="/api/admin/approvals"
-          extra={{ kind: "FINANCIAL_ADJUSTMENT" }}
-          submitLabel="درخواست اصلاح مالی (نه Edit Balance)"
-        />
+        <WalletCreditForm />
       </div>
       {rows.ready ? (
         <AdminTable headers={["نوع", "وضعیت", "maker", "checker", "زمان", "اقدام"]} empty={rows.rows.length === 0}>
@@ -45,6 +44,12 @@ export default async function AdminApprovalsPage() {
                   <span className="block text-[11px] text-white/50" dir="ltr">
                     {String((r.payload as { asset?: string })?.asset ?? "")}{" "}
                     {String((r.payload as { amount?: string })?.amount ?? "")}
+                  </span>
+                )}
+                {r.kind === "FINANCIAL_ADJUSTMENT" && (
+                  <span className="block text-[11px] text-white/50" dir="ltr">
+                    {String((r.payload as { userId?: string })?.userId ?? "").slice(0, 8)}{" "}
+                    {String((r.payload as { amount?: string })?.amount ?? "")} IRR-toman
                   </span>
                 )}
               </td>

@@ -3,7 +3,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { CORE_SCHEMA_SQL } from "@/lib/core/schema";
 import { PostgresCoreStore } from "@/lib/core/pg-store";
 import { tomanToIrr } from "@/lib/core/money";
-import { makePgCore } from "./helpers";
+import { walletCreditRefId } from "@/lib/admin/wallet-credit";
+import { makePgCore, makePgLite } from "./helpers";
 
 describe("PostgreSQL ledger integration (PGlite)", () => {
   it("persists buy/sell journals and balances", async () => {
@@ -181,5 +182,27 @@ describe("PostgreSQL ledger integration (PGlite)", () => {
         );
       `)
     ).rejects.toThrow();
+  });
+
+  it("credits USER_AVAILABLE once through an approved opening", async () => {
+    const { store } = await makePgLite();
+    const core = makePgCore(store, { seed: false });
+    const user = "pg-credit-user";
+    const amount = tomanToIrr(1_500_000);
+    const refId = walletCreditRefId("pg-credit-key");
+    const first = await core.creditApprovedUserIrr({
+      userId: user,
+      amountIrr: amount,
+      reason: "closed beta pg credit",
+      refId,
+    });
+    const second = await core.creditApprovedUserIrr({
+      userId: user,
+      amountIrr: amount,
+      reason: "closed beta pg credit",
+      refId,
+    });
+    expect(second).toEqual({ journalId: first.journalId, replayed: true });
+    expect((await core.wallet(user)).rialAvailable).toBe(amount);
   });
 });

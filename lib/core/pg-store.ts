@@ -269,6 +269,14 @@ export class PostgresCoreStore implements CoreStore {
     }));
   }
 
+  async findJournalIdByRef(refType: string, refId: string): Promise<string | null> {
+    const { rows } = await this.sql().query(
+      `select id from core_journals where ref_type=$1 and ref_id=$2 order by created_at asc limit 1`,
+      [refType, refId]
+    );
+    return rows[0] ? str(rows[0].id) : null;
+  }
+
   async insertJournal(entry: JournalEntry) {
     await this.sql().exec(
       `insert into core_journals (id, created_at, reason, ref_type, ref_id) values ($1,$2,$3,$4,$5)`,
