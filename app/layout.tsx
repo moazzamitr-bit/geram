@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
 import { AuthProvider } from "@/lib/auth/auth-context";
 import "./globals.css";
 
@@ -26,12 +27,17 @@ export const metadata: Metadata = {
       { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
       { url: "/brand/logo.png", sizes: "528x525", type: "image/png" },
     ],
-    apple: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: {
     capable: true,
+    // Marketing pages stay dark. /app overrides this to "default" for the cream shell.
     statusBarStyle: "black-translucent",
     title: "گرم",
+  },
+  // Next emits mobile-web-app-capable. Older iOS still reads the apple- prefix.
+  other: {
+    "apple-mobile-web-app-capable": "yes",
   },
   openGraph: {
     title: "گرم | طلا، نقره و مس در یک کیف‌پول",
@@ -44,6 +50,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // Browser chrome on the marketing site. The installed PWA uses the manifest
+  // cream theme, and /app overrides themeColor so the logged-in shell matches.
   themeColor: "#080B0D",
   width: "device-width",
   initialScale: 1,
@@ -64,6 +72,7 @@ export default function RootLayout({
         >
           پرش به محتوای اصلی
         </a>
+        <RegisterServiceWorker />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
