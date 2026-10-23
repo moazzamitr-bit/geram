@@ -21,10 +21,10 @@ const presets = [
 export default function NewGoalPage() {
   const store = useDemoStore();
   const router = useRouter();
-  const [name, setName] = useState(presets[0]);
-  const [targetRial, setTargetRial] = useState(100_000_000);
-  const [monthlyRial, setMonthlyRial] = useState(5_000_000);
-  const [targetDate, setTargetDate] = useState("اسفند ۱۴۰۴");
+  const [name, setName] = useState("");
+  const [targetRial, setTargetRial] = useState(0);
+  const [monthlyRial, setMonthlyRial] = useState(0);
+  const [targetDate, setTargetDate] = useState("");
 
   return (
     <div className="mx-auto max-w-xl space-y-5">
@@ -82,7 +82,8 @@ export default function NewGoalPage() {
           type="button"
           className="mt-6 w-full"
           onClick={() => {
-            const id = store.addGoal({ name, targetRial, monthlyRial, targetDate });
+            if (!name.trim() || targetRial <= 0) return;
+            const id = store.addGoal({ name: name.trim(), targetRial, monthlyRial, targetDate });
             router.push(`/app/goals/${id}`);
           }}
         >

@@ -3,7 +3,6 @@
 import { AppCard } from "@/components/app/AppCard";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { useDemoStore } from "@/lib/app/demo-store";
@@ -13,7 +12,7 @@ import { useState } from "react";
 
 export default function ScheduledPurchasesPage() {
   const store = useDemoStore();
-  const [amount, setAmount] = useState(5_000_000);
+  const [amount, setAmount] = useState(0);
   const [cadence, setCadence] = useState("هر ماه، روز اول");
   const [err, setErr] = useState("");
 
@@ -22,7 +21,6 @@ export default function ScheduledPurchasesPage() {
       <PageHeader
         title="خرید زمان‌بندی‌شده"
         description="فقط از موجودی کیف پول — بدون برداشت خودکار بانکی."
-        action={<SimulationBadge />}
       />
 
       <AppCard>

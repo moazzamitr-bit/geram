@@ -4,7 +4,6 @@ import { AnimatedNumber } from "@/components/app/AnimatedNumber";
 import { AppCard } from "@/components/app/AppCard";
 import { InstrumentTabs } from "@/components/app/InstrumentTabs";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { PriceChart } from "@/components/ui/PriceChart";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { useDemoStore } from "@/lib/app/demo-store";
@@ -37,7 +36,7 @@ export default function MarketPage() {
   const [direction, setDirection] = useState<"above" | "below">("above");
   const [msg, setMsg] = useState("");
   const [autoBuy, setAutoBuy] = useState(false);
-  const [autoBuyAmount, setAutoBuyAmount] = useState(5_000_000);
+  const [autoBuyAmount, setAutoBuyAmount] = useState(0);
   const [smsChannel, setSmsChannel] = useState(false);
 
   useEffect(() => {
@@ -48,8 +47,7 @@ export default function MarketPage() {
     <div className="mx-auto max-w-4xl space-y-5">
       <PageHeader
         title="بازار فلزات"
-        description="طلا، نقره و مس — قیمت لایو، نمودار و معامله در یک جا."
-        action={<SimulationBadge />}
+        description="طلا، نقره و مس — قیمت بازار، نمودار و معامله در یک جا."
       />
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -71,7 +69,7 @@ export default function MarketPage() {
             >
               <p className="text-[12px] text-muted-app">{m.title}</p>
               <p className="mt-1 text-[18px] font-extrabold tabular-nums text-text">
-                {formatToman(p)}
+                {p > 0 ? formatToman(p) : "—"}
               </p>
               <p
                 className={`mt-1 text-[12px] tabular-nums ${
@@ -93,10 +91,14 @@ export default function MarketPage() {
           <div>
             <p className="text-[13px] text-muted-app">{meta.title}</p>
             <p className="mt-2 text-[36px] font-extrabold text-text">
-              <AnimatedNumber
-                value={price}
-                formatter={(n) => formatToman(Math.round(n))}
-              />
+              {price > 0 ? (
+                <AnimatedNumber
+                  value={price}
+                  formatter={(n) => formatToman(Math.round(n))}
+                />
+              ) : (
+                "—"
+              )}
             </p>
             <p className="mt-1 text-[13px] tabular-nums text-positive">
               {quote.changePercent != null

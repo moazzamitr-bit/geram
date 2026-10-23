@@ -3,7 +3,6 @@
 import { AppCard } from "@/components/app/AppCard";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { useDemoStore } from "@/lib/app/demo-store";
@@ -24,7 +23,6 @@ export default function BankAccountsPage() {
         title="حساب‌های بانکی"
         description="برای برداشت، یک شبا تأییدشده لازم است."
         backHref="/app/profile"
-        action={<SimulationBadge />}
       />
 
       {store.bankAccounts.length === 0 ? (
@@ -83,10 +81,10 @@ export default function BankAccountsPage() {
             }
             store.addBankAccount(iban, bank);
             setIban("IR");
-            setMsg("حساب اضافه و در سندباکس تأیید شد.");
+            setMsg("حساب ثبت شد. تأیید مالکیت شبا هنوز انجام نشده است.");
           }}
         >
-          افزودن و تأیید سندباکس
+          افزودن حساب
         </GoldButton>
         {msg && <p className="text-[13px] text-muted-app">{msg}</p>}
       </AppCard>

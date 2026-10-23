@@ -39,7 +39,6 @@ export function PriceChart({
 }: PriceChartProps) {
   const [data, setData] = useState<Point[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +46,6 @@ export function PriceChart({
 
     async function load() {
       setLoading(true);
-      setError(false);
       try {
         const res = await fetch(
           `/api/market/history?range=${range}&instrument=${instrument}`,
@@ -70,7 +68,6 @@ export function PriceChart({
         }
       } catch {
         if (!cancelled && !controller.signal.aborted) {
-          setError(true);
           setData([]);
         }
       } finally {
@@ -108,7 +105,7 @@ export function PriceChart({
     );
   }
 
-  if (error && data.length === 0) {
+  if (data.length === 0) {
     return (
       <div
         className={cn(
@@ -117,7 +114,7 @@ export function PriceChart({
         )}
         style={{ height }}
       >
-        نمودار در دسترس نیست
+        داده‌ای برای نمایش وجود ندارد
       </div>
     );
   }

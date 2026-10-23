@@ -1,5 +1,6 @@
 "use client";
 
+import { isLiveDisplayQuote } from "@/lib/market/display-price";
 import {
   INSTRUMENT_IDS,
   INSTRUMENTS,
@@ -14,18 +15,12 @@ type Quote = {
   instrument: InstrumentId;
   priceToman: number;
   changePercent: number | null;
+  sourceKey?: string | null;
   stale?: boolean;
 };
 
-const FALLBACK: Quote[] = INSTRUMENT_IDS.map((id) => ({
-  instrument: id,
-  priceToman: INSTRUMENTS[id].fallbackPriceToman,
-  changePercent: null,
-  stale: true,
-}));
-
 export function LiveMetalsSection() {
-  const [quotes, setQuotes] = useState<Quote[]>(FALLBACK);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -36,19 +31,15 @@ export function LiveMetalsSection() {
         const res = await fetch("/api/market/price?all=1", { cache: "no-store" });
         if (!res.ok) return;
         const json = (await res.json()) as { quotes?: Quote[] };
-        if (!cancelled && json.quotes?.length) {
-          setQuotes(
-            json.quotes.map((q) => ({
-              instrument: q.instrument,
-              priceToman: q.priceToman,
-              changePercent: q.changePercent,
-              stale: q.stale,
-            }))
-          );
+        const live = (json.quotes ?? []).filter((q) =>
+          isLiveDisplayQuote({ priceToman: q.priceToman, sourceKey: q.sourceKey })
+        );
+        if (!cancelled && live.length) {
+          setQuotes(live);
           setLoaded(true);
         }
       } catch {
-        /* keep fallback */
+        /* leave prices blank until a live quote arrives */
       }
     }
 
@@ -84,9 +75,9 @@ export function LiveMetalsSection() {
         <ul className="grid gap-0 overflow-hidden rounded-[20px] border border-white/[0.08] bg-[linear-gradient(160deg,rgba(20,25,29,0.95),rgba(8,11,13,0.98))] sm:grid-cols-3">
           {INSTRUMENT_IDS.map((id, index) => {
             const meta = INSTRUMENTS[id];
-            const quote =
-              quotes.find((q) => q.instrument === id) ?? FALLBACK[index]!;
-            const change = quote.changePercent;
+            const quote = quotes.find((q) => q.instrument === id);
+            const change = quote?.changePercent ?? null;
+            const price = quote?.priceToman ?? 0;
             return (
               <li
                 key={id}
@@ -106,7 +97,7 @@ export function LiveMetalsSection() {
                   <div>
                     <p className="text-[13px] text-text-secondary">{meta.title}</p>
                     <p className="mt-2 text-[26px] font-extrabold tabular-nums tracking-tight text-text md:text-[28px]">
-                      {formatToman(quote.priceToman)}
+                      {price > 0 ? formatToman(price) : "—"}
                     </p>
                     <p
                       className={`mt-1.5 text-[12px] tabular-nums ${

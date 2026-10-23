@@ -2,7 +2,7 @@
 
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { GoldButton } from "@/components/ui/GoldButton";
-import { DEMO_OTP, formatMaskedPhone, useAuth } from "@/lib/auth/auth-context";
+import { formatMaskedPhone, useAuth } from "@/lib/auth/auth-context";
 import { cn } from "@/lib/utils";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
@@ -351,7 +351,6 @@ function OtpLogin() {
   const { login, isAuthenticated, hydrated, user } = useAuth();
   const [step, setStep] = useState<OtpStep>("phone");
   const [phone, setPhone] = useState("");
-  const [sandbox, setSandbox] = useState(false);
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -381,7 +380,6 @@ function OtpLogin() {
       const data = (await res.json()) as {
         ok: boolean;
         error?: string;
-        sandbox?: boolean;
         resendInSec?: number;
         retryAfterSec?: number;
       };
@@ -393,7 +391,6 @@ function OtpLogin() {
         );
         return false;
       }
-      setSandbox(Boolean(data.sandbox));
       setSeconds(data.resendInSec ?? 60);
       return true;
     } catch {
@@ -470,7 +467,6 @@ function OtpLogin() {
         <p className="mt-2 text-[14px] leading-7 text-muted-app">
           کد تأیید به شماره {formatMaskedPhone(normalizedPhone)} ارسال شد.
         </p>
-        {sandbox && <p className="mt-2 text-[12px] text-warning">در سندباکس کد ثابت است: {DEMO_OTP}</p>}
       </div>
       <label className="block">
         <span className="mb-2 block text-[13px] text-text-secondary">کد ۶ رقمی</span>

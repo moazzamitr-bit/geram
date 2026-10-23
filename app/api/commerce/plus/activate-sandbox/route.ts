@@ -52,6 +52,6 @@ export async function POST() {
     ok: true,
     planTier: "plus",
     planExpiresAt: expires.toISOString(),
-    message: "گرم پلاس برای ۳۰ روز فعال شد (سندباکس).",
+    message: "گرم پلاس برای ۳۰ روز فعال شد.",
   });
 }

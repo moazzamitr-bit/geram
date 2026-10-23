@@ -28,7 +28,7 @@ export async function GET() {
         }).format(new Date(d.createdAt)),
         timeline: [
           { label: "درخواست واریز", done: true },
-          { label: "تأیید درگاه (سندباکس)", done: true },
+          { label: "ثبت واریز", done: true },
           { label: "افزایش موجودی", done: true },
         ],
       })),

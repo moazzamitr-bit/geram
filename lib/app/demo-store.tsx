@@ -1,13 +1,14 @@
 "use client";
 
+import { stripDemoFixtures } from "@/lib/app/demo-fixtures";
 import type { KycStatus } from "@/lib/auth/auth-context";
 import type { UiQuote } from "@/lib/core-api";
 import {
   DEFAULT_COMMERCE_SETTINGS,
   type CommerceSettings,
 } from "@/lib/commerce/types";
+import { isLiveDisplayQuote } from "@/lib/market/display-price";
 import {
-  INSTRUMENTS,
   type InstrumentId,
   parseInstrumentId,
 } from "@/lib/market/instruments";
@@ -216,100 +217,6 @@ function newId() {
   return uid("id");
 }
 
-const initialTransactions: DemoTransaction[] = [
-  {
-    id: "tx-buy-1",
-    trackingCode: "GRM-A1B2C3",
-    type: "خرید",
-    instrument: "gold18",
-    goldMg: 125,
-    amountRial: 950_000,
-    feeRial: 25_000,
-    pricePerGram: 7_000_000,
-    status: "تکمیل‌شده",
-    createdAt: "۱۴۰۴/۰۵/۱۲، ۱۴:۲۰",
-    timeline: [
-      { label: "سفارش ایجاد شد", done: true, at: "۱۴:۲۰" },
-      { label: "پرداخت", done: true, at: "۱۴:۲۰" },
-      { label: "تخصیص طلا", done: true, at: "۱۴:۲۱" },
-      { label: "ثبت نهایی", done: true, at: "۱۴:۲۱" },
-    ],
-    paymentRef: "PAY-9912",
-  },
-  {
-    id: "tx-sell-1",
-    trackingCode: "GRM-D4E5F6",
-    type: "فروش",
-    instrument: "gold18",
-    goldMg: 800,
-    amountRial: 6_100_000,
-    feeRial: 40_000,
-    pricePerGram: 7_675_000,
-    status: "در انتظار تسویه",
-    createdAt: "۱۴۰۴/۰۵/۱۰، ۱۱:۰۵",
-    timeline: [
-      { label: "سفارش ایجاد شد", done: true, at: "۱۱:۰۵" },
-      { label: "رزرو طلا", done: true, at: "۱۱:۰۵" },
-      { label: "تسویه", done: false },
-      { label: "تکمیل", done: false },
-    ],
-  },
-  {
-    id: "tx-buy-2",
-    trackingCode: "GRM-G7H8I9",
-    type: "خرید",
-    instrument: "gold18",
-    goldMg: 1200,
-    amountRial: 8_200_000,
-    feeRial: 50_000,
-    pricePerGram: 6_791_000,
-    status: "تکمیل‌شده",
-    createdAt: "۱۴۰۴/۰۵/۰۲، ۰۹:۴۰",
-    timeline: [
-      { label: "سفارش ایجاد شد", done: true },
-      { label: "پرداخت", done: true },
-      { label: "تخصیص طلا", done: true },
-      { label: "ثبت نهایی", done: true },
-    ],
-  },
-  {
-    id: "tx-buy-silver-1",
-    trackingCode: "GRM-AG01",
-    type: "خرید",
-    instrument: "silver925",
-    goldMg: 5000,
-    amountRial: 1_950_000,
-    feeRial: 20_000,
-    pricePerGram: 386_000,
-    status: "تکمیل‌شده",
-    createdAt: "۱۴۰۴/۰۵/۰۸، ۱۶:۱۰",
-    timeline: [
-      { label: "سفارش ایجاد شد", done: true },
-      { label: "پرداخت", done: true },
-      { label: "تخصیص نقره", done: true },
-      { label: "ثبت نهایی", done: true },
-    ],
-  },
-  {
-    id: "tx-buy-copper-1",
-    trackingCode: "GRM-CU01",
-    type: "خرید",
-    instrument: "copper",
-    goldMg: 200_000,
-    amountRial: 520_000,
-    feeRial: 10_000,
-    pricePerGram: 2_550,
-    status: "تکمیل‌شده",
-    createdAt: "۱۴۰۴/۰۵/۰۹، ۱۲:۴۰",
-    timeline: [
-      { label: "سفارش ایجاد شد", done: true },
-      { label: "پرداخت", done: true },
-      { label: "تخصیص مس", done: true },
-      { label: "ثبت نهایی", done: true },
-    ],
-  },
-];
-
 const emptyQuoteMeta = {
   highToman: null as number | null,
   lowToman: null as number | null,
@@ -328,13 +235,13 @@ const seed = {
   avgBuyPriceRial: 0,
   avgBuyPriceSilverRial: 0,
   avgBuyPriceCopperRial: 0,
-  marketPriceRial: INSTRUMENTS.gold18.fallbackPriceToman,
+  marketPriceRial: 0,
   marketPrices: {
-    gold18: INSTRUMENTS.gold18.fallbackPriceToman,
-    silver925: INSTRUMENTS.silver925.fallbackPriceToman,
-    copper: INSTRUMENTS.copper.fallbackPriceToman,
+    gold18: 0,
+    silver925: 0,
+    copper: 0,
   } as Record<InstrumentId, number>,
-  marketStatus: "open" as const,
+  marketStatus: "paused" as "open" | "closed" | "paused",
   marketSource: "در حال دریافت...",
   marketUpdatedAt: null as string | null,
   marketStale: true,
@@ -357,46 +264,12 @@ const seed = {
     }
   >,
   pin: null as string | null,
-  bankAccounts: [
-    {
-      id: "bank-1",
-      iban: "IR120170000000123456789001",
-      bank: "بانک ملی",
-      verified: true,
-    },
-  ],
-  transactions: initialTransactions,
-  goals: [
-    {
-      id: "goal-car",
-      name: "خرید خودرو",
-      targetRial: 230_000_000,
-      currentRial: 98_000_000,
-      targetDate: "آذر ۱۴۰۴",
-      monthlyRial: 12_500_000,
-    },
-  ],
+  bankAccounts: [] as { id: string; iban: string; bank: string; verified: boolean }[],
+  transactions: [] as DemoTransaction[],
+  goals: [] as DemoGoal[],
   deliveries: [] as DemoDelivery[],
   alerts: [] as DemoAlert[],
-  notifications: [
-    {
-      id: "n1",
-      type: "TRADE",
-      title: "خرید با موفقیت انجام شد",
-      message: "۰.۱۲۵ گرم طلا به دارایی شما اضافه شد.",
-      createdAt: "۱۴۰۴/۰۵/۱۲",
-      read: false,
-      href: "/app/transactions/tx-buy-1",
-    },
-    {
-      id: "n2",
-      type: "SECURITY",
-      title: "ورود جدید",
-      message: "ورود سندباکس از دستگاه فعلی ثبت شد.",
-      createdAt: "امروز",
-      read: true,
-    },
-  ] as DemoNotification[],
+  notifications: [] as DemoNotification[],
   tickets: [] as SupportTicket[],
   scheduledPurchases: [] as DemoState["scheduledPurchases"],
   plusActive: false,
@@ -521,21 +394,21 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem("gram_demo_platform_v1");
         if (raw && !cancelled) {
           const parsed = JSON.parse(raw) as Partial<Persisted>;
-          const merged = stripFinancial({
-            ...seed,
-            ...parsed,
-            marketPrices: {
-              ...seed.marketPrices,
-              ...(parsed.marketPrices ?? {}),
-            },
-            marketQuotes: {
-              ...seed.marketQuotes,
-              ...(parsed.marketQuotes ?? {}),
-            },
-            transactions: seed.transactions,
-          });
-          const plusRaw = localStorage.getItem("gram_plus_sandbox");
-          if (plusRaw === "1") merged.plusActive = true;
+          const merged = stripDemoFixtures(
+            stripFinancial({
+              ...seed,
+              ...parsed,
+              marketPrices: { ...seed.marketPrices },
+              marketQuotes: { ...seed.marketQuotes },
+              transactions: parsed.transactions ?? [],
+              goals: parsed.goals ?? [],
+              notifications: parsed.notifications ?? [],
+              bankAccounts: parsed.bankAccounts ?? [],
+              plusActive: false,
+              kycStatus: "UNVERIFIED",
+            })
+          );
+          localStorage.removeItem("gram_plus_sandbox");
           setState(merged);
         }
       } catch {
@@ -596,6 +469,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           instrument?: string;
           priceToman?: number;
           source?: string;
+          sourceKey?: string;
           updatedAt?: string;
           stale?: boolean;
           highToman?: number | null;
@@ -609,12 +483,16 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       setState((s) => {
         const marketPrices = { ...s.marketPrices };
         const marketQuotes = { ...s.marketQuotes };
+        let accepted = 0;
         for (const q of quotes) {
           const id = parseInstrumentId(q.instrument);
-          if (!q.priceToman || q.priceToman < 1) continue;
+          if (!isLiveDisplayQuote({ priceToman: q.priceToman, sourceKey: q.sourceKey })) {
+            continue;
+          }
           // Gold sanity: reject absurdly low quotes
-          if (id === "gold18" && q.priceToman < 100_000) continue;
-          marketPrices[id] = q.priceToman;
+          if (id === "gold18" && (q.priceToman ?? 0) < 100_000) continue;
+          accepted += 1;
+          marketPrices[id] = q.priceToman!;
           marketQuotes[id] = {
             highToman: q.highToman ?? null,
             lowToman: q.lowToman ?? null,
@@ -624,6 +502,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             stale: Boolean(q.stale),
           };
         }
+        if (accepted === 0) return s;
         const gold = marketQuotes.gold18;
         return {
           ...s,
@@ -701,15 +580,12 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         avgBuyPriceRial: walletRes.avgBuyTomanPerGram.gold18,
         avgBuyPriceSilverRial: walletRes.avgBuyTomanPerGram.silver925,
         avgBuyPriceCopperRial: walletRes.avgBuyTomanPerGram.copper,
-        transactions:
-          txRes.ui.length > 0
-            ? txRes.ui.map((t) => ({
-                ...t,
-                type: t.type as DemoTransaction["type"],
-                status: t.status as DemoTransaction["status"],
-                instrument: parseInstrumentId(t.instrument),
-              }))
-            : s.transactions.filter((t) => t.type !== "خرید" && t.type !== "فروش" && t.type !== "واریز"),
+        transactions: txRes.ui.map((t) => ({
+          ...t,
+          type: t.type as DemoTransaction["type"],
+          status: t.status as DemoTransaction["status"],
+          instrument: parseInstrumentId(t.instrument),
+        })),
       }));
     } catch {
       /* keep last known ledger projection */
@@ -866,7 +742,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         return {
           ok: false as const,
-          error: err instanceof Error ? err.message : "واریز سندباکس ممکن نیست",
+          error: err instanceof Error ? err.message : "واریز در این نسخه ممکن نیست",
         };
       }
     },
@@ -1011,22 +887,12 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
               ? {
                   ...t,
                   status: "WAITING_USER",
-                  messages: [
-                    ...t.messages,
-                    { from: "user", text, at: nowFa() },
-                    {
-                      from: "support",
-                      text: "پیام شما دریافت شد. تیم پشتیبانی به‌زودی پاسخ می‌دهد.",
-                      at: nowFa(),
-                    },
-                  ],
+                  messages: [...t.messages, { from: "user", text, at: nowFa() }],
                 }
               : t
           ),
         }));
         if (liveDb) {
-          // Only the user's own message is persisted; the acknowledgement above
-          // is local UI, not a real support reply.
           void import("@/lib/db/platform-sync").then(({ persistTicketReply }) =>
             persistTicketReply(id, text, "user")
           );
@@ -1096,19 +962,12 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             message?: string;
           };
           if (!data.ok) {
-            if (!liveDb) {
-              localStorage.setItem("gram_plus_sandbox", "1");
-              setState((s) => ({ ...s, plusActive: true }));
-              return { ok: true, message: "گرم پلاس (محلی) فعال شد." };
-            }
-            return { ok: false, error: data.error ?? "خطا" };
+            return { ok: false, error: data.error ?? "فعال‌سازی ممکن نیست" };
           }
           setState((s) => ({ ...s, plusActive: true }));
           return { ok: true, message: data.message };
         } catch {
-          localStorage.setItem("gram_plus_sandbox", "1");
-          setState((s) => ({ ...s, plusActive: true }));
-          return { ok: true, message: "گرم پلاس (محلی) فعال شد." };
+          return { ok: false, error: "فعال‌سازی ممکن نیست" };
         }
       },
       refreshMarketPrice,

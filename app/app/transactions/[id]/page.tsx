@@ -2,7 +2,6 @@
 
 import { AppCard } from "@/components/app/AppCard";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { Timeline } from "@/components/app/Timeline";
 import { GoldButton } from "@/components/ui/GoldButton";
@@ -32,7 +31,6 @@ export default function TransactionDetailPage() {
       <PageHeader
         title={`${tx.type} ${metal} — جزئیات`}
         backHref="/app/transactions"
-        action={<SimulationBadge />}
       />
 
       <AppCard>

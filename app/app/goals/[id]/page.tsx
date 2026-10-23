@@ -2,7 +2,6 @@
 
 import { AppCard } from "@/components/app/AppCard";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { useDemoStore } from "@/lib/app/demo-store";
 import { formatToman } from "@/lib/utils";
@@ -13,7 +12,7 @@ export default function GoalDetailPage() {
   const { id } = useParams<{ id: string }>();
   const store = useDemoStore();
   const goal = store.goals.find((g) => g.id === id);
-  const [amount, setAmount] = useState(1_000_000);
+  const [amount, setAmount] = useState(0);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
@@ -26,7 +25,7 @@ export default function GoalDetailPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-5">
-      <PageHeader title={goal.name} backHref="/app/goals" action={<SimulationBadge />} />
+      <PageHeader title={goal.name} backHref="/app/goals" />
       <AppCard>
         <p className="text-[36px] font-extrabold text-gold">{pct.toLocaleString("fa-IR")}٪</p>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">

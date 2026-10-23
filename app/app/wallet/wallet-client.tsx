@@ -4,7 +4,6 @@ import { AnimatedNumber } from "@/components/app/AnimatedNumber";
 import { AppCard } from "@/components/app/AppCard";
 import { NoData } from "@/components/app/NoData";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { withdrawFee } from "@/lib/commerce/fees";
@@ -15,8 +14,8 @@ import { useState } from "react";
 
 export function WalletClient({ selfDepositEnabled }: { selfDepositEnabled: boolean }) {
   const store = useDemoStore();
-  const [depositAmount, setDepositAmount] = useState(1_000_000);
-  const [withdrawAmount, setWithdrawAmount] = useState(500_000);
+  const [depositAmount, setDepositAmount] = useState(0);
+  const [withdrawAmount, setWithdrawAmount] = useState(0);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
@@ -27,7 +26,7 @@ export function WalletClient({ selfDepositEnabled }: { selfDepositEnabled: boole
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <PageHeader title="کیف پول" action={<SimulationBadge />} />
+      <PageHeader title="کیف پول" />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <AppCard>
@@ -54,7 +53,7 @@ export function WalletClient({ selfDepositEnabled }: { selfDepositEnabled: boole
         <AppCard>
           {selfDepositEnabled ? (
             <>
-              <h2 className="text-[15px] font-bold">واریز (سندباکس)</h2>
+              <h2 className="text-[15px] font-bold">واریز</h2>
               <input
                 dir="ltr"
                 className="mt-3 h-12 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-left tabular-nums outline-none focus:border-gold"
@@ -70,11 +69,11 @@ export function WalletClient({ selfDepositEnabled }: { selfDepositEnabled: boole
                   void (async () => {
                     const res = await store.deposit(depositAmount);
                     if (!res.ok) {
-                      setErr(res.error ?? "خطا در واریز سندباکس");
+                      setErr(res.error ?? "خطا در واریز");
                       setMsg("");
                       return;
                     }
-                    setMsg("واریز سندباکس انجام شد.");
+                    setMsg("واریز انجام شد.");
                     setErr("");
                   })();
                 }}
@@ -144,6 +143,9 @@ export function WalletClient({ selfDepositEnabled }: { selfDepositEnabled: boole
 
       <AppCard>
         <h2 className="text-[15px] font-bold">حساب‌های بانکی</h2>
+        {store.bankAccounts.length === 0 ? (
+          <p className="mt-3 text-[13px] text-muted-app">حساب بانکی ثبت نشده است.</p>
+        ) : (
         <ul className="mt-3 space-y-2">
           {store.bankAccounts.map((b) => (
             <li
@@ -160,6 +162,7 @@ export function WalletClient({ selfDepositEnabled }: { selfDepositEnabled: boole
             </li>
           ))}
         </ul>
+        )}
       </AppCard>
 
       <AppCard padded={false}>

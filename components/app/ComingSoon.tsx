@@ -15,9 +15,7 @@ export function ComingSoon({ title, description }: ComingSoonProps) {
       </h1>
       <AppCard className="mt-6">
         <p className="text-[15px] leading-8 text-muted-app">{description}</p>
-        <p className="mt-3 text-[12px] text-warning">
-          این بخش در فازهای بعدی به داده واقعی سندباکس متصل می‌شود.
-        </p>
+        <p className="mt-3 text-[12px] text-muted-app">این بخش هنوز آماده نیست.</p>
         <Link href="/app/dashboard" className="mt-6 inline-flex">
           <GoldButton type="button" size="sm">
             بازگشت به خانه
