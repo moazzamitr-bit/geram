@@ -9,15 +9,16 @@ import { isSupabaseConfigured } from "@/lib/db/types";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  // Password mode must answer method_disabled before any Supabase call.
+  if (authMethod() !== "otp") {
+    return NextResponse.json({ ok: false, error: "method_disabled" }, { status: 403 });
+  }
+
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
       { ok: false, error: "supabase_not_configured" },
       { status: 503 }
     );
-  }
-
-  if (authMethod() !== "otp") {
-    return NextResponse.json({ ok: false, error: "method_disabled" }, { status: 403 });
   }
   // Real SMS OTP when a provider is configured; the fixed demo code only in
   // SANDBOX. Without either, login is refused (see lib/auth/otp.ts).
