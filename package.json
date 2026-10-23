@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@serwist/next": "^9.5.13",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.2",
     "clsx": "^2.1.1",
@@ -18,25 +19,27 @@
     "lucide-react": "^0.525.0",
     "motion": "^12.23.12",
     "next": "^15.4.5",
+    "pg": "^8.16.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "recharts": "^3.1.0",
+    "serwist": "^9.5.13",
     "tailwind-merge": "^3.3.1",
-    "zod": "^4.4.3",
-    "pg": "^8.16.3"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.7",
     "@eslint/eslintrc": "^3.3.1",
+    "@serwist/cli": "^9.5.13",
     "@tailwindcss/postcss": "^4.1.11",
     "@types/node": "^20.19.9",
+    "@types/pg": "^8.15.5",
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
-    "@types/pg": "^8.15.5",
     "eslint": "^9.32.0",
     "eslint-config-next": "^15.4.5",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4",
-    "@electric-sql/pglite": "^0.3.7"
+    "vitest": "^3.2.4"
   }
 }

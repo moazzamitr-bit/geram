@@ -1,6 +1,7 @@
 "use client";
 
 import { PriceTicker } from "@/components/app/PriceTicker";
+import { PwaInstallBanner } from "@/components/app/PwaInstallBanner";
 import { AppShellSkeleton } from "@/components/app/Skeleton";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import {
@@ -169,6 +170,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main id="main" className="px-4 py-4 pb-28 md:px-6 md:py-5 lg:pb-8">
+          <PwaInstallBanner />
           {children}
         </main>
       </div>
