@@ -1,15 +1,13 @@
 import {
+  ArrowLeftRight,
   Bell,
-  HandCoins,
+  FileText,
   Headphones,
   Home,
-  Landmark,
   LineChart,
   Package,
   PieChart,
   Settings,
-  ShieldCheck,
-  ShoppingBag,
   Target,
   Wallet,
   type LucideIcon,
@@ -32,32 +30,25 @@ export const desktopNavSections: AppNavSection[] = [
   {
     items: [
       { label: "خانه", href: "/app/dashboard", icon: Home },
-      { label: "خرید فلز", href: "/app/buy", icon: ShoppingBag, accent: true },
-      { label: "فروش فلز", href: "/app/sell", icon: HandCoins },
+      { label: "خرید و فروش", href: "/app/buy", icon: ArrowLeftRight },
+      { label: "واریز و برداشت", href: "/app/wallet", icon: Wallet },
+      { label: "گزارشات", href: "/app/transactions", icon: FileText },
+      { label: "دارایی‌های من", href: "/app/portfolio", icon: PieChart },
+    ],
+  },
+  {
+    label: "سایر",
+    items: [
       { label: "بازار", href: "/app/market", icon: LineChart },
-    ],
-  },
-  {
-    label: "دارایی",
-    items: [
-      { label: "پرتفوی", href: "/app/portfolio", icon: PieChart },
       { label: "اهداف", href: "/app/goals", icon: Target },
-      { label: "کیف پول", href: "/app/wallet", icon: Wallet },
-      { label: "تراکنش‌ها", href: "/app/transactions", icon: Landmark },
-      { label: "تحویل فیزیکی", href: "/app/delivery", icon: Package },
-    ],
-  },
-  {
-    label: "اعتماد و پشتیبانی",
-    items: [
-      { label: "مرکز اعتماد", href: "/app/trust", icon: ShieldCheck },
+      { label: "تحویل", href: "/app/delivery", icon: Package },
+      { label: "پشتیبانی", href: "/app/support", icon: Headphones },
       {
         label: "اعلان‌ها",
         href: "/app/notifications",
         icon: Bell,
         badgeKey: "notifications",
       },
-      { label: "پشتیبانی", href: "/app/support", icon: Headphones },
     ],
   },
 ];
@@ -71,10 +62,10 @@ export const desktopBottomNav: AppNavItem[] = [
 
 export const mobileBottomNav: AppNavItem[] = [
   { label: "خانه", href: "/app/dashboard", icon: Home },
-  { label: "بازار", href: "/app/market", icon: LineChart },
-  { label: "خرید", href: "/app/buy", icon: ShoppingBag, accent: true },
-  { label: "اهداف", href: "/app/goals", icon: Target },
-  { label: "حساب من", href: "/app/profile", icon: Settings },
+  { label: "معامله", href: "/app/buy", icon: ArrowLeftRight },
+  { label: "دارایی", href: "/app/portfolio", icon: PieChart },
+  { label: "کیف پول", href: "/app/wallet", icon: Wallet },
+  { label: "حساب", href: "/app/profile", icon: Settings },
 ];
 
 export const notificationsNav = {

@@ -13,7 +13,7 @@ import {
 import { useDemoStore } from "@/lib/app/demo-store";
 import { useAuth } from "@/lib/auth/auth-context";
 import { cn } from "@/lib/utils";
-import { Headphones, LogOut, UserRound } from "lucide-react";
+import { LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
@@ -22,13 +22,16 @@ function isNavActive(pathname: string, href: string) {
   if (href === "/app/dashboard") {
     return pathname === "/app/dashboard" || pathname === "/app";
   }
+  if (href === "/app/buy") {
+    return pathname.startsWith("/app/buy") || pathname.startsWith("/app/sell");
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function UnreadBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="mr-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-[#0A0C0E] tabular-nums">
+    <span className="mr-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-negative px-1 text-[10px] font-bold text-white tabular-nums">
       {count > 9 ? "۹+" : count.toLocaleString("fa-IR")}
     </span>
   );
@@ -48,22 +51,13 @@ function SideLink({
     <Link
       href={item.href}
       className={cn(
-        "group relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] transition-all duration-200",
+        "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] transition-colors duration-200",
         active
-          ? "bg-gold/10 text-gold"
-          : "text-text-secondary hover:bg-white/[0.03] hover:text-text",
-        item.accent && !active && "text-gold-soft",
-        item.accent && "border border-gold/20 bg-gold/[0.04] hover:border-gold/35"
+          ? "bg-[#FFF4D6] font-semibold text-text"
+          : "text-text-secondary hover:bg-black/[0.04] hover:text-text"
       )}
     >
-      {active && (
-        <span className="absolute inset-y-2 right-0 w-[3px] rounded-full bg-gold-gradient" />
-      )}
-      <Icon
-        size={18}
-        strokeWidth={active || item.accent ? 1.85 : 1.6}
-        className="shrink-0"
-      />
+      <Icon size={18} strokeWidth={active ? 1.9 : 1.6} className="shrink-0" />
       <span className="truncate">{item.label}</span>
       {item.badgeKey === "notifications" && <UnreadBadge count={unread} />}
     </Link>
@@ -81,17 +75,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     [store.notifications]
   );
 
-  const marketLabel =
-    store.marketStatus === "open"
-      ? "بازار باز است"
-      : store.marketStatus === "paused"
-        ? "بازار متوقف"
-        : "بازار بسته است";
-  const marketTone =
-    store.marketStatus === "open"
-      ? "border-positive/25 bg-positive/10 text-positive"
-      : "border-warning/25 bg-warning/10 text-warning";
-
   useEffect(() => {
     if (!hydrated) return;
     if (!isAuthenticated) {
@@ -108,9 +91,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-svh bg-bg text-text">
-      <aside className="fixed inset-y-0 right-0 z-30 hidden w-[var(--sidebar-w)] flex-col border-l border-white/[0.07] bg-bg-secondary lg:flex">
-        <div className="flex h-[var(--app-header-h)] items-center px-5">
+    <div className="geram-app min-h-svh bg-bg text-text">
+      <aside className="fixed inset-y-0 right-0 z-30 hidden w-[var(--sidebar-w)] flex-col border-l border-black/[0.06] bg-white lg:flex">
+        <div className="flex h-16 items-center px-5">
           <BrandLogo href="/app/dashboard" size="sm" />
         </div>
 
@@ -118,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {desktopNavSections.map((section, si) => (
             <div key={section.label ?? `sec-${si}`} className="space-y-1">
               {section.label && (
-                <p className="mb-1.5 px-3 text-[11px] font-medium tracking-wide text-muted-app">
+                <p className="mb-1.5 px-3 text-[11px] font-medium text-muted-app">
                   {section.label}
                 </p>
               )}
@@ -134,7 +117,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        <div className="space-y-1 border-t border-white/[0.06] px-3 py-3">
+        <div className="space-y-1 border-t border-black/[0.06] px-3 py-3">
           {desktopBottomNav.map((item) => (
             <SideLink
               key={item.href}
@@ -149,7 +132,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               logout();
               router.replace("/auth/login");
             }}
-            className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] text-text-secondary transition-colors hover:bg-white/[0.03] hover:text-negative"
+            className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] text-text-secondary transition-colors hover:bg-black/[0.04] hover:text-negative"
           >
             <LogOut size={18} strokeWidth={1.6} />
             خروج
@@ -158,104 +141,56 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="lg:mr-[var(--sidebar-w)]">
-        <header className="sticky top-0 z-20 flex h-[var(--app-header-h)] items-center justify-between gap-3 border-b border-white/[0.07] bg-bg/90 px-4 backdrop-blur-md md:px-6">
-          <div className="flex min-w-0 items-center gap-2">
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px]",
-                marketTone
-              )}
-            >
-              <span
-                className={cn(
-                  "h-1.5 w-1.5 rounded-full",
-                  store.marketStatus === "open" ? "bg-positive" : "bg-warning"
-                )}
-              />
-              {marketLabel}
-            </span>
-            <PriceTicker className="hidden min-w-0 md:flex" />
-          </div>
-
-          <div className="flex items-center gap-1.5 sm:gap-2">
+        <header className="sticky top-0 z-20 flex min-h-12 items-center justify-between gap-3 bg-bg/90 px-4 py-2 backdrop-blur-md md:px-6">
+          <PriceTicker className="min-w-0 flex-1" />
+          <div className="flex shrink-0 items-center gap-1.5">
             <Link
-              href="/app/support"
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.07] text-text-secondary transition-colors hover:text-gold"
-              aria-label="پشتیبانی"
+              href="/app/profile"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#161616] text-white"
+              aria-label="حساب کاربری"
             >
-              <Headphones size={18} strokeWidth={1.6} />
+              <span className="text-[12px] font-bold">
+                {(user?.firstName || "گ").slice(0, 1)}
+              </span>
             </Link>
             <Link
               href={notificationsNav.href}
-              className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.07] text-text-secondary transition-colors hover:text-gold"
-              aria-label={
-                unread > 0 ? `اعلان‌ها، ${unread} خوانده‌نشده` : "اعلان‌ها"
-              }
+              className="relative flex h-9 w-9 items-center justify-center rounded-full text-text-secondary transition-colors hover:bg-black/[0.04] hover:text-text"
+              aria-label={unread > 0 ? `اعلان‌ها، ${unread} خوانده‌نشده` : "اعلان‌ها"}
             >
-              <notificationsNav.icon size={18} strokeWidth={1.6} />
+              <notificationsNav.icon size={18} strokeWidth={1.7} />
               {unread > 0 && (
-                <span className="absolute -top-1 -left-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-[#0A0C0E] tabular-nums">
+                <span className="absolute -top-0.5 -left-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-negative px-1 text-[9px] font-bold text-white tabular-nums">
                   {unread > 9 ? "۹+" : unread.toLocaleString("fa-IR")}
                 </span>
               )}
             </Link>
-            <Link
-              href="/app/profile"
-              className="flex min-h-11 items-center gap-2 rounded-xl border border-white/[0.07] px-2.5 py-1.5 text-[13px] text-text-secondary transition-colors hover:text-text"
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gold/15 text-gold">
-                <UserRound size={14} />
-              </span>
-              <span className="hidden sm:inline">
-                {user?.firstName} {user?.lastName}
-              </span>
-            </Link>
           </div>
         </header>
-        <div className="border-b border-white/[0.05] px-4 py-2 md:hidden">
-          <PriceTicker />
-        </div>
 
-        <main id="main" className="px-4 py-5 pb-28 md:px-6 md:py-7 lg:pb-8">
+        <main id="main" className="px-4 py-4 pb-28 md:px-6 md:py-5 lg:pb-8">
           {children}
         </main>
       </div>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.07] bg-bg-secondary/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-black/[0.06] bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
         aria-label="ناوبری موبایل"
       >
         <ul className="mx-auto grid max-w-lg grid-cols-5 px-1 py-1.5">
           {mobileBottomNav.map((item) => {
             const active = isNavActive(pathname, item.href);
             const Icon = item.icon;
-            const showNotifDot = item.href === "/app/profile" && unread > 0;
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
                   className={cn(
-                    "relative flex min-h-12 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] transition-colors duration-200",
-                    active ? "text-gold" : "text-muted-app"
+                    "flex min-h-12 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] transition-colors",
+                    active ? "font-semibold text-text" : "text-muted-app"
                   )}
                 >
-                  <span
-                    className={cn(
-                      "relative flex h-9 w-9 items-center justify-center rounded-full transition-transform duration-200 active:scale-95",
-                      item.accent &&
-                        "bg-gold-gradient text-[#0A0C0E] shadow-[0_6px_18px_rgba(138,101,38,0.35)]",
-                      !item.accent && active && "bg-gold/10"
-                    )}
-                  >
-                    <Icon
-                      size={18}
-                      strokeWidth={1.7}
-                      className={item.accent ? "text-[#0A0C0E]" : undefined}
-                    />
-                    {showNotifDot && (
-                      <span className="absolute -top-0.5 -left-0.5 h-2 w-2 rounded-full bg-gold ring-2 ring-bg-secondary" />
-                    )}
-                  </span>
+                  <Icon size={18} strokeWidth={active ? 2 : 1.6} />
                   {item.label}
                 </Link>
               </li>

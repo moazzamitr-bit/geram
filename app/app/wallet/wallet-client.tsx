@@ -2,6 +2,7 @@
 
 import { AnimatedNumber } from "@/components/app/AnimatedNumber";
 import { AppCard } from "@/components/app/AppCard";
+import { NoData } from "@/components/app/NoData";
 import { PageHeader } from "@/components/app/PageHeader";
 import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
@@ -20,6 +21,9 @@ export function WalletClient({ selfDepositEnabled }: { selfDepositEnabled: boole
   const [err, setErr] = useState("");
 
   const wFee = withdrawFee(store.plusActive, store.commerceSettings.fees);
+  const history = store.transactions
+    .filter((t) => ["واریز", "برداشت", "خرید", "فروش"].includes(t.type))
+    .slice(0, 8);
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -162,11 +166,11 @@ export function WalletClient({ selfDepositEnabled }: { selfDepositEnabled: boole
         <div className="border-b border-white/[0.06] px-5 py-4">
           <h2 className="text-[15px] font-bold">تاریخچه کیف پول</h2>
         </div>
+        {history.length === 0 ? (
+          <NoData />
+        ) : (
         <ul>
-          {store.transactions
-            .filter((t) => ["واریز", "برداشت", "خرید", "فروش"].includes(t.type))
-            .slice(0, 8)
-            .map((t) => (
+          {history.map((t) => (
               <li
                 key={t.id}
                 className="flex items-center justify-between border-b border-white/[0.04] px-5 py-3 text-[13px] last:border-0"
@@ -182,6 +186,7 @@ export function WalletClient({ selfDepositEnabled }: { selfDepositEnabled: boole
               </li>
             ))}
         </ul>
+        )}
       </AppCard>
     </div>
   );

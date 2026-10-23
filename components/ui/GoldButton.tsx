@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { ButtonHTMLAttributes, forwardRef } from "react";
 
 type GoldButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "ghost" | "black" | "buy" | "sell";
   size?: "sm" | "md" | "lg";
   asChild?: boolean;
 };
@@ -22,6 +22,12 @@ export const GoldButton = forwardRef<HTMLButtonElement, GoldButtonProps>(
         "bg-transparent text-text border border-white/10 hover:border-gold/40 hover:text-gold-highlight hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]",
       ghost:
         "bg-transparent text-text-secondary hover:text-text hover:-translate-y-0.5 active:translate-y-0",
+      black:
+        "bg-[#161616] text-white font-bold hover:bg-black active:scale-[0.98]",
+      buy:
+        "bg-[#1F9D55] text-white font-bold hover:bg-[#18864A] active:scale-[0.98]",
+      sell:
+        "bg-[#E5484D] text-white font-bold hover:bg-[#D23B40] active:scale-[0.98]",
     };
 
     return (

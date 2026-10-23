@@ -10,7 +10,7 @@ type Method = "password" | "otp";
 type OtpStep = "phone" | "otp";
 
 const fieldClass =
-  "h-12 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-[15px] text-text outline-none transition focus:border-gold";
+  "h-12 w-full rounded-xl border border-black/10 bg-[#F6F4F1] px-4 text-[15px] text-text outline-none transition focus:border-[#FFB800] focus:bg-white";
 
 function messageFor(code: string | null) {
   switch (code) {
@@ -78,26 +78,46 @@ export function UserLoginForm({
   }, [hydrated, isAuthenticated, user]);
 
   return (
-    <div className="relative flex min-h-svh items-center justify-center bg-bg px-4 py-10">
+    <div className="geram-app min-h-svh bg-bg text-text">
       <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 70% 30%, rgba(190,145,61,0.12), transparent 40%)",
-        }}
-      />
-      <div className="relative z-10 w-full max-w-[420px]">
-        <div className="mb-8 flex justify-center">
-          <BrandLogo href="/" size="md" />
+        dir="ltr"
+        className="mx-auto grid min-h-svh max-w-6xl items-stretch gap-4 px-4 py-6 lg:grid-cols-2 lg:px-8 lg:py-10"
+      >
+        <div dir="rtl" className="order-1 flex items-center justify-center lg:order-2">
+          <div className="w-full max-w-[440px] rounded-[28px] border border-black/[0.06] bg-white p-6 shadow-[0_24px_70px_rgba(28,25,23,0.06)] md:p-8">
+            <div className="mb-6 flex justify-center lg:justify-start">
+              <BrandLogo href="/" size="md" />
+            </div>
+            {queryError && (
+              <p className="mb-4 text-[13px] text-negative" role="alert">
+                {queryError}
+              </p>
+            )}
+            {method === "otp" ? <OtpLogin /> : <PasswordLogin initialTab={initialTab} />}
+          </div>
         </div>
-        <div className="rounded-2xl border border-white/[0.07] bg-card-app p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)] md:p-8">
-          {queryError && (
-            <p className="mb-4 text-[13px] text-negative" role="alert">
-              {queryError}
+        <aside
+          dir="rtl"
+          className="relative order-2 hidden overflow-hidden rounded-[28px] bg-[#FBF4E4] lg:order-1 lg:flex lg:flex-col lg:justify-between lg:p-10"
+        >
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(circle at 30% 40%, rgba(255,184,0,0.28), transparent 46%)",
+            }}
+          />
+          <BrandLogo href="/" size="md" className="relative" />
+          <div className="relative max-w-sm">
+            <p className="text-[28px] font-extrabold leading-10 text-text">
+              طلا، نقره و مس در یک حساب
             </p>
-          )}
-          {method === "otp" ? <OtpLogin /> : <PasswordLogin initialTab={initialTab} />}
-        </div>
+            <p className="mt-4 text-[15px] leading-8 text-text-secondary">
+              قیمت لحظه‌ای و کارمزد را قبل از تأیید می‌بینید. موجودی فقط از دفترکل گرم تغییر می‌کند.
+            </p>
+          </div>
+          <p className="relative text-[13px] text-muted-app">geram.co</p>
+        </aside>
       </div>
     </div>
   );
@@ -206,9 +226,9 @@ function PasswordLogin({ initialTab }: { initialTab: "login" | "register" }) {
         className="auth-pane-login space-y-4"
       >
         <div>
-          <h1 className="text-[22px] font-extrabold text-text">ورود</h1>
+          <h1 className="text-[22px] font-extrabold text-text">ورود به حساب کاربری</h1>
           <p className="mt-2 text-[14px] leading-7 text-muted-app">
-            با شماره موبایل و رمز عبوری که هنگام ثبت‌نام انتخاب کرده‌اید وارد شوید.
+            برای مدیریت دارایی‌ها، شماره موبایل و رمز عبور را وارد کنید.
           </p>
         </div>
         <PhoneField />
@@ -218,7 +238,7 @@ function PasswordLogin({ initialTab }: { initialTab: "login" | "register" }) {
             {error}
           </p>
         )}
-        <GoldButton type="submit" className="w-full" disabled={loading !== null}>
+        <GoldButton type="submit" variant="black" className="w-full" disabled={loading !== null}>
           {loading === "login" ? "در حال ورود..." : "ورود"}
         </GoldButton>
       </form>
@@ -270,7 +290,7 @@ function PasswordLogin({ initialTab }: { initialTab: "login" | "register" }) {
             {error}
           </p>
         )}
-        <GoldButton type="submit" className="w-full" disabled={loading !== null}>
+        <GoldButton type="submit" variant="black" className="w-full" disabled={loading !== null}>
           {loading === "register" ? "لطفاً صبر کنید..." : "ثبت‌نام و ورود"}
         </GoldButton>
       </form>
@@ -421,7 +441,7 @@ function OtpLogin() {
           {error}
         </p>
       )}
-      <GoldButton type="submit" className="w-full" disabled={loading}>
+      <GoldButton type="submit" variant="black" className="w-full" disabled={loading}>
         {loading ? "لطفاً صبر کنید..." : "ادامه"}
       </GoldButton>
     </form>
@@ -461,7 +481,7 @@ function OtpLogin() {
           maxLength={6}
           value={otp}
           onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
-          className="h-12 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-center text-[22px] tracking-[0.4em] text-text outline-none transition focus:border-gold"
+          className="h-12 w-full rounded-xl border border-black/10 bg-[#F6F4F1] px-4 text-center text-[22px] tracking-[0.4em] text-text outline-none transition focus:border-[#FFB800] focus:bg-white"
         />
       </label>
       {error && (
@@ -469,7 +489,7 @@ function OtpLogin() {
           {error}
         </p>
       )}
-      <GoldButton type="submit" className="w-full" disabled={loading}>
+      <GoldButton type="submit" variant="black" className="w-full" disabled={loading}>
         {loading ? "در حال بررسی..." : "تأیید و ورود"}
       </GoldButton>
       <button

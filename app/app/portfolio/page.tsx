@@ -2,6 +2,7 @@
 
 import { AnimatedNumber } from "@/components/app/AnimatedNumber";
 import { AppCard } from "@/components/app/AppCard";
+import { NoData } from "@/components/app/NoData";
 import { PageHeader } from "@/components/app/PageHeader";
 import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
@@ -39,6 +40,9 @@ export default function PortfolioPage() {
   const totalCost = rows.reduce((sum, r) => sum + r.costBasis, 0);
   const totalPnl = totalValue - totalCost;
   const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
+  const trades = store.transactions
+    .filter((t) => t.type === "خرید" || t.type === "فروش" || t.type === "تحویل")
+    .slice(0, 8);
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
@@ -137,18 +141,18 @@ export default function PortfolioPage() {
               {row.pnl >= 0 ? "+" : ""}
               {formatToman(row.pnl)}
             </p>
-            <div className="mt-4 flex gap-2">
-              <Link
-                href={`/app/buy?instrument=${row.id}`}
-                className="text-[12px] text-gold"
-              >
-                خرید
-              </Link>
+            <div className="mt-4 grid grid-cols-2 gap-2">
               <Link
                 href={`/app/sell?instrument=${row.id}`}
-                className="text-[12px] text-muted-app"
+                className="flex h-10 items-center justify-center rounded-xl border border-black/10 text-[13px] font-bold text-text"
               >
                 فروش
+              </Link>
+              <Link
+                href={`/app/buy?instrument=${row.id}`}
+                className="flex h-10 items-center justify-center rounded-xl bg-[#161616] text-[13px] font-bold text-white"
+              >
+                خرید
               </Link>
             </div>
           </AppCard>
@@ -179,13 +183,11 @@ export default function PortfolioPage() {
             همه
           </Link>
         </div>
-        <ul className="divide-y divide-white/[0.05]">
-          {store.transactions
-            .filter(
-              (t) => t.type === "خرید" || t.type === "فروش" || t.type === "تحویل"
-            )
-            .slice(0, 8)
-            .map((tx) => (
+        {trades.length === 0 ? (
+          <NoData />
+        ) : (
+          <ul className="divide-y divide-white/[0.05]">
+            {trades.map((tx) => (
               <li key={tx.id}>
                 <Link
                   href={`/app/transactions/${tx.id}`}
@@ -206,7 +208,8 @@ export default function PortfolioPage() {
                 </Link>
               </li>
             ))}
-        </ul>
+          </ul>
+        )}
       </AppCard>
     </div>
   );
