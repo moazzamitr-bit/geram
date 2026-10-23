@@ -6,6 +6,7 @@ import {
   OpsBadge,
 } from "@/components/admin/AdminUI";
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
+import { WalletCreditForm } from "@/components/admin/WalletCreditForm";
 import { listTransactionsFiltered } from "@/lib/admin/queries";
 import { probeTable } from "@/lib/admin/probe";
 import { formatToman } from "@/lib/utils";
@@ -23,13 +24,16 @@ export default async function AdminDepositsPage() {
     <div>
       <AdminPageHeader
         title="صف واریز"
-        description="Credit Wallet وجود ندارد. اعتبار مالی فقط از workflow تأییدشده بک‌اند."
+        description="واریز شخصی خاموش است. شارژ کیف پول فقط از ژورنال تأییدشده (USER_AVAILABLE) انجام می‌شود."
         action={<a className="text-[13px] text-gold" href="/api/admin/export?type=deposits">CSV</a>}
       />
       <OpsBadge state="MOCK" />
-      <AdminNotice title="PSP">
-        واریز واقعی PROVIDER_SUCCESS / LEDGER_POSTED پیاده نشده. وضعیت‌های آینده روی این صفحه آماده نمایش‌اند ولی منبع فعلی جدول میراث «واریز» و sandbox deposits است.
+      <AdminNotice title="شارژ دستی">
+        درگاه بانکی وصل نیست. برای بتای بسته، درخواست شارژ بسازید؛ ادمین دوم Approve و سپس Execute journal می‌زند. موجودی wallets مستقیم تغییر نمی‌کند. خرید مشتری تا وقتی فلز در PLATFORM_AVAILABLE نباشد رد می‌شود.
       </AdminNotice>
+      <div className="mb-6 max-w-lg">
+        <WalletCreditForm />
+      </div>
       <AdminTable headers={["کد", "کاربر", "مبلغ", "وضعیت", "رفرنس", "زمان", "اقدام"]} empty={rows.length === 0}>
         {rows.map((t) => {
           const profile = Array.isArray(t.profiles) ? t.profiles[0] : t.profiles;

@@ -4,6 +4,7 @@ import {
   getFeatureFlags,
   isDeployedEnvironment,
   resolveExecutionMode,
+  sandboxDepositAllowed,
   sandboxSeedAllowed,
   CONSERVATIVE_FLAGS,
   SANDBOX_FLAGS,
@@ -54,11 +55,20 @@ describe("conservative feature flags", () => {
     );
   });
 
-  it("keeps SANDBOX demo UI flags on by default but seed off unless explicit", () => {
+  it("keeps SANDBOX demo UI flags on by default but seed and self-deposit off unless explicit", () => {
     expect(SANDBOX_FLAGS.GOALS_ENABLED).toBe(true);
     expect(SANDBOX_FLAGS.SANDBOX_SEED_ENABLED).toBe(false);
+    expect(SANDBOX_FLAGS.SANDBOX_DEPOSIT_ENABLED).toBe(false);
     expect(CONSERVATIVE_FLAGS.SANDBOX_DEPOSIT_ENABLED).toBe(false);
     expect(getFeatureFlags("SANDBOX", {}).SANDBOX_SEED_ENABLED).toBe(false);
+    expect(getFeatureFlags("SANDBOX", {}).SANDBOX_DEPOSIT_ENABLED).toBe(false);
+    expect(sandboxDepositAllowed("SANDBOX", getFeatureFlags("SANDBOX", {}))).toBe(false);
+    expect(
+      sandboxDepositAllowed(
+        "SANDBOX",
+        getFeatureFlags("SANDBOX", { SANDBOX_DEPOSIT_ENABLED: "true" })
+      )
+    ).toBe(true);
     expect(getFeatureFlags("SANDBOX", { SANDBOX_SEED_ENABLED: "true" }).SANDBOX_SEED_ENABLED).toBe(
       true
     );

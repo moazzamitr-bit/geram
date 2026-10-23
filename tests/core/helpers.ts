@@ -23,8 +23,9 @@ export const DEFAULT_INVENTORY: Record<AssetCode, bigint> = {
   TEST_METAL: UG_PER_GRAM * 1_000n,
 };
 
+/** Trading tests still opt into simulated funding. The product default is off. */
 export function sandboxFlags(seed = true) {
-  return { ...SANDBOX_FLAGS, SANDBOX_SEED_ENABLED: seed };
+  return { ...SANDBOX_FLAGS, SANDBOX_SEED_ENABLED: seed, SANDBOX_DEPOSIT_ENABLED: true };
 }
 
 export function makeMemoryCore(

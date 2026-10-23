@@ -7,6 +7,7 @@ import {
   getFeatureFlags,
   isDeployedEnvironment,
   postgresRequired,
+  sandboxDepositAllowed,
 } from "@/lib/core/mode";
 import { DEFAULT_COMMERCE_SETTINGS } from "@/lib/commerce/types";
 import { tomanToIrr } from "@/lib/core/money";
@@ -174,6 +175,7 @@ export function readinessSnapshot() {
     executionMode: mode,
     databaseBacked,
     sandboxSeedEnabled: flags.SANDBOX_SEED_ENABLED && mode === "SANDBOX",
+    userSandboxDepositEnabled: sandboxDepositAllowed(mode, flags),
     marketDataProductionApproved,
     financialWritesAllowed,
     // Presence flags only — never values — so ops can see why login/trading fails.

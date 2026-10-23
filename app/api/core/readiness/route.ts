@@ -25,6 +25,7 @@ export async function GET() {
           executionMode: null,
           databaseBacked: false,
           sandboxSeedEnabled: false,
+          userSandboxDepositEnabled: false,
           marketDataProductionApproved: false,
           financialWritesAllowed: false,
         },

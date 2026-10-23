@@ -5,6 +5,7 @@ import {
   AdminTable,
 } from "@/components/admin/AdminUI";
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
+import { WalletCreditForm } from "@/components/admin/WalletCreditForm";
 import {
   getProfile,
   getUserBanks,
@@ -38,10 +39,13 @@ export default async function AdminUser360Page({
     <div>
       <AdminPageHeader
         title={name}
-        description="نمای ۳۶۰ مشتری. ویرایش موجودی وجود ندارد."
+        description="نمای ۳۶۰ مشتری. شارژ فقط از ژورنال تأییدشده است، نه ویرایش wallets."
         action={<AdminBadge tone={profile.role === "admin" ? "gold" : "neutral"}>{profile.role}</AdminBadge>}
       />
-      <AdminNotice title="ممنوع">دکمه Edit Balance / تغییر مستقیم موجودی وجود ندارد. اصلاح مالی فقط از مسیر journal و maker-checker.</AdminNotice>
+      <AdminNotice title="شارژ دفترکل">دکمه Edit Balance وجود ندارد. شارژ زیر درخواست maker-checker می‌سازد و بعد از Execute به USER_AVAILABLE پست می‌شود.</AdminNotice>
+      <div className="mb-6 max-w-lg">
+        <WalletCreditForm userId={id} lockUserId />
+      </div>
 
       <section className="mb-6 grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5 text-[13px] leading-7">
