@@ -212,6 +212,52 @@ export class FinancialCore {
     return journalId;
   }
 
+  /**
+   * Admin closed-beta funding. Credits USER_AVAILABLE IRR from PLATFORM_OPENING.
+   * Same refId posts once. Does not write the legacy wallets table.
+   */
+  async creditApprovedUserIrr(input: {
+    userId: string;
+    amountIrr: Irr;
+    reason: string;
+    refId: string;
+  }): Promise<{ journalId: string; replayed: boolean }> {
+    const userId = input.userId.trim();
+    const reason = input.reason.trim();
+    const refId = input.refId.trim();
+    if (!userId || userId === PLATFORM_HOLDER) {
+      throw new CoreError("invalid_user", "Target user is invalid", 400);
+    }
+    if (input.amountIrr <= 0n) {
+      throw new CoreError("invalid_amount", "Credit amount must be positive", 400);
+    }
+    if (reason.length < 8) {
+      throw new CoreError("invalid_reason", "Reason must be at least 8 characters", 400);
+    }
+    if (!refId) {
+      throw new CoreError("invalid_request", "Idempotency ref is required", 400);
+    }
+    await this.bootstrap();
+    await ensureUserAccounts(this.deps.store, userId);
+    return this.deps.store.withLock(`admin-credit:${refId}`, async () => {
+      const existing = await this.deps.store.findJournalIdByRef(
+        "APPROVED_OPENING_BALANCE",
+        refId
+      );
+      if (existing) return { journalId: existing, replayed: true };
+      const journalId = await this.postOpening({
+        accountCode: "USER_AVAILABLE",
+        holderId: userId,
+        asset: "IRR",
+        amount: input.amountIrr,
+        refType: "APPROVED_OPENING_BALANCE",
+        reason,
+        refId,
+      });
+      return { journalId, replayed: false };
+    });
+  }
+
   async sandboxDeposit(userId: string, amountIrr: Irr, idempotencyKey: string) {
     if (amountIrr <= 0n) throw new CoreError("invalid_amount", "deposit must be > 0");
     if (!sandboxDepositAllowed(this.mode(), this.flags())) {

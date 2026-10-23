@@ -54,7 +54,8 @@ export const SANDBOX_FLAGS: FeatureFlags = {
   REFERRAL_ENABLED: true,
   GERAM_PLUS_ENABLED: true,
   PHYSICAL_REDEMPTION_ENABLED: false,
-  SANDBOX_DEPOSIT_ENABLED: true,
+  // Opt-in only. Closed beta on geram.co must not let users mint IRR.
+  SANDBOX_DEPOSIT_ENABLED: false,
   SANDBOX_SEED_ENABLED: false,
 };
 
