@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
-import { AuthProvider } from "@/lib/auth/auth-context";
 import "./globals.css";
 
 // Bundled locally: next/font/google downloads at build time, and Google Fonts
@@ -23,10 +22,7 @@ export const metadata: Metadata = {
   applicationName: "گرم",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: [
-      { url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/brand/logo.png", sizes: "528x525", type: "image/png" },
-    ],
+    icon: [{ url: "/brand/favicon-32.png", sizes: "32x32", type: "image/png" }],
     apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: {
@@ -73,7 +69,9 @@ export default function RootLayout({
           پرش به محتوای اصلی
         </a>
         <RegisterServiceWorker />
-        <AuthProvider>{children}</AuthProvider>
+        {/* AuthProvider is mounted under /auth and /app. Marketing pages do
+            not read the session, and the Supabase browser client is large. */}
+        {children}
       </body>
     </html>
   );

@@ -2,7 +2,8 @@
 
 import { ChartRangeTabs } from "@/components/app/ChartRangeTabs";
 import { NoData } from "@/components/app/NoData";
-import { PriceChart, type ChartRange } from "@/components/ui/PriceChart";
+import { DeferredPriceChart } from "@/components/ui/DeferredPriceChart";
+import type { ChartRange } from "@/components/ui/PriceChart";
 import { useDemoStore } from "@/lib/app/demo-store";
 import { unrealizedPnl } from "@/lib/app/pnl";
 import { INSTRUMENTS, type InstrumentId } from "@/lib/market/instruments";
@@ -206,7 +207,7 @@ export default function DashboardPage() {
             <ChartRangeTabs value={range} onChange={setRange} />
           </div>
           <div className="mt-3">
-            <PriceChart
+            <DeferredPriceChart
               variant="market"
               appearance="light"
               showAxis

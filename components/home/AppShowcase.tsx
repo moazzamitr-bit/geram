@@ -124,6 +124,7 @@ export function AppShowcase() {
 
           <Link
             href="/auth/login"
+            prefetch={false}
             className="link-underline mt-5 inline-block text-[13px] text-gold"
           >
             ورود به نسخه وب

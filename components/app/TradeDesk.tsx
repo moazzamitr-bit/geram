@@ -3,7 +3,8 @@
 import { ChartRangeTabs } from "@/components/app/ChartRangeTabs";
 import { NoData } from "@/components/app/NoData";
 import { TradeSuccessSheet } from "@/components/app/TradeSuccessSheet";
-import { PriceChart, type ChartRange } from "@/components/ui/PriceChart";
+import { DeferredPriceChart } from "@/components/ui/DeferredPriceChart";
+import type { ChartRange } from "@/components/ui/PriceChart";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
 import {
   feeRate,
@@ -401,7 +402,7 @@ export function TradeDesk({ side }: { side: "buy" | "sell" }) {
             {price > 0 ? formatToman(price) : "—"}
           </p>
           <div className="mt-2">
-            <PriceChart
+            <DeferredPriceChart
               variant="market"
               appearance="light"
               showAxis

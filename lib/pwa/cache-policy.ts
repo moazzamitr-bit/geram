@@ -17,6 +17,17 @@ export function isStaticAssetPath(pathname: string): boolean {
   return /\.(?:js|css|woff2?|ttf|otf|png|jpe?g|gif|svg|ico|webp|avif)$/i.test(pathname);
 }
 
+/**
+ * Build assets the service worker may download on install.
+ * Admin screens and the full-size brand PNG are not part of the customer shell.
+ */
+export function shouldPrecacheAsset(url: string): boolean {
+  if (url.includes("/app/api/") || url.startsWith("/api")) return false;
+  if (url.includes("/app/admin/")) return false;
+  if (url.includes("/brand/logo.png")) return false;
+  return true;
+}
+
 export function isPageNavigation(
   request: { mode: string; destination: string },
   url: URL

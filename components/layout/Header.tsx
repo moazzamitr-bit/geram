@@ -62,7 +62,7 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link href="/auth/login" className="hidden sm:inline-flex">
+            <Link href="/auth/login" prefetch={false} className="hidden sm:inline-flex">
               <GoldButton
                 size="sm"
                 className="min-w-[140px]"
@@ -114,7 +114,7 @@ export function Header() {
               {item.label}
             </Link>
           ))}
-          <Link href="/auth/login" onClick={() => setOpen(false)} className="mt-8 block">
+          <Link href="/auth/login" prefetch={false} onClick={() => setOpen(false)} className="mt-8 block">
             <GoldButton className="w-full" type="button">
               <User className="h-4 w-4" strokeWidth={1.75} />
               ورود / ثبت‌نام

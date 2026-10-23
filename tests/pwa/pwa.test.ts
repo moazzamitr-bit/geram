@@ -4,6 +4,7 @@ import {
   isBypassedRequest,
   isPageNavigation,
   isStaticAssetPath,
+  shouldPrecacheAsset,
   shouldStorePage,
 } from "@/lib/pwa/cache-policy";
 import { installCopy } from "@/lib/pwa/copy";
@@ -45,7 +46,13 @@ describe("pwa cache policy", () => {
     expect(isBypassedRequest(new URL("https://geram.co/app/dashboard"))).toBe(false);
     expect(isBypassedRequest(new URL("https://geram.co/offline"))).toBe(false);
     expect(isStaticAssetPath("/icons/icon-192.png")).toBe(true);
+    expect(isStaticAssetPath("/images/hero-bg.webp")).toBe(true);
     expect(isStaticAssetPath("/api/core/wallet")).toBe(false);
+    expect(shouldPrecacheAsset("/_next/static/chunks/app/admin/page-abc.js")).toBe(false);
+    expect(shouldPrecacheAsset("/_next/static/chunks/app/api/route-abc.js")).toBe(false);
+    expect(shouldPrecacheAsset("/brand/logo.png")).toBe(false);
+    expect(shouldPrecacheAsset("/brand/logo-mark.webp")).toBe(true);
+    expect(shouldPrecacheAsset("/_next/static/chunks/app/auth/login/page-abc.js")).toBe(true);
     expect(
       isPageNavigation(
         { mode: "navigate", destination: "document" },
