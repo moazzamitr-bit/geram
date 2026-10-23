@@ -55,6 +55,12 @@ docker run -d --restart unless-stopped --env-file .env.production -p 3000:3000 g
 - کرون روزانه: `curl -H "Authorization: Bearer $CRON_SECRET" https://YOUR_DOMAIN/api/cron/revenue`
 - محدودیت نرخ درخواست در حافظه همان سرور است؛ با یک کانتینر دقیق کار می‌کند.
 
+## ۵٫۱ ورود (رمز عبور، نه پیامک)
+
+تا وقتی کاوه‌نگار تنظیم نشده، صفحه `/auth/login` فرم شماره و رمز عبور است و `/api/auth/phone-login` پاسخ `method_disabled` می‌دهد. ثبت‌نام به `SUPABASE_SERVICE_ROLE_KEY` نیاز دارد. ورود ادمین با ایمیل حسابی است که `profiles.role = admin` دارد؛ `admin@geram.ir` روی سرور خودمیزبان فعلی این نقش را ندارد.
+
+پروکسی `/sb` اگر همین الان GoTrue را جواب می‌دهد، برای این اصلاح لازم نیست عوض شود. فقط `Set-Cookie` را حذف نکنید و `NEXT_PUBLIC_SUPABASE_URL` همان آدرسی بماند که مرورگر می‌بیند (`https://geram.co/sb`). متغیر `GERAM_EXECUTION_MODE` را برای این تغییر عوض نکنید.
+
 ## ۶. چک‌لیست قبل از باز کردن برای کاربر
 
 - [ ] `/api/core/readiness`: `databaseBacked: true`، `phoneAuthReady: true`

@@ -1,22 +1,9 @@
 import { randomBytes } from "crypto";
 import { createClient as createBrowserOrServer } from "@supabase/supabase-js";
+import { phoneE164, phoneEmail } from "@/lib/auth/phone";
 import { getExecutionMode } from "@/lib/core/mode";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/db/types";
-
-/** Synthetic email — must use a real domain Supabase accepts (not .local / example.com). */
-function phoneEmail(phone: string) {
-  const digits = phone.replace(/\D/g, "");
-  return `p${digits}@geram.vercel.app`;
-}
-
-function phoneE164(digits: string) {
-  const normalized = digits.replace(/^98/, "0");
-  if (!/^09\d{9}$/.test(normalized)) {
-    throw new Error("invalid_phone");
-  }
-  return `+98${normalized.slice(1)}`;
-}
 
 /**
  * Anon-only fallback (no service role). The password is derivable from the

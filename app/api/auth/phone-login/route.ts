@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { publicAuthMethod } from "@/lib/auth/method";
 import { otpMode, verifyOtp } from "@/lib/auth/otp";
 import { ensurePhoneUser } from "@/lib/db/phone-auth";
 import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -8,6 +9,11 @@ import { isSupabaseConfigured } from "@/lib/db/types";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  // Password login is the default. OTP stays available only when SMS is configured.
+  if (publicAuthMethod() !== "otp") {
+    return NextResponse.json({ ok: false, error: "method_disabled" }, { status: 403 });
+  }
+
   if (!isSupabaseConfigured()) {
     return NextResponse.json(
       { ok: false, error: "supabase_not_configured" },
@@ -15,8 +21,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Real SMS OTP when a provider is configured; the fixed demo code only in
-  // SANDBOX. Without either, login is refused (see lib/auth/otp.ts).
   if (otpMode() === "unavailable") {
     return NextResponse.json(
       { ok: false, error: "otp_provider_not_configured" },
