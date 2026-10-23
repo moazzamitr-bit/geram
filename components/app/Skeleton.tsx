@@ -11,7 +11,7 @@ export function Skeleton({ className }: { className?: string }) {
 
 export function AppShellSkeleton() {
   return (
-    <div className="min-h-svh bg-bg px-4 py-6 md:px-6" aria-busy="true" aria-live="polite">
+    <div className="geram-app min-h-svh bg-bg px-4 py-6 md:px-6" aria-busy="true" aria-live="polite">
       <span className="sr-only">در حال آماده‌سازی پنل...</span>
       <div className="mx-auto max-w-6xl space-y-5">
         <div className="flex items-center justify-between">

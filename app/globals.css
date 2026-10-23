@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@theme inline {
+@theme {
   --color-bg: #080b0d;
   --color-bg-secondary: #0d1114;
   --color-card: #101417;
@@ -292,4 +292,117 @@ body {
   background: rgba(214, 168, 75, 0.15);
   color: #d6a84b;
   font-weight: 700;
+}
+
+/* Logged-in app + login. Marketing and admin stay on the dark tokens above. */
+.geram-app {
+  --color-bg: #faf8f5;
+  --color-bg-secondary: #ffffff;
+  --color-card: #ffffff;
+  --color-card-elevated: #ffffff;
+  --color-card-app: #ffffff;
+  --color-elevated-app: #ffffff;
+  --color-border: rgba(28, 25, 23, 0.08);
+  --color-gold: #c48f00;
+  --color-gold-highlight: #ffb800;
+  --color-gold-dark: #8f6800;
+  --color-gold-soft: #d9a441;
+  --color-text: #1c1917;
+  --color-text-secondary: #57534e;
+  --color-text-muted: #78716c;
+  --color-muted-app: #8a8178;
+  --color-positive: #1b9e4b;
+  --color-negative: #e5484d;
+  --color-warning: #d97706;
+  --bg: #faf8f5;
+  --bg-secondary: #ffffff;
+  --card: #ffffff;
+  --card-elevated: #ffffff;
+  --card-app: #ffffff;
+  --elevated-app: #ffffff;
+  --border: rgba(28, 25, 23, 0.08);
+  --gold: #c48f00;
+  --gold-highlight: #ffb800;
+  --gold-dark: #8f6800;
+  --gold-soft: #d9a441;
+  --text: #1c1917;
+  --text-secondary: #57534e;
+  --text-muted: #78716c;
+  --muted-app: #8a8178;
+  --positive: #1b9e4b;
+  --negative: #e5484d;
+  --warning: #d97706;
+  --sidebar-w: 232px;
+  --gold-gradient: linear-gradient(135deg, #8f6800 0%, #ffb800 55%, #e6a200 100%);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.geram-app ::selection {
+  background: rgba(255, 184, 0, 0.35);
+  color: #1c1917;
+}
+
+.geram-app .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(28, 25, 23, 0.04) 0%,
+    rgba(255, 184, 0, 0.2) 45%,
+    rgba(28, 25, 23, 0.04) 100%
+  );
+  background-size: 200% 100%;
+}
+
+.geram-app .auth-switch:has(#auth-tab-login:checked) label[for="auth-tab-login"],
+.geram-app .auth-switch:has(#auth-tab-register:checked) label[for="auth-tab-register"] {
+  background: #161616;
+  color: #fff;
+}
+
+/* Existing app screens hard-code the old dark surfaces. Remap them inside the light shell. */
+.geram-app .border-white\/10,
+.geram-app .border-white\/15,
+.geram-app .border-white\/20,
+.geram-app .border-white\/\[0\.04\],
+.geram-app .border-white\/\[0\.05\],
+.geram-app .border-white\/\[0\.06\],
+.geram-app .border-white\/\[0\.07\] {
+  border-color: rgba(28, 25, 23, 0.08) !important;
+}
+
+.geram-app .bg-\[\#0A0C0E\],
+.geram-app .bg-\[\#0A0C0E\]\/50,
+.geram-app .bg-\[\#0A0C0E\]\/60,
+.geram-app .bg-\[\#0A0C0E\]\/80 {
+  background-color: #fff !important;
+}
+
+.geram-app .bg-white\/5,
+.geram-app .bg-white\/10,
+.geram-app .bg-white\/\[0\.03\],
+.geram-app .bg-white\/\[0\.04\],
+.geram-app .bg-white\/\[0\.06\] {
+  background-color: rgba(28, 25, 23, 0.04) !important;
+}
+
+.geram-app .hover\:bg-white\/\[0\.02\]:hover,
+.geram-app .hover\:bg-white\/\[0\.03\]:hover,
+.geram-app .hover\:bg-white\/\[0\.04\]:hover,
+.geram-app .active\:bg-white\/\[0\.08\]:active {
+  background-color: rgba(28, 25, 23, 0.05) !important;
+}
+
+.geram-app .divide-white\/\[0\.05\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(28, 25, 23, 0.08);
+}
+
+.geram-app button.bg-gold-gradient {
+  background-image: none !important;
+  background-color: #161616 !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+.geram-app button.bg-gold-gradient:hover {
+  background-color: #000 !important;
 }
