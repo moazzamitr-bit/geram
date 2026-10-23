@@ -6,6 +6,7 @@ import {
   OpsBadge,
 } from "@/components/admin/AdminUI";
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
+import { WalletCreditForm } from "@/components/admin/WalletCreditForm";
 import { probeTable } from "@/lib/admin/probe";
 
 export default async function AdminApprovalsPage() {
@@ -20,22 +21,25 @@ export default async function AdminApprovalsPage() {
         description="سازنده نمی‌تواند درخواست خودش را تأیید کند. اجرای اصلاح مالی فقط از ژورنال — هرگز mutation مستقیم موجودی."
       />
       {!rows.ready ? <OpsBadge state="NOT_READY" /> : <OpsBadge state="SANDBOX" />}
-      <AdminNotice title="AdjustmentRequest">
-        ایجاد اصلاح مالی صف تأیید می‌سازد. Execute وقتی دفترکل عملیاتی نباشد رد می‌شود و wallets را عوض نمی‌کند.
+      <AdminNotice title="شارژ کیف پول">
+        FINANCIAL_ADJUSTMENT موجودی قابل استفاده کاربر را با ژورنال APPROVED_OPENING_BALANCE زیاد می‌کند. سازنده نمی‌تواند درخواست خودش را تأیید کند. جدول wallets عوض نمی‌شود.
       </AdminNotice>
       <div className="mb-6 max-w-lg">
-        <AdminActionForm
-          action="create"
-          endpoint="/api/admin/approvals"
-          extra={{ kind: "FINANCIAL_ADJUSTMENT" }}
-          submitLabel="درخواست اصلاح مالی (نه Edit Balance)"
-        />
+        <WalletCreditForm />
       </div>
       {rows.ready ? (
         <AdminTable headers={["نوع", "وضعیت", "maker", "checker", "زمان", "اقدام"]} empty={rows.rows.length === 0}>
           {rows.rows.map((r) => (
             <tr key={String(r.id)} className="border-b border-white/5 align-top">
-              <td className="px-4 py-3">{String(r.kind)}</td>
+              <td className="px-4 py-3">
+                {String(r.kind)}
+                {r.kind === "FINANCIAL_ADJUSTMENT" && (
+                  <span className="block text-[11px] text-white/50" dir="ltr">
+                    {String((r.payload as { userId?: string })?.userId ?? "").slice(0, 8)}{" "}
+                    {String((r.payload as { amount?: string })?.amount ?? "")} IRR-toman
+                  </span>
+                )}
+              </td>
               <td className="px-4 py-3"><AdminBadge>{String(r.status)}</AdminBadge></td>
               <td className="px-4 py-3 font-mono text-[12px]">{String(r.maker_id ?? "—").slice(0, 8)}</td>
               <td className="px-4 py-3 font-mono text-[12px]">{String(r.checker_id ?? "—").slice(0, 8)}</td>

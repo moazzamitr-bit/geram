@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import { adminGate, readActionBody } from "@/lib/admin/auth";
 import { writeAudit } from "@/lib/admin/audit";
+import { hasPermission, type AdminRole } from "@/lib/admin/rbac";
+import {
+  parseIdempotencyKey,
+  parseStoredWalletCredit,
+  parseTomanAmount,
+  resolveCreditTarget,
+} from "@/lib/admin/wallet-credit";
+import { getFinancialCore } from "@/lib/core/runtime";
+import { CoreError } from "@/lib/core/types";
 import { createServiceClient } from "@/lib/supabase/admin";
 
 const KINDS = new Set([
@@ -12,6 +21,8 @@ const KINDS = new Set([
   "RECONCILIATION_CORRECTION",
 ]);
 
+type ServiceDb = ReturnType<typeof createServiceClient>;
+
 export async function POST(request: Request) {
   const gate = await adminGate();
   if (!gate.ok) return gate.response;
@@ -20,7 +31,7 @@ export async function POST(request: Request) {
   const action = (body.action ?? "").trim();
   const reason = (body.reason ?? "").trim();
 
-  let db;
+  let db: ServiceDb;
   try {
     db = createServiceClient();
   } catch {
@@ -31,6 +42,9 @@ export async function POST(request: Request) {
     const kind = (body.kind ?? "").trim();
     if (!KINDS.has(kind) || reason.length < 8) {
       return NextResponse.json({ ok: false, error: "invalid_request" }, { status: 400 });
+    }
+    if (kind === "FINANCIAL_ADJUSTMENT") {
+      return createWalletCredit(db, gate.ctx, body, reason);
     }
     const { data, error } = await db
       .from("admin_approval_requests")
@@ -75,6 +89,24 @@ export async function POST(request: Request) {
 
   const { data: row } = await db.from("admin_approval_requests").select("*").eq("id", id).maybeSingle();
   if (!row) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+
+  if (
+    row.kind === "FINANCIAL_ADJUSTMENT" &&
+    (action === "approve" || action === "execute") &&
+    !hasPermission(gate.ctx.role, "treasury.write")
+  ) {
+    await writeAudit({
+      actorId: gate.ctx.userId,
+      role: gate.ctx.role,
+      action: "permission.denied",
+      entity: "approval_request",
+      entityId: id,
+      reason,
+      result: "denied",
+      meta: { kind: row.kind, action },
+    });
+    return NextResponse.json({ ok: false, error: "permission denied" }, { status: 403 });
+  }
 
   if (action === "approve") {
     if (row.maker_id === gate.ctx.userId) {
@@ -127,26 +159,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "فقط درخواست APPROVED قابل اجراست." }, { status: 400 });
     }
     if (row.kind === "FINANCIAL_ADJUSTMENT") {
-      await writeAudit({
-        actorId: gate.ctx.userId,
-        role: gate.ctx.role,
-        action: "approval.execute_blocked",
-        entity: "approval_request",
-        entityId: id,
-        reason,
-        result: "denied",
-        meta: {
-          note: "Ledger journal posting is NOT READY on this database. wallets.balance is never mutated.",
-        },
-      });
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "اجرای اصلاح مالی نیازمند posting ژورنال است. دفترکل عملیاتی روی این دیتابیس NOT READY است. موجودی مستقیم تغییر نمی‌کند.",
-        },
-        { status: 503 }
-      );
+      return executeWalletCredit({ db, row, reason, ctx: gate.ctx });
     }
     return NextResponse.json(
       { ok: false, error: "اجرای این نوع درخواست هنوز پیاده نشده (NOT READY)." },
@@ -155,4 +168,230 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: false, error: "unknown_action" }, { status: 400 });
+}
+
+async function createWalletCredit(
+  db: ServiceDb,
+  ctx: { userId: string; role: AdminRole },
+  body: Record<string, string>,
+  reason: string
+) {
+  if (!hasPermission(ctx.role, "treasury.write")) {
+    await writeAudit({
+      actorId: ctx.userId,
+      role: ctx.role,
+      action: "permission.denied",
+      entity: "approval_request",
+      reason,
+      result: "denied",
+      meta: { kind: "FINANCIAL_ADJUSTMENT" },
+    });
+    return NextResponse.json({ ok: false, error: "permission denied" }, { status: 403 });
+  }
+
+  const idempotencyKey = parseIdempotencyKey(body.idempotencyKey);
+  const amount = parseTomanAmount(body.amount ?? "");
+  if (!idempotencyKey) {
+    return NextResponse.json({ ok: false, error: "idempotency_key_required" }, { status: 400 });
+  }
+  if (!amount) {
+    return NextResponse.json({ ok: false, error: "invalid_amount" }, { status: 400 });
+  }
+
+  const target = await resolveCreditTarget({
+    userId: body.userId,
+    phone: body.phone,
+    lookupById: async (id) => {
+      const { data } = await db.from("profiles").select("id, phone").eq("id", id).maybeSingle();
+      return data ? { id: data.id as string, phone: (data.phone as string | null) ?? null } : null;
+    },
+    lookupByPhones: async (phones) => {
+      const { data } = await db.from("profiles").select("id, phone").in("phone", phones).limit(5);
+      return (data ?? []).map((row) => ({
+        id: row.id as string,
+        phone: (row.phone as string | null) ?? null,
+      }));
+    },
+  });
+  if (!target.ok) {
+    return NextResponse.json({ ok: false, error: target.error }, { status: target.status });
+  }
+
+  const { data: existing, error: lookupError } = await db
+    .from("admin_approval_requests")
+    .select("id, status, payload")
+    .eq("kind", "FINANCIAL_ADJUSTMENT")
+    .contains("payload", { idempotencyKey })
+    .limit(1);
+  if (lookupError) {
+    return NextResponse.json(
+      { ok: false, error: "جدول تأیید دو مرحله‌ای NOT READY است." },
+      { status: 503 }
+    );
+  }
+  const prior = existing?.[0];
+  if (prior) {
+    const stored = parseStoredWalletCredit(prior.payload);
+    const same =
+      stored.ok &&
+      stored.userId === target.userId &&
+      stored.amountToman === amount.toman &&
+      stored.idempotencyKey === idempotencyKey;
+    if (!same) {
+      return NextResponse.json(
+        { ok: false, error: "idempotency_conflict" },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({
+      ok: true,
+      replayed: true,
+      id: prior.id,
+      message: "این کلید قبلاً ثبت شده است.",
+    });
+  }
+
+  const payload = {
+    userId: target.userId,
+    phone: target.phone,
+    amount: String(amount.toman),
+    asset: "IRR",
+    direction: "CREDIT",
+    idempotencyKey,
+  };
+
+  const { data, error } = await db
+    .from("admin_approval_requests")
+    .insert({
+      kind: "FINANCIAL_ADJUSTMENT",
+      payload,
+      status: "PENDING_APPROVAL",
+      maker_id: ctx.userId,
+      reason,
+    })
+    .select("id")
+    .maybeSingle();
+  await writeAudit({
+    actorId: ctx.userId,
+    role: ctx.role,
+    action: "approval.create",
+    entity: "approval_request",
+    entityId: data?.id ?? null,
+    reason,
+    result: error ? "error" : "ok",
+    meta: {
+      kind: "FINANCIAL_ADJUSTMENT",
+      userId: target.userId,
+      amountToman: amount.toman,
+      idempotencyKey,
+    },
+  });
+  if (error) {
+    return NextResponse.json(
+      { ok: false, error: "جدول تأیید دو مرحله‌ای NOT READY است." },
+      { status: 503 }
+    );
+  }
+  return NextResponse.json({
+    ok: true,
+    id: data?.id,
+    message: "درخواست شارژ کیف پول در صف تأیید قرار گرفت.",
+  });
+}
+
+/**
+ * Posts APPROVED_OPENING_BALANCE to USER_AVAILABLE IRR.
+ * Claim APPROVED → EXECUTED before the journal so a double click cannot post twice.
+ * The ledger ref id is the idempotency key. The wallets table is never updated.
+ */
+async function executeWalletCredit(input: {
+  db: ServiceDb;
+  row: Record<string, unknown>;
+  reason: string;
+  ctx: { userId: string; role: AdminRole };
+}) {
+  const { db, row, reason, ctx } = input;
+  const id = String(row.id);
+  const parsed = parseStoredWalletCredit(row.payload);
+  if (!parsed.ok) {
+    return NextResponse.json({ ok: false, error: parsed.error }, { status: 400 });
+  }
+
+  const { data: profile } = await db
+    .from("profiles")
+    .select("id")
+    .eq("id", parsed.userId)
+    .maybeSingle();
+  if (!profile) {
+    return NextResponse.json({ ok: false, error: "user_not_found" }, { status: 404 });
+  }
+
+  const { data: claimed } = await db
+    .from("admin_approval_requests")
+    .update({ status: "EXECUTED", updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("status", "APPROVED")
+    .select("id")
+    .maybeSingle();
+  if (!claimed) {
+    return NextResponse.json({ ok: false, error: "این درخواست قبلاً اجرا شده است." }, { status: 409 });
+  }
+
+  try {
+    const core = getFinancialCore();
+    const posted = await core.creditApprovedUserIrr({
+      userId: parsed.userId,
+      amountIrr: parsed.amountIrr,
+      reason,
+      refId: parsed.refId,
+    });
+    await writeAudit({
+      actorId: ctx.userId,
+      role: ctx.role,
+      action: "approval.execute",
+      entity: "approval_request",
+      entityId: id,
+      reason,
+      result: "ok",
+      meta: {
+        kind: "FINANCIAL_ADJUSTMENT",
+        userId: parsed.userId,
+        amountToman: parsed.amountToman,
+        amountIrr: parsed.amountIrr.toString(),
+        journalId: posted.journalId,
+        replayed: posted.replayed,
+        refType: "APPROVED_OPENING_BALANCE",
+        accountCode: "USER_AVAILABLE",
+        note: "Ledger opening credit. wallets table was not mutated.",
+      },
+    });
+    return NextResponse.json({
+      ok: true,
+      journalId: posted.journalId,
+      replayed: posted.replayed,
+      message: `در دفترکل ثبت شد (${posted.journalId}).`,
+    });
+  } catch (err) {
+    await db
+      .from("admin_approval_requests")
+      .update({ status: "APPROVED", updated_at: new Date().toISOString() })
+      .eq("id", id);
+    await writeAudit({
+      actorId: ctx.userId,
+      role: ctx.role,
+      action: "approval.execute",
+      entity: "approval_request",
+      entityId: id,
+      reason,
+      result: "error",
+      meta: { error: err instanceof CoreError ? err.code : "post_failed" },
+    });
+    if (err instanceof CoreError) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: err.httpStatus });
+    }
+    return NextResponse.json(
+      { ok: false, error: "ثبت در دفترکل ناموفق بود. اتصال دیتابیس معاملات را بررسی کنید." },
+      { status: 500 }
+    );
+  }
 }
