@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { fetchWithTimeout } from "@/lib/supabase/fetch";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -28,6 +29,7 @@ export async function middleware(request: NextRequest) {
   });
 
   const supabase = createServerClient(url, key, {
+    global: { fetch: fetchWithTimeout(8_000) },
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -46,9 +48,15 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: { id: string } | null = null;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  } catch {
+    // Auth host hung or refused. Fail closed on protected pages instead of
+    // leaving the request pending forever.
+    user = null;
+  }
 
   if (!user) {
     // /app used to be gated only in the browser; enforce it on the server too.

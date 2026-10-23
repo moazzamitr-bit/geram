@@ -279,3 +279,17 @@ body {
     background: rgba(255, 255, 255, 0.06);
   }
 }
+
+/* Password login tabs work without JavaScript (:has on the radios). */
+.auth-switch:has(#auth-tab-register:checked) .auth-pane-login {
+  display: none;
+}
+.auth-switch:not(:has(#auth-tab-register:checked)) .auth-pane-register {
+  display: none;
+}
+.auth-switch:has(#auth-tab-login:checked) label[for="auth-tab-login"],
+.auth-switch:has(#auth-tab-register:checked) label[for="auth-tab-register"] {
+  background: rgba(214, 168, 75, 0.15);
+  color: #d6a84b;
+  font-weight: 700;
+}
