@@ -4,7 +4,7 @@ import { AnimatedNumber } from "@/components/app/AnimatedNumber";
 import { AppCard } from "@/components/app/AppCard";
 import { InstrumentTabs } from "@/components/app/InstrumentTabs";
 import { PageHeader } from "@/components/app/PageHeader";
-import { PriceChart } from "@/components/ui/PriceChart";
+import { DeferredPriceChart } from "@/components/ui/DeferredPriceChart";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { useDemoStore } from "@/lib/app/demo-store";
 import {
@@ -148,7 +148,7 @@ export default function MarketPage() {
           ))}
         </div>
         <div className="mt-4 rounded-xl border border-white/[0.06] bg-[#0A0C0E] p-3">
-          <PriceChart
+          <DeferredPriceChart
             variant="market"
             height={180}
             range={period}

@@ -1,7 +1,7 @@
 "use client";
 
 import { LogoMark } from "@/components/brand/BrandLogo";
-import { PriceChart } from "@/components/ui/PriceChart";
+import { DeferredPriceChart } from "@/components/ui/DeferredPriceChart";
 import { cn } from "@/lib/utils";
 import { Bell, Cuboid } from "lucide-react";
 import { ReactNode } from "react";
@@ -89,7 +89,7 @@ function PortfolioScreen() {
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] bg-card/80 p-2">
-        <PriceChart variant="portfolio" height={72} />
+        <DeferredPriceChart variant="portfolio" height={72} />
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -170,7 +170,7 @@ function MarketScreen() {
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] bg-card/80 p-2">
-        <PriceChart variant="market" height={110} />
+        <DeferredPriceChart variant="market" height={110} />
       </div>
 
       <div className="mt-auto grid grid-cols-3 gap-1.5">

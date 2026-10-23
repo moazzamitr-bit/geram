@@ -129,6 +129,7 @@ export function LiveMetalsSection() {
                 <div className="mt-6 flex items-center gap-4">
                   <Link
                     href={`/app/buy?instrument=${id}`}
+                    prefetch={false}
                     className="inline-flex items-center gap-1 text-[13px] font-semibold text-gold transition-colors hover:text-gold-highlight"
                   >
                     خرید {meta.label}
@@ -136,6 +137,7 @@ export function LiveMetalsSection() {
                   </Link>
                   <Link
                     href={`/app/market`}
+                    prefetch={false}
                     className="text-[12px] text-text-muted transition-colors hover:text-text-secondary"
                   >
                     نمودار

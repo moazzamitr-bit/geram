@@ -79,10 +79,11 @@ export function HeroSection() {
         aria-hidden
       >
         <Image
-          src="/images/hero-bg.png"
+          src="/images/hero-bg.webp"
           alt=""
           fill
           priority
+          unoptimized
           sizes="100vw"
           className="object-cover object-[72%_center]"
         />
@@ -157,7 +158,7 @@ export function HeroSection() {
             }}
             className="mt-9 flex flex-wrap items-center gap-3"
           >
-            <Link href="/auth/login">
+            <Link href="/auth/login" prefetch={false}>
               <GoldButton className="min-w-[150px]" type="button">
                 شروع معامله
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/15">

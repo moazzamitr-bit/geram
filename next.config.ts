@@ -1,12 +1,10 @@
 import type { NextConfig } from "next";
 import withSerwistInit from "@serwist/next";
 import path from "path";
+import { shouldPrecacheAsset } from "./lib/pwa/cache-policy";
 
-// Next emits a tiny client chunk for every route handler. Those URLs contain
-// `/app/api/` but they are not API responses. Drop them so the precache is
-// only the shell (pages, icons, font, offline page).
-function dropApiChunks<T extends { url: string }>(entries: T[]) {
-  return entries.filter((entry) => !entry.url.includes("/app/api/") && !entry.url.startsWith("/api"));
+function keepShellPrecache<T extends { url: string }>(entries: T[]) {
+  return entries.filter((entry) => shouldPrecacheAsset(entry.url));
 }
 
 // Dev stays on Turbopack (`next dev --turbopack`); Serwist compiles in the
@@ -26,11 +24,12 @@ const withSerwist = withSerwistInit({
     "icons/icon-*.png",
     "icons/apple-touch-icon.png",
     "brand/favicon-32.png",
-    "brand/logo.png",
+    "brand/logo-mark.webp",
+    "images/hero-bg.webp",
   ],
   manifestTransforms: [
     async (entries) => ({
-      manifest: dropApiChunks(entries),
+      manifest: keepShellPrecache(entries),
       warnings: [],
     }),
   ],
@@ -53,11 +52,23 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
     formats: ["image/avif", "image/webp"],
+    // Optimized images are content-stable until the source file changes.
+    minimumCacheTTL: 60 * 60 * 24 * 7,
   },
   outputFileTracingRoot: path.join(__dirname),
   async headers() {
+    const staticAssetCache = [
+      {
+        key: "Cache-Control",
+        value: "public, max-age=86400, stale-while-revalidate=604800",
+      },
+    ];
     return [
       { source: "/:path*", headers: securityHeaders },
+      { source: "/images/:path*", headers: staticAssetCache },
+      { source: "/brand/:path*", headers: staticAssetCache },
+      { source: "/icons/:path*", headers: staticAssetCache },
+      { source: "/splash/:path*", headers: staticAssetCache },
       {
         source: "/sw.js",
         headers: [

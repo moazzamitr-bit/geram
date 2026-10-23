@@ -33,7 +33,7 @@ export function BrandLogo({
   if (!href) return content;
 
   return (
-    <Link href={href} className="inline-flex" aria-label="صفحه اصلی گرم">
+    <Link href={href} prefetch={false} className="inline-flex" aria-label="صفحه اصلی گرم">
       {content}
     </Link>
   );
@@ -48,11 +48,11 @@ export function LogoMark({
 }) {
   return (
     <Image
-      src="/brand/logo.png"
+      src="/brand/logo-mark.webp"
       alt=""
       width={size}
       height={size}
-      priority
+      unoptimized
       className={cn("shrink-0 object-contain", className)}
       style={{ width: size, height: size }}
       aria-hidden

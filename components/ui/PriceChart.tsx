@@ -15,7 +15,7 @@ export type ChartRange = "1d" | "7d" | "1m" | "3m" | "1y";
 
 type Point = { label: string; value: number };
 
-type PriceChartProps = {
+export type PriceChartProps = {
   variant?: "portfolio" | "market";
   className?: string;
   height?: number;

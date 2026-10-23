@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app/AppShell";
 import { DemoStoreProvider } from "@/lib/app/demo-store";
+import { AuthProvider } from "@/lib/auth/auth-context";
 import type { Metadata, Viewport } from "next";
 
 export const viewport: Viewport = {
@@ -31,8 +32,10 @@ export const metadata: Metadata = {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <DemoStoreProvider>
-      <AppShell>{children}</AppShell>
-    </DemoStoreProvider>
+    <AuthProvider>
+      <DemoStoreProvider>
+        <AppShell>{children}</AppShell>
+      </DemoStoreProvider>
+    </AuthProvider>
   );
 }
