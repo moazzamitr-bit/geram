@@ -1,8 +1,8 @@
 "use client";
 
 import { AppCard } from "@/components/app/AppCard";
+import { NoData } from "@/components/app/NoData";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
@@ -13,9 +13,6 @@ export default function TrustPage() {
   const [code, setCode] = useState("");
   const [result, setResult] = useState<string | null>(null);
 
-  const liabilityMg = store.goldMg;
-  const reserveMg = Math.round(liabilityMg * 1.0);
-
   const found = useMemo(
     () => store.transactions.find((t) => t.trackingCode === code.trim().toUpperCase()),
     [store.transactions, code]
@@ -25,44 +22,26 @@ export default function TrustPage() {
     <div className="mx-auto max-w-4xl space-y-5">
       <PageHeader
         title="مرکز اعتماد"
-        description="شفافیت پشتوانه، تطبیق و صحت‌سنجی تراکنش."
-        action={<SimulationBadge />}
+        description="فقط عددی نشان داده می‌شود که از حساب یا دفترکل شما آمده باشد."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat title="بدهی طلای مشتریان" value={`${mgToGramsLabel(liabilityMg)} گرم`} />
-        <Stat title="پشتوانه ثبت‌شده" value={`${mgToGramsLabel(reserveMg)} گرم`} />
-        <Stat title="نسبت پوشش" value="۱۰۰٪" />
-        <Stat title="آخرین تطبیق" value="امروز، ۱۶:۳۰" />
+        <Stat title="موجودی طلای شما" value={`${mgToGramsLabel(store.goldMg)} گرم`} />
+        <Stat title="پشتوانه ثبت‌شده" value="—" />
+        <Stat title="نسبت پوشش" value="—" />
+        <Stat title="آخرین تطبیق" value="—" />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <AppCard>
           <h2 className="text-[15px] font-bold">نگهداری و بیمه</h2>
-          <dl className="mt-4 space-y-3 text-[13px]">
-            <div className="flex justify-between">
-              <dt className="text-muted-app">وضعیت خزانه</dt>
-              <dd>عادی</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-app">شریک نگهداری</dt>
-              <dd>پیکربندی سندباکس</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-app">بیمه</dt>
-              <dd>فعال (نمایشی)</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-app">سامانه ناظر</dt>
-              <dd className="text-warning">pending / sandbox</dd>
-            </div>
-          </dl>
+          <NoData className="py-8" />
         </AppCard>
 
         <AppCard>
           <h2 className="text-[15px] font-bold">صحت‌سنجی کد رهگیری</h2>
           <p className="mt-2 text-[13px] text-muted-app">
-            فقط وضعیت تراکنش خودتان نمایش داده می‌شود؛ اطلاعات شخصی دیگران افشا نمی‌شود.
+            فقط وضعیت تراکنش خودتان نمایش داده می‌شود.
           </p>
           <input
             dir="ltr"
@@ -88,6 +67,9 @@ export default function TrustPage() {
           {result === "missing" && (
             <p className="mt-3 text-[13px] text-muted-app">کدی با این مشخصات یافت نشد.</p>
           )}
+          {result && result !== "found" && result !== "missing" && (
+            <p className="mt-3 text-[13px] text-muted-app">{result}</p>
+          )}
           {result === "found" && found && (
             <div className="mt-4 rounded-xl border border-white/[0.06] p-3 text-[13px]">
               <div className="flex items-center justify-between">
@@ -96,7 +78,7 @@ export default function TrustPage() {
               </div>
               <p className="mt-2 text-muted-app">{found.createdAt}</p>
               <p className="mt-1">
-                {found.goldMg ? `${mgToGramsLabel(found.goldMg)} گرم` : "بدون طلا"}
+                {found.goldMg ? `${mgToGramsLabel(found.goldMg)} گرم` : "بدون فلز"}
               </p>
             </div>
           )}
@@ -105,11 +87,7 @@ export default function TrustPage() {
 
       <AppCard>
         <h2 className="text-[15px] font-bold">گزارش‌ها</h2>
-        <ul className="mt-3 space-y-2 text-[13px] text-muted-app">
-          <li className="rounded-xl border border-white/[0.06] px-3 py-3">گزارش تطبیق روزانه (نمایشی)</li>
-          <li className="rounded-xl border border-white/[0.06] px-3 py-3">گزارش خزانه (نمایشی)</li>
-          <li className="rounded-xl border border-white/[0.06] px-3 py-3">اسناد حسابرسی (به‌زودی)</li>
-        </ul>
+        <NoData />
       </AppCard>
     </div>
   );

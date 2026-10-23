@@ -2,7 +2,7 @@
 
 import { LogoMark } from "@/components/brand/BrandLogo";
 import { PriceChart } from "@/components/ui/PriceChart";
-import { cn, formatFaNumber } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Bell, Cuboid } from "lucide-react";
 import { ReactNode } from "react";
 
@@ -77,20 +77,15 @@ function PortfolioScreen() {
           <Bell className="h-3.5 w-3.5 text-gold" strokeWidth={1.5} />
         </button>
         <div className="flex items-center gap-2">
-          <span className="text-[12px] text-text">سلام، مهدی</span>
+          <span className="text-[12px] text-text">حساب شما</span>
           <LogoMark size={24} />
         </div>
       </div>
 
       <div>
         <p className="text-[11px] text-text-muted">ارزش دارایی من</p>
-        <p className="mt-1 text-[26px] font-extrabold leading-none tracking-tight text-text">
-          {formatFaNumber(24630000)}
-        </p>
+        <p className="mt-1 text-[26px] font-extrabold leading-none tracking-tight text-text">—</p>
         <p className="mt-1 text-[11px] text-text-secondary">تومان</p>
-        <p className="mt-2 inline-flex rounded-full bg-positive/10 px-2 py-0.5 text-[11px] text-positive">
-          +۳.۴٪ این ماه
-        </p>
       </div>
 
       <div className="rounded-2xl border border-white/[0.07] bg-card/80 p-2">
@@ -114,9 +109,9 @@ function PortfolioScreen() {
 
       <div className="mt-auto space-y-1.5 rounded-2xl border border-white/[0.07] bg-card-elevated p-3">
         {[
-          ["طلا", "۳.۲۴۱ گرم"],
-          ["نقره", "۵.۰۰۰ گرم"],
-          ["مس", "۲۰۰ گرم"],
+          ["طلا", "—"],
+          ["نقره", "—"],
+          ["مس", "—"],
         ].map(([label, value]) => (
           <div key={label} className="flex items-center justify-between text-[11px]">
             <span className="text-text-muted">{label}</span>
@@ -138,10 +133,10 @@ function MarketScreen() {
 
       <div className="space-y-2">
         {[
-          ["طلا ۱۸", 19_205_600, "#D6A84B"],
-          ["نقره ۹۲۵", 383_957, "#C0C7D1"],
-          ["مس", 2_560, "#B87333"],
-        ].map(([label, price, color]) => (
+          ["طلا ۱۸", "#D6A84B"],
+          ["نقره ۹۲۵", "#C0C7D1"],
+          ["مس", "#B87333"],
+        ].map(([label, color]) => (
           <div
             key={String(label)}
             className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-card/70 px-2.5 py-2"
@@ -153,9 +148,7 @@ function MarketScreen() {
               />
               <span className="text-[11px] text-text">{label}</span>
             </div>
-            <span className="text-[11px] font-bold tabular-nums text-text">
-              {formatFaNumber(Number(price))}
-            </span>
+            <span className="text-[11px] font-bold tabular-nums text-text">—</span>
           </div>
         ))}
       </div>
@@ -220,29 +213,27 @@ function BuyScreen() {
 
       <label className="block rounded-2xl border border-white/[0.07] bg-card px-3 py-2.5">
         <span className="text-[10px] text-text-muted">مبلغ</span>
-        <p className="mt-1 text-[15px] font-semibold text-text">
-          {formatFaNumber(2_000_000)} تومان
-        </p>
+        <p className="mt-1 text-[15px] font-semibold text-text">—</p>
       </label>
 
       <label className="block rounded-2xl border border-white/[0.07] bg-card px-3 py-2.5">
         <span className="text-[10px] text-text-muted">وزن تقریبی نقره</span>
-        <p className="mt-1 text-[15px] font-semibold text-gold">۵.۱۲ گرم</p>
+        <p className="mt-1 text-[15px] font-semibold text-gold">—</p>
       </label>
 
       <div className="space-y-2 rounded-2xl border border-white/[0.07] bg-card-elevated p-3 text-[11px]">
         <div className="flex justify-between">
           <span className="text-text">قیمت هر گرم</span>
-          <span className="text-text-muted">{formatFaNumber(383_957)}</span>
+          <span className="text-text-muted">—</span>
         </div>
         <div className="flex justify-between">
           <span className="text-text">کارمزد</span>
-          <span className="text-text-muted">{formatFaNumber(14_000)}</span>
+          <span className="text-text-muted">—</span>
         </div>
         <div className="my-1 h-px bg-white/[0.06]" />
         <div className="flex justify-between font-semibold">
           <span className="text-text">مبلغ نهایی</span>
-          <span className="text-gold">{formatFaNumber(2_014_000)}</span>
+          <span className="text-gold">—</span>
         </div>
       </div>
 

@@ -3,7 +3,6 @@
 import { AppCard } from "@/components/app/AppCard";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { useDemoStore } from "@/lib/app/demo-store";
 import { formatToman } from "@/lib/utils";
@@ -20,7 +19,6 @@ export default function GoalsPage() {
         description="برای چیزی که می‌خواهید، با طلا پس‌انداز کنید."
         action={
           <div className="flex items-center gap-2">
-            <SimulationBadge />
             <Link href="/app/goals/new">
               <GoldButton type="button" size="sm">
                 هدف جدید

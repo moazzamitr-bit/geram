@@ -3,7 +3,6 @@
 import { AppCard } from "@/components/app/AppCard";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { useDemoStore } from "@/lib/app/demo-store";
 import { Bell } from "lucide-react";
 import Link from "next/link";
@@ -27,11 +26,12 @@ export default function NotificationsPage() {
         description={
           unread > 0
             ? `${unread.toLocaleString("fa-IR")} اعلان خوانده‌نشده`
-            : "همه اعلان‌ها را دیده‌اید."
+            : store.notifications.length === 0
+              ? "اعلانی ندارید."
+              : "همه اعلان‌ها را دیده‌اید."
         }
         action={
           <div className="flex items-center gap-2">
-            <SimulationBadge />
             {unread > 0 && (
               <button
                 type="button"

@@ -109,8 +109,14 @@ export default function DashboardPage() {
                 </span>
               </div>
               <p className="mt-3 text-[20px] font-extrabold tabular-nums text-text">
-                {formatFaNumber(store.getMarketPrice(row.id))}
-                <span className="mr-1 text-[12px] font-semibold text-muted-app">تومان</span>
+                {store.getMarketPrice(row.id) > 0 ? (
+                  <>
+                    {formatFaNumber(store.getMarketPrice(row.id))}
+                    <span className="mr-1 text-[12px] font-semibold text-muted-app">تومان</span>
+                  </>
+                ) : (
+                  <span className="text-muted-app">—</span>
+                )}
               </p>
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <Link

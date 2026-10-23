@@ -205,9 +205,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       persistLocal({
-        id: "demo-user-1",
-        firstName: "مهدی",
-        lastName: "محمدی",
+        id: "local-user",
+        firstName: "کاربر",
+        lastName: "",
         phone: digits,
         kycStatus: "UNVERIFIED",
         onboardingDone: false,
@@ -281,9 +281,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         "/api/auth/password-login",
         { phone, password },
         {
-          id: "demo-user-1",
+          id: "local-user",
           firstName: "کاربر",
-          lastName: "گرم",
+          lastName: "",
           phone,
           kycStatus: "UNVERIFIED",
           onboardingDone: true,
@@ -304,7 +304,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           lastName: input.lastName,
         },
         {
-          id: "demo-user-1",
+          id: "local-user",
           firstName: input.firstName,
           lastName: input.lastName,
           phone: input.phone,

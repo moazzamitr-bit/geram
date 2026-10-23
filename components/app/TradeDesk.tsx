@@ -398,7 +398,7 @@ export function TradeDesk({ side }: { side: "buy" | "sell" }) {
             <ChartRangeTabs value={range} onChange={setRange} />
           </div>
           <p className="mt-3 text-[13px] tabular-nums text-muted-app">
-            {formatToman(price)}
+            {price > 0 ? formatToman(price) : "—"}
           </p>
           <div className="mt-2">
             <PriceChart

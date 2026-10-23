@@ -206,10 +206,12 @@ async function fetchCopperDaily(): Promise<HistoryPoint[]> {
     throw new Error("empty copper history");
   }
 
-  // Fallback dollar if a day is missing: use latest known.
-  let lastDollar =
-    [...dollarByDay.values()].at(-1) ??
-    INSTRUMENT_FALLBACK_DOLLAR_TOMAN;
+  const knownDollars = [...dollarByDay.values()];
+  if (knownDollars.length === 0) {
+    throw new Error("dollar history unavailable");
+  }
+  // A missing day reuses the latest real dollar print. Never invent a rate.
+  let lastDollar = knownDollars.at(-1)!;
 
   return copperRows
     .map((row) => {
@@ -234,8 +236,6 @@ async function fetchCopperDaily(): Promise<HistoryPoint[]> {
     .filter((p): p is HistoryPoint => Boolean(p))
     .sort((a, b) => a.timestamp - b.timestamp);
 }
-
-const INSTRUMENT_FALLBACK_DOLLAR_TOMAN = 187_800;
 
 async function loadInstrumentDaily(instrument: InstrumentId) {
   if (instrument === "gold18") {

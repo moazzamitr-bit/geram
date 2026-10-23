@@ -3,7 +3,6 @@
 import { AppCard } from "@/components/app/AppCard";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { mgToGramsLabel, useDemoStore, type TxType } from "@/lib/app/demo-store";
 import { instrumentLabel, type InstrumentId } from "@/lib/market/instruments";
@@ -41,8 +40,7 @@ export default function TransactionsPage() {
     <div className="mx-auto max-w-5xl space-y-5">
       <PageHeader
         title="تراکنش‌ها"
-        description="همه عملیات مالی و طلایی شما در یکجا."
-        action={<SimulationBadge />}
+        description="همه عملیات مالی شما در یکجا."
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -72,8 +70,8 @@ export default function TransactionsPage() {
 
       {rows.length === 0 ? (
         <EmptyState
-          title="اولین تراکنش شما اینجا نمایش داده می‌شود."
-          description="با خرید طلا از ۵۰۰ هزار تومان شروع کنید."
+          title="تراکنشی ثبت نشده"
+          description="پس از خرید یا فروش، تراکنش اینجا دیده می‌شود."
           actionHref="/app/buy"
           actionLabel="خرید طلا"
           icon={Receipt}

@@ -2,7 +2,6 @@
 
 import { AppCard } from "@/components/app/AppCard";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { useState } from "react";
 
@@ -39,7 +38,7 @@ const initial: Consent[] = [
   {
     id: "data",
     title: "اشتراک داده با شرکای اعتماد",
-    desc: "فقط برای تطبیق پشتوانه و بیمه (سندباکس).",
+    desc: "فقط برای تطبیق پشتوانه و بیمه، در صورت وجود قرارداد.",
     required: false,
     accepted: true,
   },
@@ -55,7 +54,6 @@ export default function ConsentsPage() {
         title="رضایت‌نامه‌ها"
         description="می‌توانید رضایت‌های اختیاری را تغییر دهید."
         backHref="/app/profile"
-        action={<SimulationBadge />}
       />
 
       <div className="space-y-3">
@@ -106,7 +104,7 @@ export default function ConsentsPage() {
         ذخیره تغییرات
       </GoldButton>
       {saved && (
-        <p className="text-center text-[13px] text-positive">تغییرات ذخیره شد (سندباکس).</p>
+        <p className="text-center text-[13px] text-muted-app">این انتخاب‌ها هنوز روی حساب ذخیره نمی‌شوند.</p>
       )}
     </div>
   );

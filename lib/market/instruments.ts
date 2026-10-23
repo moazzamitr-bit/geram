@@ -12,8 +12,6 @@ export type InstrumentMeta = {
   sourceHint: string;
   /** Minimum buy amount in تومان */
   minBuyToman: number;
-  /** Fallback seed price (تومان / گرم) when offline */
-  fallbackPriceToman: number;
   /** Accent for UI chips */
   accent: string;
 };
@@ -26,7 +24,6 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentMeta> = {
     unitLabel: "گرم",
     sourceHint: "بازار آزاد · TGJU geram18",
     minBuyToman: 100_000,
-    fallbackPriceToman: 7_012_000,
     accent: "#D6A84B",
   },
   silver925: {
@@ -36,7 +33,6 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentMeta> = {
     unitLabel: "گرم",
     sourceHint: "بازار آزاد · TGJU silver_999",
     minBuyToman: 100_000,
-    fallbackPriceToman: 384_000,
     accent: "#C0C7D1",
   },
   copper: {
@@ -46,7 +42,6 @@ export const INSTRUMENTS: Record<InstrumentId, InstrumentMeta> = {
     unitLabel: "گرم",
     sourceHint: "LME + دلار آزاد",
     minBuyToman: 100_000,
-    fallbackPriceToman: 2_550,
     accent: "#B87333",
   },
 };

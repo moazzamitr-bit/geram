@@ -2,7 +2,6 @@
 
 import { AppCard } from "@/components/app/AppCard";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { Timeline } from "@/components/app/Timeline";
 import { useDemoStore } from "@/lib/app/demo-store";
@@ -18,7 +17,7 @@ export default function DeliveryDetailPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-5">
-      <PageHeader title={d.productName} backHref="/app/delivery" action={<SimulationBadge />} />
+      <PageHeader title={d.productName} backHref="/app/delivery" />
       <AppCard>
         <StatusBadge status={d.status} />
         <dl className="mt-4 space-y-3 text-[13px]">

@@ -1,5 +1,4 @@
 import {
-  INSTRUMENTS,
   type InstrumentId,
   parseInstrumentId,
 } from "@/lib/market/instruments";
@@ -219,16 +218,15 @@ function buildQuote(
 }
 
 function fallbackQuote(instrument: InstrumentId): MarketPriceQuote {
-  const meta = INSTRUMENTS[instrument];
   return {
     instrument,
-    priceToman: meta.fallbackPriceToman,
-    priceRial: meta.fallbackPriceToman * 10,
+    priceToman: 0,
+    priceRial: 0,
     highToman: null,
     lowToman: null,
     changePercent: null,
-    source: "بازار آزاد",
-    sourceKey: "seed",
+    source: "unavailable",
+    sourceKey: "unavailable",
     updatedAt: new Date().toISOString(),
     fetchedAt: new Date().toISOString(),
     stale: true,

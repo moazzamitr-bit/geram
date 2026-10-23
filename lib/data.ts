@@ -121,23 +121,3 @@ export const contactInfo = {
   address: "تهران، خیابان ولیعصر، برج آناهیتا، طبقه ۱۲",
 } as const;
 
-export const chartData = [
-  { label: "۲۱ اردیبهشت", value: 6200000 },
-  { label: "۲۲ اردیبهشت", value: 6350000 },
-  { label: "۲۳ اردیبهشت", value: 6280000 },
-  { label: "۲۴ اردیبهشت", value: 6480000 },
-  { label: "۲۵ اردیبهشت", value: 6610000 },
-  { label: "۲۶ اردیبهشت", value: 6550000 },
-  { label: "۲۷ اردیبهشت", value: 6720000 },
-  { label: "۲۸ اردیبهشت", value: 6854000 },
-] as const;
-
-export const portfolioChartData = [
-  { label: "۱", value: 21000000 },
-  { label: "۵", value: 21800000 },
-  { label: "۱۰", value: 21500000 },
-  { label: "۱۵", value: 22600000 },
-  { label: "۲۰", value: 23200000 },
-  { label: "۲۵", value: 23800000 },
-  { label: "۳۰", value: 24630000 },
-] as const;

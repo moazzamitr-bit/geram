@@ -3,7 +3,6 @@
 import { AppCard } from "@/components/app/AppCard";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
 import { formatToman } from "@/lib/utils";
 import { FileText } from "lucide-react";
@@ -17,9 +16,8 @@ export default function DocumentsPage() {
     <div className="mx-auto max-w-xl space-y-5">
       <PageHeader
         title="اسناد"
-        description="رسید تراکنش‌ها و گزارش‌های قابل دانلود (نمایشی)."
+        description="رسید تراکنش‌های واقعی حساب شما."
         backHref="/app/profile"
-        action={<SimulationBadge />}
       />
 
       {docs.length === 0 ? (

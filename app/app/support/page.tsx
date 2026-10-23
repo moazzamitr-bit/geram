@@ -31,7 +31,7 @@ export default function SupportPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
-      <PageHeader title="پشتیبانی" description="درخواست خود را ثبت کنید؛ پاسخ در سندباکس شبیه‌سازی می‌شود." />
+      <PageHeader title="پشتیبانی" description="درخواست خود را ثبت کنید. پاسخ، فقط پیام واقعی پشتیبانی است." />
 
       <AppCard className="space-y-3">
         <label className="block text-[13px]">
@@ -77,7 +77,7 @@ export default function SupportPage() {
       </AppCard>
 
       {store.tickets.length === 0 ? (
-        <EmptyState title="تیکتی ندارید" description="سؤال یا مشکل خود را ثبت کنید؛ پاسخ سندباکس شبیه‌سازی می‌شود." icon={Headphones} />
+        <EmptyState title="تیکتی ندارید" description="سؤال یا مشکل خود را ثبت کنید." icon={Headphones} />
       ) : (
         <div className="space-y-3">
           {store.tickets.map((t) => (

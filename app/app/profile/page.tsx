@@ -2,7 +2,6 @@
 
 import { AppCard } from "@/components/app/AppCard";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { formatMaskedPhone, useAuth } from "@/lib/auth/auth-context";
@@ -37,11 +36,10 @@ export default function ProfilePage() {
   const router = useRouter();
   const [referralInput, setReferralInput] = useState("");
   const [refMsg, setRefMsg] = useState("");
-  const [plusMsg, setPlusMsg] = useState("");
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
-      <PageHeader title="حساب من" action={<SimulationBadge />} />
+      <PageHeader title="حساب من" />
 
       <AppCard>
         <div className="flex items-start justify-between gap-3">
@@ -91,20 +89,6 @@ export default function ProfilePage() {
             از کارمزد خرید و فروش آن‌ها سهم شما می‌شود.
           </p>
         )}
-        {!store.plusActive && (
-          <GoldButton
-            type="button"
-            size="sm"
-            className="mt-4"
-            onClick={async () => {
-              const res = await store.activatePlusSandbox();
-              setPlusMsg(res.message ?? res.error ?? "");
-            }}
-          >
-            فعال‌سازی آزمایشی (۳۰ روز)
-          </GoldButton>
-        )}
-        {plusMsg && <p className="mt-2 text-[13px] text-positive">{plusMsg}</p>}
         <label className="mt-5 block text-[13px]">
           <span className="text-muted-app">کد دعوت دوست</span>
           <input

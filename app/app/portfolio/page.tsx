@@ -4,10 +4,8 @@ import { AnimatedNumber } from "@/components/app/AnimatedNumber";
 import { AppCard } from "@/components/app/AppCard";
 import { NoData } from "@/components/app/NoData";
 import { PageHeader } from "@/components/app/PageHeader";
-import { SimulationBadge } from "@/components/app/SimulationBadge";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
-import { PriceChart } from "@/components/ui/PriceChart";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
 import { unrealizedPnl } from "@/lib/app/pnl";
 import {
@@ -48,8 +46,7 @@ export default function PortfolioPage() {
     <div className="mx-auto max-w-4xl space-y-5">
       <PageHeader
         title="پرتفوی"
-        description="طلا، نقره و مس در یک نگاه — ارزش روز و سود/زیان نمایشی."
-        action={<SimulationBadge />}
+        description="طلا، نقره و مس در یک نگاه — ارزش روز و سود یا زیان از معاملات واقعی."
       />
 
       <AppCard className="relative overflow-hidden">
@@ -92,9 +89,6 @@ export default function PortfolioPage() {
               {totalPnlPct.toLocaleString("fa-IR", { maximumFractionDigits: 1 })}٪
             </p>
           </div>
-        </div>
-        <div className="relative mt-5 rounded-xl border border-white/[0.05] bg-[#0A0C0E]/50 p-2">
-          <PriceChart variant="portfolio" height={80} range="1m" />
         </div>
         <div className="relative mt-6 flex flex-wrap gap-3">
           <Link href="/app/buy">
