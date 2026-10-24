@@ -91,13 +91,15 @@ describe("pwa cache policy", () => {
     ).toBe(true);
   });
 
-  it("keeps the worker off the default Next cache that stores GET /api", () => {
+  it("does not intercept or cache /api and /sb", () => {
     const sw = readFileSync("app/sw.ts", "utf8");
     expect(sw).not.toContain("defaultCache");
-    expect(sw).toContain("NetworkOnly");
-    expect(sw.indexOf("matcher: ({ url }) => isBypassedRequest(url)")).toBeLessThan(
-      sw.indexOf("new NetworkFirst")
-    );
+    expect(sw).not.toMatch(/new NetworkOnly\(/);
+    expect(sw).not.toMatch(/NetworkOnly,/);
+    expect(sw).toContain("isBypassedRequest(url)");
+    expect(sw).toContain("stopImmediatePropagation");
+    expect(sw.indexOf("stopImmediatePropagation")).toBeLessThan(sw.indexOf("new Serwist"));
+    expect(sw.indexOf("stopImmediatePropagation")).toBeLessThan(sw.indexOf("serwist.addEventListeners"));
     expect(sw).toContain('url: "/offline.html"');
   });
 });
