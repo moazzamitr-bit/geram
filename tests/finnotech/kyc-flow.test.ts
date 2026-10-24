@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import { FinnotechError } from "@/lib/finnotech/client";
 import type { IdentityInquiry, ShahkarSend } from "@/lib/finnotech/kyc";
+import { KYC_MESSAGES, kycOtpUiError } from "@/lib/kyc/messages";
 import {
   confirmShahkarKyc,
   startShahkarKyc,
@@ -125,6 +127,7 @@ describe("shahkar kyc flow", () => {
     expect(started).toEqual({ ok: true, step: "otp" });
 
     const done = await confirmShahkarKyc(api, { userId: "user-1", otp: "123456", ip: "203.0.113.5" });
+    expect(api.verifyShahkar).toHaveBeenCalledWith("123456", "track-send", "09120000000", NID);
     expect(done).toEqual({ ok: true, step: "verified", firstName: "سارا", lastName: "اکبری" });
     expect(api.saved()).toMatchObject({
       firstName: "سارا",
@@ -158,6 +161,89 @@ describe("shahkar kyc flow", () => {
       })
     ).rejects.toMatchObject({ code: "deceased" });
     expect(api.saved()).toBeNull();
+  });
+
+  it("maps a Shahkar 400 to invalid input or a wrong code, and a 503 to an outage", async () => {
+    const send = deps({
+      sendShahkar: vi.fn(async () => {
+        throw new FinnotechError("VALIDATION_ERROR", 400, "شماره موبایل نامعتبر است");
+      }),
+    });
+    await expect(
+      startShahkarKyc(send, {
+        userId: "user-1",
+        nationalCode: NID,
+        birthDate: "1370/06/15",
+        ip: "203.0.113.10",
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_input",
+      httpStatus: 400,
+      message: "شماره موبایل نامعتبر است",
+    });
+
+    const wrong = deps({
+      verifyShahkar: vi.fn(async () => {
+        throw new FinnotechError("VALIDATION_ERROR", 400, "کد تایید منقضی شده است");
+      }),
+    });
+    await startShahkarKyc(wrong, {
+      userId: "user-1",
+      nationalCode: NID,
+      birthDate: "1370/06/15",
+      ip: "203.0.113.11",
+    });
+    await expect(
+      confirmShahkarKyc(wrong, { userId: "user-1", otp: "12345", ip: "203.0.113.11" })
+    ).rejects.toMatchObject({
+      code: "invalid_otp",
+      httpStatus: 400,
+      message: "کد تایید منقضی شده است",
+    });
+
+    const leaked = deps({
+      verifyShahkar: vi.fn(async () => {
+        throw new FinnotechError("VALIDATION_ERROR", 400, `rejected ${NID} 09120000000`);
+      }),
+    });
+    await startShahkarKyc(leaked, {
+      userId: "user-1",
+      nationalCode: NID,
+      birthDate: "1370/06/15",
+      ip: "203.0.113.12",
+    });
+    await expect(
+      confirmShahkarKyc(leaked, { userId: "user-1", otp: "12345", ip: "203.0.113.12" })
+    ).rejects.toMatchObject({
+      code: "invalid_otp",
+      httpStatus: 400,
+      message: KYC_MESSAGES.invalid_otp,
+    });
+
+    const down = deps({
+      verifyShahkar: vi.fn(async () => {
+        throw new FinnotechError("http_503", 503);
+      }),
+    });
+    await startShahkarKyc(down, {
+      userId: "user-1",
+      nationalCode: NID,
+      birthDate: "1370/06/15",
+      ip: "203.0.113.13",
+    });
+    await expect(
+      confirmShahkarKyc(down, { userId: "user-1", otp: "12345", ip: "203.0.113.13" })
+    ).rejects.toMatchObject({ code: "provider", httpStatus: 502 });
+  });
+
+  it("distinguishes a 400 on the OTP screen from an outage", () => {
+    expect(kycOtpUiError(400, { message: "کد تایید منقضی شده است" })).toBe("کد تایید منقضی شده است");
+    expect(kycOtpUiError(400, { error: "invalid_otp" })).toBe("کد وارد شده اشتباه یا منقضی شده است");
+    expect(kycOtpUiError(502, { error: "provider", message: KYC_MESSAGES.provider })).toBe(KYC_MESSAGES.unavailable);
+    expect(kycOtpUiError(503, { error: "not_configured" })).toBe(KYC_MESSAGES.not_configured);
+    expect(kycOtpUiError(429, { error: "rate_limited", message: KYC_MESSAGES.rate_limited })).toBe(
+      KYC_MESSAGES.rate_limited
+    );
   });
 
   it("rate-limits repeated sends", async () => {

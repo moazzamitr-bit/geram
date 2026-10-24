@@ -138,6 +138,48 @@ describe("finnotech client", () => {
     expect(blob).not.toContain(SECRET);
     expect(redactSecrets(`nid ${NID} Bearer abc.def`)).not.toContain(NID);
     expect(redactSecrets(`nid ${NID} Bearer abc.def`)).toContain("Bearer [redacted]");
+    expect(redactSecrets(`mobile 09120000000 +989121111111 nid ${NID}`)).not.toContain("09120000000");
+    expect(redactSecrets(`mobile 09120000000 +989121111111 nid ${NID}`)).not.toContain(NID);
+    expect(redactSecrets(`mobile 09120000000 +989121111111 nid ${NID}`)).toContain("•••••••0000");
+  });
+
+  it("logs a 4xx error message and body with national code and mobile masked", async () => {
+    configure();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (String(url).includes("/oauth2/token")) return Response.json(tokenBody());
+        return Response.json(
+          {
+            status: "FAILED",
+            responseCode: "FN-BRFH-40099900000",
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `invalid nationalCode ${NID} mobile 09120000000`,
+            },
+          },
+          { status: 400 }
+        );
+      })
+    );
+    const logs: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    await expect(
+      finnotechCall({
+        method: "GET",
+        path: "/kyc/v2/clients/geram/shahkar/smsVerification",
+        query: { otp: "12345", nationalCode: NID, mobile: "09120000000" },
+      })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR", httpStatus: 400 });
+    const blob = logs.join("\n");
+    expect(blob).toContain("finnotech_http GET /kyc/v2/clients/geram/shahkar/smsVerification 400 VALIDATION_ERROR");
+    expect(blob).toContain("invalid nationalCode");
+    expect(blob).toContain("FN-BRFH-40099900000");
+    expect(blob).not.toContain(NID);
+    expect(blob).not.toContain("09120000000");
+    expect(blob).not.toContain(SECRET);
   });
 
   it("stops after timeouts", async () => {

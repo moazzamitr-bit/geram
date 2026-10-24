@@ -10,7 +10,7 @@ import {
   normalizeJalaliBirthDate,
 } from "@/lib/kyc/national-id";
 import { KYC_LEVEL_CAPS, KYC_LEVEL_TITLES, type KycLevel } from "@/lib/kyc/levels";
-import { KYC_MESSAGES, type KycErrorCode } from "@/lib/kyc/messages";
+import { KYC_MESSAGES, kycOtpUiError, type KycErrorCode } from "@/lib/kyc/messages";
 import { formatToman } from "@/lib/utils";
 import { FormEvent, useEffect, useState } from "react";
 
@@ -142,7 +142,7 @@ export default function KycPage() {
         lastName?: string;
       };
       if (!res.ok || !data.ok) {
-        setError(messageFor(data.error, data.message));
+        setError(kycOtpUiError(res.status, data));
         return;
       }
       applyKycResult({

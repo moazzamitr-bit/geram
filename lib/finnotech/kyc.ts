@@ -4,12 +4,27 @@ import { finnotechClientId } from "@/lib/finnotech/config";
 /**
  * Shahkar SMS send + verification, then civil-registry identification.
  *
- * Send (scope kyc:sms-shahkar-send:get):
- *   GET /kyc/v2/clients/{clientId}/shahkar/smsSend
- * Facility fallback (scope facility:sms-shahkar-send:get), version 2:
+ * smsSend contract, operation facilityShahkarSmsSendGet in
+ * https://docs.finnotech.ir/openapi-public.json (fetched 2026-10-24):
  *   GET /facility/v2/clients/{clientId}/shahkar/smsSend
- * Verification (scope kyc:sms-shahkar-verification:get):
+ *   required query: trackId (UUID, max 40), mobile, nationalCode
+ *   optional query: version=2
+ *   result.smsSent
+ * Scope facility:sms-shahkar-send:get. The live client still answers the KYC
+ * alias first (scope kyc:sms-shahkar-send:get):
+ *   GET /kyc/v2/clients/{clientId}/shahkar/smsSend
+ *   query: trackId, mobile, nationalCode
+ * Facility is the 404 fallback and sends version=2.
+ *
+ * smsVerification is not in that public OpenAPI. Production
  *   GET /kyc/v2/clients/{clientId}/shahkar/smsVerification
+ *   (scope kyc:sms-shahkar-verification:get)
+ * returns 400 VALIDATION_ERROR when the query is only otp and inquiryTrackId.
+ * The call sends the smsSend subject keys (mobile, nationalCode), the code
+ * (otp), the smsSend response track id as inquiryTrackId (the follow-up name
+ * used by finnotextInquiry and transactionCreditInquiryVerify in the same
+ * spec), and a new trackId. finnotechCall sets a fresh UUID trackId on every call.
+ *
  * Identification (scope kyc:identification-inquiry:get):
  *   GET /kyc/v2/clients/{clientId}/identificationInquiry
  *     nationalCode, birthDate yyyy/mm/dd
@@ -68,8 +83,13 @@ export async function sendShahkarSms(mobile: string, nationalCode: string): Prom
   return interpretSend(sent.trackId, sent.result);
 }
 
-export async function verifyShahkarSms(otp: string, inquiryTrackId: string) {
-  const query = { otp, inquiryTrackId };
+export async function verifyShahkarSms(
+  otp: string,
+  inquiryTrackId: string,
+  mobile: string,
+  nationalCode: string
+) {
+  const query = { otp, inquiryTrackId, mobile, nationalCode };
   const paths = [
     `${clientPath("kyc")}/shahkar/smsVerification`,
     `${clientPath("kyc")}/shahkar/smsVerify`,

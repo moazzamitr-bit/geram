@@ -22,7 +22,11 @@ type FetchInit = RequestInit & { dispatcher?: Agent };
 export class FinnotechError extends Error {
   constructor(
     public code: string,
-    public httpStatus = 0
+    public httpStatus = 0,
+    /** Provider `error.message`, unredacted. Log and UI callers must mask it. */
+    public providerMessage = "",
+    /** JSON of the error envelope fields (no result payload). */
+    public providerBody = ""
   ) {
     super(`finnotech_${code}`);
     this.name = "FinnotechError";
@@ -39,6 +43,8 @@ type CachedToken = {
 type Envelope<T> = {
   status?: string;
   trackId?: string;
+  responseCode?: string;
+  message?: string;
   result?: T;
   error?: { code?: string; message?: string };
 };
@@ -149,11 +155,40 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function finnotechError(res: Response, data: Envelope<Record<string, unknown>> | null) {
+  const code = data?.error?.code || `http_${res.status}`;
+  const message =
+    (typeof data?.error?.message === "string" && data.error.message) ||
+    (typeof data?.message === "string" ? data.message : "");
+  const body = JSON.stringify({
+    status: data?.status ?? null,
+    responseCode: data?.responseCode ?? null,
+    message: typeof data?.message === "string" ? data.message : null,
+    error: data?.error ?? null,
+  });
+  return new FinnotechError(code, res.status, message, body);
+}
+
+function logFinnotechFailure(method: string, path: string, err: FinnotechError) {
+  if (err.httpStatus >= 400 && err.httpStatus < 500) {
+    console.error(
+      "finnotech_http",
+      method,
+      path,
+      err.httpStatus,
+      err.code,
+      redactSecrets(err.providerMessage),
+      redactSecrets(err.providerBody)
+    );
+    return;
+  }
+  console.error("finnotech_http", method, path, err.httpStatus, err.code);
+}
+
 async function readJson(res: Response): Promise<Envelope<Record<string, unknown>>> {
   const data = (await res.json().catch(() => null)) as Envelope<Record<string, unknown>> | null;
   if (!res.ok || !data || data.status === "FAILED") {
-    const code = data?.error?.code || `http_${res.status}`;
-    throw new FinnotechError(code, res.status);
+    throw finnotechError(res, data);
   }
   return data;
 }
@@ -170,7 +205,15 @@ async function tokenRequest(body: Record<string, string>, path: string, now: num
     dispatcher: finnotechDispatcher,
     signal: AbortSignal.timeout(finnotechTimeoutMs()),
   } as FetchInit);
-  const data = await readJson(res);
+  let data: Envelope<Record<string, unknown>>;
+  try {
+    data = await readJson(res);
+  } catch (err) {
+    if (err instanceof FinnotechError && err.httpStatus >= 400 && err.httpStatus < 500) {
+      logFinnotechFailure("POST", path, err);
+    }
+    throw err;
+  }
   const result = data.result ?? {};
   const accessToken = String(result.value ?? "");
   const refreshToken = String(result.refreshToken ?? "");
@@ -319,9 +362,7 @@ async function once<T>(input: FinnotechCall, trackId: string, token: string) {
   try {
     data = (await readJson(res)) as Envelope<T>;
   } catch (err) {
-    if (err instanceof FinnotechError) {
-      console.error("finnotech_http", input.method, input.path, err.httpStatus, err.code);
-    }
+    if (err instanceof FinnotechError) logFinnotechFailure(input.method, input.path, err);
     throw err;
   }
   return { trackId: data.trackId || trackId, result: (data.result ?? ({} as T)) };
