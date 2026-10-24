@@ -563,29 +563,47 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
 
   const refreshFinancial = useCallback(async () => {
     try {
-      const readyRes = await fetch("/api/core/readiness", { cache: "no-store" });
-      if (!readyRes.ok) return;
-      const ready = (await readyRes.json()) as { databaseBacked?: boolean };
-      // Until the operational ledger is Postgres-backed and opening balances
-      // are migrated, keep the existing `wallets` table as the display source.
-      if (!ready.databaseBacked) return;
+      const balRes = await fetch("/api/me/balances", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (balRes.ok) {
+        const data = (await balRes.json()) as {
+          ok?: boolean;
+          source?: string;
+          ui?: {
+            goldMg: number;
+            silverMg: number;
+            copperMg: number;
+            rialAvailable: number;
+            rialPending: number;
+          };
+          avgBuyTomanPerGram?: { gold18: number; silver925: number; copper: number };
+        };
+        if (data.ok && data.source === "ledger" && data.ui) {
+          const ui = data.ui;
+          setState((s) => ({
+            ...s,
+            goldMg: ui.goldMg,
+            silverMg: ui.silverMg,
+            copperMg: ui.copperMg,
+            rialAvailable: ui.rialAvailable,
+            rialPending: ui.rialPending,
+            avgBuyPriceRial: data.avgBuyTomanPerGram?.gold18 ?? 0,
+            avgBuyPriceSilverRial: data.avgBuyTomanPerGram?.silver925 ?? 0,
+            avgBuyPriceCopperRial: data.avgBuyTomanPerGram?.copper ?? 0,
+          }));
+        }
+      }
+    } catch {
+      /* A failed ledger read must not fall back to the wallets table. */
+    }
 
+    try {
       const { coreApi } = await import("@/lib/core-api");
-      const [walletRes, txRes] = await Promise.all([
-        coreApi.wallet(),
-        coreApi.transactions().catch(() => ({ ok: true as const, ui: [] })),
-      ]);
-      const ui = walletRes.wallet.ui;
+      const txRes = await coreApi.transactions();
       setState((s) => ({
         ...s,
-        goldMg: ui.goldMg,
-        silverMg: ui.silverMg,
-        copperMg: ui.copperMg,
-        rialAvailable: ui.rialAvailable,
-        rialPending: ui.rialPending,
-        avgBuyPriceRial: walletRes.avgBuyTomanPerGram.gold18,
-        avgBuyPriceSilverRial: walletRes.avgBuyTomanPerGram.silver925,
-        avgBuyPriceCopperRial: walletRes.avgBuyTomanPerGram.copper,
         transactions: txRes.ui.map((t) => ({
           ...t,
           type: t.type as DemoTransaction["type"],
@@ -594,7 +612,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         })),
       }));
     } catch {
-      /* keep last known ledger projection */
+      /* Activity history is separate from the balance projection. */
     }
   }, []);
 

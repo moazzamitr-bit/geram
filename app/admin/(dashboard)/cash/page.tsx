@@ -22,23 +22,22 @@ export default async function AdminCashPage() {
       </AdminNotice>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <AdminStatCard
-          label="بدهی IRR مشتری (ledger)"
-          value=""
-          unavailable
-          hint="دفترکل عملیاتی مهاجرت نشده"
+          label="بدهی تومان مشتری (دفترکل)"
+          value={ops.connected && ops.money.userIrrLiability.kind === "value" ? formatToman(Number(ops.money.userIrrLiability.value)) : ""}
+          unavailable={!ops.connected || ops.money.userIrrLiability.kind !== "value"}
+          hint="USER_AVAILABLE به‌علاوه USER_RESERVED"
           icon={Wallet}
         />
         <AdminStatCard
-          label="IRR رزرو کاربر"
-          value=""
-          unavailable
-          hint="حساب رزرو دفترکل نیست"
+          label="تومان رزرو (دفترکل)"
+          value={ops.connected && ops.money.pendingDeposits.kind === "value" ? formatToman(Number(ops.money.pendingDeposits.value)) : ""}
+          unavailable={!ops.connected || ops.money.pendingDeposits.kind !== "value"}
           icon={Wallet}
         />
         <AdminStatCard
-          label="تومان دفتری wallets (میراث)"
-          value={ops.connected && ops.money.legacyTomanBook.kind === "value" ? formatToman(Number(ops.money.legacyTomanBook.value)) : ""}
-          unavailable={!ops.connected || ops.money.legacyTomanBook.kind !== "value"}
+          label="تومان قابل استفاده (دفترکل)"
+          value={ops.connected && ops.money.ledgerTomanAvailable.kind === "value" ? formatToman(Number(ops.money.ledgerTomanAvailable.value)) : ""}
+          unavailable={!ops.connected || ops.money.ledgerTomanAvailable.kind !== "value"}
           icon={Wallet}
         />
         <AdminStatCard label="PAYMENT_GATEWAY_CLEARING" value="" unavailable hint="PSP یکپارچه نشده" icon={Landmark} />

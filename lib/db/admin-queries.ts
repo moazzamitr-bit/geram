@@ -2,6 +2,8 @@ import { isSupabaseConfigured } from "@/lib/db/types";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { roleFromProfileRole } from "@/lib/admin/rbac";
+import { sumCustomerLedger } from "@/lib/ledger/display";
+import { readLedgerAccountRows } from "@/lib/ledger/read";
 
 async function getDb() {
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -30,7 +32,6 @@ export async function getAdminOverview() {
       users,
       txs,
       tickets,
-      wallets,
       kyc,
       price,
     ] = await Promise.all([
@@ -40,7 +41,6 @@ export async function getAdminOverview() {
         .from("support_tickets")
         .select("id", { count: "exact", head: true })
         .in("status", ["OPEN", "WAITING_USER"]),
-      supabase.from("wallets").select("gold_mg, toman_available"),
       supabase
         .from("profiles")
         .select("id", { count: "exact", head: true })
@@ -54,11 +54,10 @@ export async function getAdminOverview() {
         .maybeSingle(),
     ]);
 
-    const goldMg =
-      wallets.data?.reduce((sum, w) => sum + Number(w.gold_mg || 0), 0) ?? 0;
-    const tomanAvailable =
-      wallets.data?.reduce((sum, w) => sum + Number(w.toman_available || 0), 0) ??
-      0;
+    const ledger = await readLedgerAccountRows();
+    const books = ledger.ok ? sumCustomerLedger(ledger.rows) : null;
+    const goldMg = books?.goldMg ?? 0;
+    const tomanAvailable = books?.availableToman ?? 0;
 
     return {
       connected: true as const,
@@ -102,17 +101,6 @@ export async function listTransactions(limit = 50) {
     .from("transactions")
     .select("*, profiles(first_name,last_name,phone)")
     .order("created_at", { ascending: false })
-    .limit(limit);
-  return data ?? [];
-}
-
-export async function listWallets(limit = 50) {
-  if (!isSupabaseConfigured()) return [];
-  const supabase = await getDb();
-  const { data } = await supabase
-    .from("wallets")
-    .select("*, profiles(first_name,last_name,phone,kyc_status)")
-    .order("updated_at", { ascending: false })
     .limit(limit);
   return data ?? [];
 }

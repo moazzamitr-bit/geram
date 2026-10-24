@@ -73,6 +73,7 @@ export const adminNavCatalog: AdminNavGroup[] = [
       { label: "واریز", href: "/admin/deposits", icon: Banknote },
       { label: "برداشت", href: "/admin/withdrawals", icon: CreditCard },
       { label: "دفترکل", href: "/admin/ledger", icon: BookOpen },
+      { label: "کیف پول‌ها", href: "/admin/wallets", icon: Wallet },
       { label: "تراکنش‌ها", href: "/admin/transactions", icon: Wallet },
       { label: "موقعیت نقد", href: "/admin/cash", icon: Banknote },
       { label: "تطبیق", href: "/admin/reconciliation", icon: ClipboardCheck },

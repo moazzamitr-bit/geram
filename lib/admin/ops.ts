@@ -5,6 +5,8 @@ import {
   getFeatureFlags,
   getKillSwitches,
 } from "@/lib/core/mode";
+import { readLedgerAccountRows } from "@/lib/ledger/read";
+import { sumCustomerLedger } from "@/lib/ledger/display";
 import { UNAVAILABLE } from "./status";
 import type { OpsState } from "./status";
 
@@ -64,7 +66,6 @@ export async function loadDashboardOps() {
     new30,
     txs,
     tickets,
-    wallets,
     pendingKyc,
     price,
     banks,
@@ -80,7 +81,6 @@ export async function loadDashboardOps() {
     sb.from("profiles").select("id", { count: "exact", head: true }).gte("created_at", d30),
     sb.from("transactions").select("id, type, instrument, gold_mg, amount_toman, status, created_at"),
     sb.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["OPEN", "WAITING_USER"]),
-    sb.from("wallets").select("gold_mg, silver_mg, copper_mg, toman_available, toman_pending"),
     sb.from("profiles").select("id", { count: "exact", head: true }).eq("kyc_status", "PENDING"),
     sb.from("market_prices").select("price_toman, instrument, observed_at, source").order("observed_at", { ascending: false }).limit(12),
     sb.from("bank_accounts").select("id, verified"),
@@ -106,12 +106,9 @@ export async function loadDashboardOps() {
     .filter((t) => inst(t) === "copper")
     .reduce((s, t) => s + Number(t.gold_mg || 0), 0);
 
-  const w = wallets.data ?? [];
-  const goldBook = w.reduce((s, r) => s + Number(r.gold_mg || 0), 0);
-  const silverBook = w.reduce((s, r) => s + Number((r as { silver_mg?: number }).silver_mg || 0), 0);
-  const copperBook = w.reduce((s, r) => s + Number((r as { copper_mg?: number }).copper_mg || 0), 0);
-  const toman = w.reduce((s, r) => s + Number(r.toman_available || 0), 0);
-  const tomanPend = w.reduce((s, r) => s + Number(r.toman_pending || 0), 0);
+  const ledgerAccounts = await readLedgerAccountRows();
+  const books = ledgerAccounts.ok ? sumCustomerLedger(ledgerAccounts.rows) : null;
+  const ledgerNa = na(ledgerAccounts.ok ? "جمع دفترکل از حد نمایش خارج است" : ledgerAccounts.error);
 
   const depositsToday = todayTx.filter((t) => t.type === "واریز").length;
   const withdrawalsToday = todayTx.filter((t) => t.type === "برداشت").length;
@@ -148,19 +145,19 @@ export async function loadDashboardOps() {
       expiredQuotes: na("جدول quote هنوز روی این دیتابیس نیست"),
     },
     money: {
-      userIrrLiability: ledgerReady ? na("دفترکل عملیاتی مهاجرت نشده") : na("Postgres دفترکل متصل نیست"),
-      pendingDeposits: val(tomanPend),
+      userIrrLiability: books ? val(books.liabilityToman) : ledgerNa,
+      pendingDeposits: books ? val(books.reservedToman) : ledgerNa,
       pendingWithdrawals: val(withdrawalsToday),
       pspClearing: na("PSP هنوز یکپارچه نشده"),
       bankSettlement: na("تسویه بانکی هنوز یکپارچه نشده"),
       controlledCash: na("PLATFORM_CASH_CONTROL روی این محیط موجود نیست"),
       depositsToday: val(depositsToday),
-      legacyTomanBook: val(toman),
+      ledgerTomanAvailable: books ? val(books.availableToman) : ledgerNa,
     },
     metals: {
-      customerGoldBookMg: val(goldBook),
-      customerSilverBookMg: val(silverBook),
-      customerCopperBookMg: val(copperBook),
+      customerGoldBookMg: books ? val(books.goldMg) : ledgerNa,
+      customerSilverBookMg: books ? val(books.silverMg) : ledgerNa,
+      customerCopperBookMg: books ? val(books.copperMg) : ledgerNa,
       customerGoldLiability: na("CustomerMetalLiability در milestone خزانه‌داری نیست"),
       availableTreasury: na("CORE_MILESTONE_PLACEHOLDER"),
       reservedInventory: na("رزرو فلز در این دیتابیس موجود نیست"),

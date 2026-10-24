@@ -30,7 +30,7 @@ export default async function AdminTreasuryPage({
           : null;
 
   const metrics: { label: string; value: string | null; hint: string }[] = [
-    { label: "Customer metal book (wallets, mg)", value: book != null ? String(book) : null, hint: "میراث — بدهی دفترکل نیست" },
+    { label: "موجودی قابل استفاده مشتری (دفترکل، میلی‌گرم)", value: book != null ? String(book) : null, hint: "USER_AVAILABLE. میکروگرم دفترکل به میلی‌گرم تبدیل شده است." },
     { label: "CustomerMetalLiability", value: null, hint: "NOT READY" },
     { label: "PlatformFreeControlledInventory", value: null, hint: "CORE_MILESTONE_PLACEHOLDER" },
     { label: "ReservedInventory", value: null, hint: "NOT READY" },
@@ -59,7 +59,7 @@ export default async function AdminTreasuryPage({
       </div>
       <OpsBadge state="NOT_READY" />
       <AdminNotice title={asset}>
-        CustomerMetalLiability محاسبه نمی‌شود. موجودی دفتری wallets بدهی عملیاتی خزانه نیست.
+        CustomerMetalLiability محاسبه نمی‌شود. عدد بالا موجودی قابل استفاده مشتری در دفترکل است، نه جدول wallets.
       </AdminNotice>
       <div className="grid gap-3 md:grid-cols-2">
         {metrics.map((m) => (
