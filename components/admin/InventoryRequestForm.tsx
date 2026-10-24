@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { GoldButton } from "@/components/ui/GoldButton";
+import { AmountField } from "@/components/ui/AmountField";
+import { amountCanonical } from "@/lib/format/amount";
 
 const OPTIONS = [
   { value: "GOLD", label: "طلا (گرم)" },
@@ -22,7 +24,7 @@ function newKey() {
 export function InventoryRequestForm() {
   const router = useRouter();
   const [asset, setAsset] = useState<string>("GOLD");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(0);
   const [evidence, setEvidence] = useState("");
   const [reason, setReason] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(newKey);
@@ -35,6 +37,13 @@ export function InventoryRequestForm() {
     setLoading(true);
     setMsg("");
     setErr("");
+    const cash = asset === "IRR";
+    const canonical = amountCanonical(amount, cash ? 0 : 6);
+    if (!canonical) {
+      setErr(cash ? "مبلغ تومان را وارد کنید." : "وزن را به گرم وارد کنید.");
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch("/api/admin/approvals", {
         method: "POST",
@@ -43,7 +52,7 @@ export function InventoryRequestForm() {
           action: "create",
           kind: "INVENTORY_ADJUSTMENT",
           asset,
-          amount,
+          amount: canonical,
           direction: "IN",
           evidence,
           idempotencyKey,
@@ -57,7 +66,7 @@ export function InventoryRequestForm() {
         return;
       }
       setMsg(data.message || "ثبت شد.");
-      setAmount("");
+      setAmount(0);
       setEvidence("");
       setReason("");
       setIdempotencyKey(newKey());
@@ -80,7 +89,10 @@ export function InventoryRequestForm() {
       <div className="grid gap-3 sm:grid-cols-2">
         <select
           value={asset}
-          onChange={(e) => setAsset(e.target.value)}
+          onChange={(e) => {
+            setAsset(e.target.value);
+            setAmount(0);
+          }}
           className="h-11 rounded-xl border border-white/10 bg-[#0B1220] px-3 text-[13px] outline-none focus:border-gold"
         >
           {OPTIONS.map((o) => (
@@ -89,14 +101,16 @@ export function InventoryRequestForm() {
             </option>
           ))}
         </select>
-        <input
+        <AmountField
           required
-          dir="ltr"
-          inputMode="decimal"
+          aria-label={asset === "IRR" ? "مبلغ به تومان" : "وزن به گرم"}
           value={amount}
-          onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ""))}
-          placeholder="مقدار"
-          className="h-11 rounded-xl border border-white/10 bg-[#0B1220] px-3 text-left tabular-nums text-[13px] outline-none focus:border-gold"
+          decimals={asset === "IRR" ? 0 : 6}
+          words={asset === "IRR"}
+          wordsClassName="text-[12px] text-white/50"
+          onValueChange={setAmount}
+          placeholder={asset === "IRR" ? "مبلغ به تومان" : "گرم"}
+          className="h-11 w-full rounded-xl border border-white/10 bg-[#0B1220] px-3 text-left tabular-nums text-[13px] text-white outline-none focus:border-gold"
         />
       </div>
       <input

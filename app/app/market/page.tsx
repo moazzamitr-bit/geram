@@ -6,6 +6,7 @@ import { InstrumentTabs } from "@/components/app/InstrumentTabs";
 import { PageHeader } from "@/components/app/PageHeader";
 import { DeferredPriceChart } from "@/components/ui/DeferredPriceChart";
 import { GoldButton } from "@/components/ui/GoldButton";
+import { AmountField } from "@/components/ui/AmountField";
 import { useDemoStore } from "@/lib/app/demo-store";
 import {
   INSTRUMENT_IDS,
@@ -187,12 +188,11 @@ export default function MarketPage() {
           </label>
           <label className="block text-[13px]">
             <span className="text-muted-app">قیمت (تومان)</span>
-            <input
-              dir="ltr"
+            <AmountField
+              aria-label="قیمت هشدار به تومان"
               value={alertPrice}
-              onChange={(e) =>
-                setAlertPrice(Number(e.target.value.replace(/\D/g, "") || 0))
-              }
+              words
+              onValueChange={setAlertPrice}
               className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-3 text-left tabular-nums text-text outline-none focus:border-gold"
             />
           </label>
@@ -228,13 +228,12 @@ export default function MarketPage() {
           پس از فعال شدن، خرید خودکار تا سقف مبلغ زیر
         </label>
         {autoBuy && (
-          <input
-            dir="ltr"
+          <AmountField
+            aria-label="سقف خرید خودکار به تومان"
             value={autoBuyAmount}
-            onChange={(e) =>
-              setAutoBuyAmount(Number(e.target.value.replace(/\D/g, "") || 0))
-            }
-            className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-3 text-left tabular-nums"
+            words
+            onValueChange={setAutoBuyAmount}
+            className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-3 text-left tabular-nums text-text outline-none focus:border-gold"
           />
         )}
         <label className="mt-3 flex items-center gap-2 text-[13px] text-text-secondary">

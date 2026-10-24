@@ -6,6 +6,7 @@ import { NoData } from "@/components/app/NoData";
 import { PageHeader } from "@/components/app/PageHeader";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
+import { AmountField } from "@/components/ui/AmountField";
 import { withdrawFee } from "@/lib/commerce/fees";
 import { isKycVerified, KYC_REQUIRED_MESSAGE } from "@/lib/commerce/kyc";
 import { useDemoStore } from "@/lib/app/demo-store";
@@ -58,13 +59,12 @@ export function WalletClient() {
 
         <AppCard>
           <h2 className="text-[15px] font-bold">برداشت</h2>
-          <input
-            dir="ltr"
-            className="mt-3 h-12 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-left tabular-nums outline-none focus:border-gold"
+          <AmountField
+            aria-label="مبلغ برداشت به تومان"
             value={withdrawAmount}
-            onChange={(e) =>
-              setWithdrawAmount(Number(e.target.value.replace(/\D/g, "") || 0))
-            }
+            words
+            onValueChange={setWithdrawAmount}
+            className="mt-3 h-12 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-left tabular-nums text-text outline-none focus:border-gold"
           />
           <p className="mt-2 text-[12px] text-muted-app">
             کارمزد برداشت: {formatToman(wFee)}

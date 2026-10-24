@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
+import { AmountField } from "@/components/ui/AmountField";
 import { useDemoStore } from "@/lib/app/demo-store";
 import { formatToman } from "@/lib/utils";
 import { CalendarClock } from "lucide-react";
@@ -26,11 +27,12 @@ export default function ScheduledPurchasesPage() {
       <AppCard>
         <label className="block text-[13px]">
           <span className="text-muted-app">مبلغ هر نوبت</span>
-          <input
-            dir="ltr"
+          <AmountField
+            aria-label="مبلغ هر نوبت به تومان"
             value={amount}
-            onChange={(e) => setAmount(Number(e.target.value.replace(/\D/g, "") || 0))}
-            className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-3 text-left outline-none focus:border-gold"
+            words
+            onValueChange={setAmount}
+            className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-3 text-left text-text outline-none focus:border-gold"
           />
         </label>
         <label className="mt-4 block text-[13px]">

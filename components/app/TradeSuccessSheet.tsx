@@ -1,6 +1,5 @@
 "use client";
 
-import { GoldButton } from "@/components/ui/GoldButton";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
 import Link from "next/link";
@@ -9,30 +8,32 @@ import { useEffect } from "react";
 type TradeSuccessSheetProps = {
   open: boolean;
   title: string;
-  subtitle?: string;
-  goldLabel?: string;
-  amountLabel?: string;
+  metalLabel: string;
+  gramsLabel: string;
+  unitPriceLabel: string;
+  totalLabel: string;
   feeLabel?: string;
-  trackingCode?: string;
-  statusLabel?: string;
-  receiptHref: string;
-  secondaryLabel?: string;
-  onSecondary?: () => void;
+  trackingCode: string;
+  whenLabel: string;
+  walletLabel?: string;
+  metalBalanceLabel?: string;
+  onNewTrade: () => void;
   onClose?: () => void;
 };
 
 export function TradeSuccessSheet({
   open,
   title,
-  subtitle,
-  goldLabel,
-  amountLabel,
+  metalLabel,
+  gramsLabel,
+  unitPriceLabel,
+  totalLabel,
   feeLabel,
   trackingCode,
-  statusLabel,
-  receiptHref,
-  secondaryLabel = "بستن",
-  onSecondary,
+  whenLabel,
+  walletLabel,
+  metalBalanceLabel,
+  onNewTrade,
   onClose,
 }: TradeSuccessSheetProps) {
   useEffect(() => {
@@ -55,57 +56,53 @@ export function TradeSuccessSheet({
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-[#1C1917]/40"
         aria-label="بستن"
-        onClick={onClose ?? onSecondary}
+        onClick={onClose ?? onNewTrade}
       />
-      <div
-        className={cn(
-          "relative z-10 w-full max-w-md rounded-t-3xl border border-white/10 bg-card-app p-6 shadow-2xl sm:rounded-3xl",
-          "animate-sheet-in"
-        )}
-      >
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-positive/15 text-positive">
+      <div className="relative z-10 max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-black/[0.06] bg-[#FBF8F2] p-5 shadow-[0_24px_60px_rgba(28,25,23,0.18)] animate-sheet-in sm:rounded-3xl sm:p-6">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#E7F6EE] text-[#1F9D55]">
           <Check size={28} strokeWidth={2.5} />
         </div>
-        <h2
-          id="trade-success-title"
-          className="text-center text-[22px] font-extrabold text-text"
-        >
+        <h2 id="trade-success-title" className="text-center text-[22px] font-extrabold text-text">
           {title}
         </h2>
-        {subtitle && (
-          <p className="mt-2 text-center text-[13px] leading-7 text-muted-app">
-            {subtitle}
-          </p>
-        )}
+        <p className="mt-2 text-center text-[13px] leading-6 text-muted-app">
+          جزئیات همین معامله در تاریخچه هم ذخیره شده است.
+        </p>
 
-        <dl className="mt-6 space-y-3 rounded-2xl border border-white/[0.06] bg-[#0A0C0E]/80 px-4 py-4 text-[13px]">
-          {goldLabel && <SheetRow label="مقدار طلا" value={goldLabel} highlight />}
-          {amountLabel && <SheetRow label="مبلغ" value={amountLabel} />}
-          {feeLabel && <SheetRow label="کارمزد" value={feeLabel} />}
-          {statusLabel && <SheetRow label="وضعیت" value={statusLabel} />}
-          {trackingCode && (
-            <SheetRow label="کد رهگیری" value={trackingCode} mono />
-          )}
+        <dl className="mt-5 space-y-3 rounded-2xl bg-white px-4 py-4 text-[13px]">
+          <SheetRow label="فلز" value={metalLabel} />
+          <SheetRow label="وزن" value={gramsLabel} highlight />
+          <SheetRow label="قیمت هر گرم" value={unitPriceLabel} />
+          <SheetRow label="مبلغ کل" value={totalLabel} highlight />
+          {feeLabel ? <SheetRow label="کارمزد" value={feeLabel} /> : null}
+          <SheetRow label="کد رهگیری" value={trackingCode} mono />
+          <SheetRow label="زمان (تهران)" value={whenLabel} />
+          {walletLabel ? <SheetRow label="موجودی کیف پول" value={walletLabel} /> : null}
+          {metalBalanceLabel ? <SheetRow label="موجودی فلز" value={metalBalanceLabel} /> : null}
         </dl>
 
-        <div className="mt-6 flex flex-col gap-2.5">
-          <Link href={receiptHref} className="w-full">
-            <GoldButton type="button" className="w-full">
-              مشاهده رسید
-            </GoldButton>
+        <div className="mt-5 flex flex-col gap-2.5">
+          <Link
+            href="/app/transactions"
+            className="flex h-12 items-center justify-center rounded-xl bg-gold-gradient text-[15px] font-bold text-[#0A0C0E]"
+          >
+            مشاهده تاریخچه
           </Link>
-          {onSecondary && (
-            <GoldButton
-              type="button"
-              variant="secondary"
-              className="w-full"
-              onClick={onSecondary}
-            >
-              {secondaryLabel}
-            </GoldButton>
-          )}
+          <Link
+            href="/app/wallet"
+            className="flex h-12 items-center justify-center rounded-xl border border-black/10 bg-white text-[15px] font-bold text-text"
+          >
+            کیف پول
+          </Link>
+          <button
+            type="button"
+            onClick={onNewTrade}
+            className="flex h-12 items-center justify-center rounded-xl border border-black/10 bg-white text-[15px] font-bold text-text"
+          >
+            معامله جدید
+          </button>
         </div>
       </div>
     </div>
@@ -128,8 +125,8 @@ function SheetRow({
       <dt className="text-muted-app">{label}</dt>
       <dd
         className={cn(
-          "tabular-nums text-text",
-          highlight && "font-bold text-gold",
+          "text-left tabular-nums text-text",
+          highlight && "font-bold text-[#8A6526]",
           mono && "font-mono text-[12px] tracking-wide"
         )}
         dir={mono ? "ltr" : undefined}
