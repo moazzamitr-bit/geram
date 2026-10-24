@@ -31,10 +31,12 @@ and never leave production broken.
    New settings go in `.env.example` (empty value) and are set on the server in `.env.production`.
 3. **Never change money balances directly.** Balances are ledger projections
    (`core_ledger_accounts` updated only by `postJournal` in `lib/core/ledger.ts`). No
-   `UPDATE wallets ...`, no "edit balance" admin button. Manual wallet credit (ثبت شارژ) is
-   one admin: the form posts an idempotent `APPROVED_OPENING_BALANCE` journal to
-   `USER_AVAILABLE` and writes an audit row. Treasury opening inventory still needs a
-   second admin (`app/api/admin/approvals`, kind `INVENTORY_ADJUSTMENT`). The legacy
+   `UPDATE wallets ...`, no "edit balance" admin button. Manual wallet credit (ثبت شارژ)
+   and treasury opening inventory are each one admin: the form posts an idempotent
+   `APPROVED_OPENING_BALANCE` journal and writes an audit row. Wallet credit hits
+   `USER_AVAILABLE`. Opening metal hits `PLATFORM_AVAILABLE` (operating cash hits
+   `PLATFORM_CASH_CONTROL`). The same admin can approve any other request still in
+   `app/api/admin/approvals`. A second admin is not required. The legacy
    `wallets` table is read-only.
 4. **Keep the RLS lockdown.** `supabase/migrations/20261021120000_rls_lockdown.sql` stops users from
    changing `profiles.role/kyc_status/plan_*`, verifying their own IBAN, forging support replies or
@@ -70,10 +72,13 @@ and never leave production broken.
 
 ## 4. Known open items
 
-- **Trading needs opening inventory**: platform metal starts at 0. Two admins (maker + checker)
-  register real stock in Admin → تأیید دو مرحله‌ای → ثبت موجودی اولیه خزانه, then Approve + Execute.
-  Wallet toman credit does not use that queue: one admin submits ثبت شارژ and the journal posts.
-  Admins are created with `deploy/create-admin.sh`.
+- **Trading needs opening inventory**: platform metal starts at 0. One admin registers
+  real stock in Admin → شارژ و موجودی → ثبت موجودی اولیه خزانه. The journal posts
+  immediately (same idempotency key does not post twice). Wallet toman credit is the
+  same one-admin post to `USER_AVAILABLE`. Admins are created with `deploy/create-admin.sh`.
+- **Closed-beta admin nav**: pages listed in `lib/admin/closed-beta.ts` stay in the repo
+  but are hidden and rewritten to a “not active in beta” screen. Remove a path from that
+  list to turn the page back on. Inventory registration stays on `/admin/approvals`.
 - **SMS OTP**: sms.ir rejects templates without eNamad. Template `123456` (sandbox) only reaches the
   panel owner's number. Before setting `AUTH_METHOD=otp`: the OTP service-role path rotates the user's
   password on every login — switch it to `admin.generateLink` + `verifyOtp` first, or password

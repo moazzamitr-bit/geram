@@ -4,6 +4,7 @@ import {
   AdminStatCard,
   OpsBadge,
 } from "@/components/admin/AdminUI";
+import { isClosedBetaInactiveAdminPath } from "@/lib/admin/closed-beta";
 import { loadDashboardOps } from "@/lib/admin/ops";
 import { listProviders } from "@/lib/admin/providers";
 import { computeReleaseReadiness } from "@/lib/admin/readiness";
@@ -50,7 +51,9 @@ export default async function AdminHealthPage() {
       <div className="mt-4 flex flex-wrap gap-3 text-[13px]">
         <Link className="text-gold" href="/admin/providers">وضعیت سرویس‌ها</Link>
         <Link className="text-gold" href="/admin/readiness">آمادگی انتشار</Link>
-        <Link className="text-gold" href="/admin/incidents">حوادث</Link>
+        {!isClosedBetaInactiveAdminPath("/admin/incidents") ? (
+          <Link className="text-gold" href="/admin/incidents">حوادث</Link>
+        ) : null}
         <Link className="text-gold" href="/admin/switches">کلیدهای اضطراری</Link>
       </div>
     </div>

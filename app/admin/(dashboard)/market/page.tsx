@@ -42,7 +42,7 @@ export default async function AdminMarketPage() {
         <OpsBadge state="DEGRADED" />
       </div>
       <AdminNotice title="منابع">
-        primary=TGJU public · secondary=NOT READY · کارمزد/سقف از تنظیمات با audit. تغییرات پرریسک: صف تأیید دو مرحله‌ای.
+        primary=TGJU public · secondary=NOT READY · کارمزد و سقف از تنظیمات با ثبت audit عوض می‌شود.
       </AdminNotice>
       <div className="mb-6 grid gap-3 md:grid-cols-3">
         {["gold18", "silver925", "copper"].map((inst) => {

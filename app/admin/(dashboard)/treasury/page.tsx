@@ -75,7 +75,7 @@ export default async function AdminTreasuryPage({
           action="create"
           endpoint="/api/admin/approvals"
           extra={{ kind: "SETTINGS_CHANGE", asset }}
-          submitLabel="پیشنهاد تغییر Safety Buffer (maker-checker)"
+          submitLabel="پیشنهاد تغییر Safety Buffer"
         />
         <AdminActionForm
           action="create"

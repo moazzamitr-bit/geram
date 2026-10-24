@@ -6,7 +6,7 @@ export default function AdminProcurementPage() {
     <div>
       <AdminPageHeader
         title="تأمین"
-        description="Auto-procurement در MVP نیست. ارسال واقعی به تأمین‌کننده نیازمند maker-checker است."
+        description="Auto-procurement در MVP نیست. ارسال واقعی به تأمین‌کننده در این فاز انجام نمی‌شود."
       />
       <OpsBadge state="NOT_READY" />
       <AdminNotice title="تأمین‌کنندگان / سفارش‌ها">

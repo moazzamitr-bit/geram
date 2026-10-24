@@ -25,7 +25,7 @@ export default async function AdminBankAccountsPage() {
         description="تأیید مالکیت واقعی NOT READY است. Mark verified آزادانه وجود ندارد."
       />
       <AdminNotice title="Provider">
-        IBAN ownership = MOCK. Retry فقط audit می‌نویسد. تأیید دستی نیازمند maker-checker است و در این فاز رد می‌شود.
+        IBAN ownership = MOCK. Retry فقط audit می‌نویسد. تأیید دستی در این فاز رد می‌شود.
       </AdminNotice>
       <AdminTable
         headers={["کاربر", "بانک", "IBAN", "مالکیت", "وضعیت حساب", "ایجاد", "اقدام"]}

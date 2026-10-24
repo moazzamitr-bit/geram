@@ -1,3 +1,4 @@
+import { isClosedBetaInactiveAdminPath } from "@/lib/admin/closed-beta";
 import {
   Activity,
   AlertTriangle,
@@ -40,7 +41,8 @@ export type AdminNavGroup = {
   items: AdminNavItem[];
 };
 
-export const adminNavGroups: AdminNavGroup[] = [
+/** Full catalog. Closed-beta nav uses `adminNavGroups`, which drops inactive routes. */
+export const adminNavCatalog: AdminNavGroup[] = [
   {
     id: "overview",
     label: "نمای کلی",
@@ -112,7 +114,7 @@ export const adminNavGroups: AdminNavGroup[] = [
     label: "مرکز کنترل",
     items: [
       { label: "کلیدهای اضطراری", href: "/admin/switches", icon: ToggleLeft },
-      { label: "تأیید دو مرحله‌ای", href: "/admin/approvals", icon: ClipboardCheck },
+      { label: "شارژ و موجودی", href: "/admin/approvals", icon: ClipboardCheck },
       { label: "وضعیت سرویس‌ها", href: "/admin/providers", icon: Activity },
       { label: "فلگ ویژگی", href: "/admin/flags", icon: Flag },
       { label: "کارمزد و سقف", href: "/admin/settings", icon: Settings },
@@ -122,6 +124,14 @@ export const adminNavGroups: AdminNavGroup[] = [
     ],
   },
 ];
+
+/** Groups shown in the closed-beta admin shell. */
+export const adminNavGroups: AdminNavGroup[] = adminNavCatalog
+  .map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !isClosedBetaInactiveAdminPath(item.href)),
+  }))
+  .filter((group) => group.items.length > 0);
 
 /** Flat list kept for any leftover imports. */
 export const adminNav: AdminNavItem[] = adminNavGroups.flatMap((g) => g.items);
