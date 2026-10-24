@@ -94,7 +94,10 @@ export const coreApi = {
   },
 
   async executeTrade(quoteId: string, idempotencyKey: string) {
-    return coreFetch<{ ok: true; trade: { id: string; trackingCode: string; ui: UiTx } }>(
+    return coreFetch<{
+      ok: true;
+      trade: { id: string; trackingCode: string; createdAt: string; ui: UiTx };
+    }>(
       "/api/core/trades",
       {
         method: "POST",

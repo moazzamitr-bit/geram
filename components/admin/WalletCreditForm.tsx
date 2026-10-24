@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { GoldButton } from "@/components/ui/GoldButton";
+import { AmountField } from "@/components/ui/AmountField";
+import { amountCanonical } from "@/lib/format/amount";
 
 function newKey() {
   return crypto.randomUUID();
@@ -22,7 +24,7 @@ export function WalletCreditForm({
   const router = useRouter();
   const [userId, setUserId] = useState(lockedUserId ?? "");
   const [phone, setPhone] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(0);
   const [direction, setDirection] = useState<"CREDIT" | "DEBIT">("CREDIT");
   const [reason, setReason] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(newKey);
@@ -35,6 +37,12 @@ export function WalletCreditForm({
     setLoading(true);
     setMsg("");
     setErr("");
+    const canonical = amountCanonical(amount, 0);
+    if (!canonical) {
+      setErr("مبلغ را به تومان وارد کنید.");
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch("/api/admin/approvals", {
         method: "POST",
@@ -44,7 +52,7 @@ export function WalletCreditForm({
           kind: "FINANCIAL_ADJUSTMENT",
           userId: userId.trim(),
           phone: phone.trim(),
-          amount: amount.trim(),
+          amount: canonical,
           direction,
           idempotencyKey,
           reason,
@@ -56,7 +64,7 @@ export function WalletCreditForm({
         return;
       }
       setMsg(data.message || "ثبت شد.");
-      setAmount("");
+      setAmount(0);
       setReason("");
       if (!lockUserId) setPhone("");
       setIdempotencyKey(newKey());
@@ -103,14 +111,16 @@ export function WalletCreditForm({
           className="h-11 w-full rounded-xl border border-white/10 bg-[#0B1220] px-3 text-left text-[13px] outline-none focus:border-gold"
         />
       )}
-      <input
+      <AmountField
         required
-        dir="ltr"
-        inputMode="numeric"
+        aria-label="مبلغ به تومان"
         value={amount}
-        onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))}
+        decimals={0}
+        words
+        wordsClassName="text-[12px] text-white/50"
+        onValueChange={setAmount}
         placeholder="مبلغ به تومان"
-        className="h-11 w-full rounded-xl border border-white/10 bg-[#0B1220] px-3 text-left tabular-nums text-[13px] outline-none focus:border-gold"
+        className="h-11 w-full rounded-xl border border-white/10 bg-[#0B1220] px-3 text-left tabular-nums text-[13px] text-white outline-none focus:border-gold"
       />
       <textarea
         required

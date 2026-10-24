@@ -3,6 +3,7 @@
 import { AppCard } from "@/components/app/AppCard";
 import { PageHeader } from "@/components/app/PageHeader";
 import { GoldButton } from "@/components/ui/GoldButton";
+import { AmountField } from "@/components/ui/AmountField";
 import { useDemoStore } from "@/lib/app/demo-store";
 import { formatToman } from "@/lib/utils";
 import { useParams } from "next/navigation";
@@ -57,11 +58,12 @@ export default function GoalDetailPage() {
 
       <AppCard>
         <h2 className="text-[15px] font-bold">واریز به هدف (از کیف پول)</h2>
-        <input
-          dir="ltr"
+        <AmountField
+          aria-label="مبلغ واریز به هدف"
           value={amount}
-          onChange={(e) => setAmount(Number(e.target.value.replace(/\D/g, "") || 0))}
-          className="mt-3 h-12 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-left outline-none focus:border-gold"
+          words
+          onValueChange={setAmount}
+          className="mt-3 h-12 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-left text-text outline-none focus:border-gold"
         />
         <GoldButton
           type="button"

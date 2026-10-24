@@ -1,6 +1,7 @@
 "use client";
 
 import { GoldButton } from "@/components/ui/GoldButton";
+import { AmountField } from "@/components/ui/AmountField";
 import type { CommerceSettings } from "@/lib/commerce/types";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -31,21 +32,21 @@ function NumberInput({
   value,
   onChange,
   step = "1",
-  min = "0",
+  words = false,
 }: {
   value: number;
   onChange: (n: number) => void;
   step?: string;
-  min?: string;
+  words?: boolean;
 }) {
+  const fraction = step.includes(".") ? (step.split(".")[1]?.length ?? 0) : 0;
   return (
-    <input
-      dir="ltr"
-      type="number"
-      step={step}
-      min={min}
-      value={Number.isFinite(value) ? value : 0}
-      onChange={(e) => onChange(Number(e.target.value))}
+    <AmountField
+      value={value}
+      decimals={fraction}
+      words={words}
+      wordsClassName="mt-1 text-[12px] text-white/45"
+      onValueChange={(n) => onChange(Number.isFinite(n) ? n : 0)}
       className="h-11 w-full rounded-xl border border-white/10 bg-[#070B12] px-3 text-left tabular-nums text-white outline-none focus:border-gold"
     />
   );
@@ -131,6 +132,7 @@ export function CommerceSettingsForm({ initial }: Props) {
             <NumberInput
               value={fees.buyFeeMinTomanFree}
               onChange={(n) => setFee("buyFeeMinTomanFree", n)}
+              words
             />
           </Field>
           <Field label="درصد کارمزد خرید — پلاس">
@@ -144,6 +146,7 @@ export function CommerceSettingsForm({ initial }: Props) {
             <NumberInput
               value={fees.buyFeeMinTomanPlus}
               onChange={(n) => setFee("buyFeeMinTomanPlus", n)}
+              words
             />
           </Field>
           <Field label="درصد کارمزد فروش — رایگان">
@@ -157,6 +160,7 @@ export function CommerceSettingsForm({ initial }: Props) {
             <NumberInput
               value={fees.sellFeeMinTomanFree}
               onChange={(n) => setFee("sellFeeMinTomanFree", n)}
+              words
             />
           </Field>
           <Field label="درصد کارمزد فروش — پلاس">
@@ -170,30 +174,35 @@ export function CommerceSettingsForm({ initial }: Props) {
             <NumberInput
               value={fees.sellFeeMinTomanPlus}
               onChange={(n) => setFee("sellFeeMinTomanPlus", n)}
+              words
             />
           </Field>
           <Field label="کارمزد برداشت — رایگان (تومان)">
             <NumberInput
               value={fees.withdrawFeeTomanFree}
               onChange={(n) => setFee("withdrawFeeTomanFree", n)}
+              words
             />
           </Field>
           <Field label="کارمزد برداشت — پلاس (تومان)">
             <NumberInput
               value={fees.withdrawFeeTomanPlus}
               onChange={(n) => setFee("withdrawFeeTomanPlus", n)}
+              words
             />
           </Field>
           <Field label="کارمزد هر اجرای DCA — رایگان (تومان)">
             <NumberInput
               value={fees.dcaFeeTomanFree}
               onChange={(n) => setFee("dcaFeeTomanFree", n)}
+              words
             />
           </Field>
           <Field label="کارمزد هر اجرای DCA — پلاس (تومان)">
             <NumberInput
               value={fees.dcaFeeTomanPlus}
               onChange={(n) => setFee("dcaFeeTomanPlus", n)}
+              words
             />
           </Field>
         </div>
@@ -217,6 +226,7 @@ export function CommerceSettingsForm({ initial }: Props) {
             <NumberInput
               value={plus.monthlyPriceToman}
               onChange={(n) => setPlus((p) => ({ ...p, monthlyPriceToman: n }))}
+              words
             />
           </Field>
           <Field label="حداکثر برنامه DCA — رایگان">
@@ -263,6 +273,7 @@ export function CommerceSettingsForm({ initial }: Props) {
               onChange={(n) =>
                 setReferral((r) => ({ ...r, inviterBonusToman: n }))
               }
+              words
             />
           </Field>
           <Field label="پاداش دعوت‌شده (تومان)">
@@ -271,6 +282,7 @@ export function CommerceSettingsForm({ initial }: Props) {
               onChange={(n) =>
                 setReferral((r) => ({ ...r, inviteeBonusToman: n }))
               }
+              words
             />
           </Field>
           <label className="flex items-center gap-2 text-[13px] text-white/70 sm:col-span-2">
@@ -296,18 +308,21 @@ export function CommerceSettingsForm({ initial }: Props) {
             <NumberInput
               value={limits.dailyBuyToman}
               onChange={(n) => setLimits((l) => ({ ...l, dailyBuyToman: n }))}
+              words
             />
           </Field>
           <Field label="سقف فروش روزانه (تومان)">
             <NumberInput
               value={limits.dailySellToman}
               onChange={(n) => setLimits((l) => ({ ...l, dailySellToman: n }))}
+              words
             />
           </Field>
           <Field label="سقف برداشت روزانه (تومان)">
             <NumberInput
               value={limits.dailyWithdrawToman}
               onChange={(n) => setLimits((l) => ({ ...l, dailyWithdrawToman: n }))}
+              words
             />
           </Field>
         </div>

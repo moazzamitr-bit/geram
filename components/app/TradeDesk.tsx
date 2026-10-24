@@ -6,17 +6,14 @@ import { TradeSuccessSheet } from "@/components/app/TradeSuccessSheet";
 import { DeferredPriceChart } from "@/components/ui/DeferredPriceChart";
 import type { ChartRange } from "@/components/ui/PriceChart";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
+import { tradeFailureMessage } from "@/lib/app/trade-errors";
+import { feeRate, quotePreview, type AmountField as AmountKind } from "@/lib/app/trade-amount";
 import { useAuth } from "@/lib/auth/auth-context";
 import { isKycVerified } from "@/lib/commerce/kyc";
-import { TRADE_KYC_REQUIRED_MESSAGE } from "@/lib/kyc/messages";
-import {
-  feeRate,
-  formatGramInput,
-  parseAmount,
-  quotePreview,
-  type AmountField,
-} from "@/lib/app/trade-amount";
 import type { UiQuote } from "@/lib/core-api";
+import { tomanInWords } from "@/lib/format/amount";
+import { formatTehranJalaliDateTime } from "@/lib/format/datetime";
+import { TRADE_KYC_REQUIRED_MESSAGE } from "@/lib/kyc/messages";
 import {
   INSTRUMENTS,
   parseInstrumentId,
@@ -27,10 +24,11 @@ import {
   tradePathForInstrument,
 } from "@/lib/market/trade-routes";
 import { cn, formatToman } from "@/lib/utils";
+import { AmountField } from "@/components/ui/AmountField";
 import { Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const STROKE: Record<InstrumentId, string> = {
   gold18: "#E6B325",
@@ -58,15 +56,25 @@ export function TradeDesk({
   const [instrument, setInstrument] = useState<InstrumentId>(
     () => routeInstrument ?? queried ?? "gold18"
   );
-  const [edited, setEdited] = useState<AmountField>("toman");
-  const [tomanText, setTomanText] = useState("0");
-  const [gramText, setGramText] = useState("0");
-  const [focus, setFocus] = useState<AmountField | null>(null);
+  const [edited, setEdited] = useState<AmountKind>("toman");
+  const [toman, setToman] = useState(0);
+  const [grams, setGrams] = useState(0);
   const [checked, setChecked] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [doneTx, setDoneTx] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<{
+    txId: string;
+    trackingCode: string;
+    goldMg: number;
+    unitPrice: number;
+    total: number;
+    fee: number;
+    createdAt: string;
+    walletToman: number | null;
+    metalMg: number | null;
+  } | null>(null);
   const [locked, setLocked] = useState<UiQuote | null>(null);
+  const pending = useRef(false);
   const [now, setNow] = useState(() => Date.now());
   const [range, setRange] = useState<ChartRange>("1d");
 
@@ -84,7 +92,7 @@ export function TradeDesk({
     setLocked(null);
     setChecked(false);
     setError("");
-    setDoneTx(null);
+    setReceipt(null);
   }, [side, instrument]);
 
   useEffect(() => {
@@ -95,8 +103,6 @@ export function TradeDesk({
 
   useEffect(() => {
     if (locked) return;
-    const toman = parseAmount(tomanText);
-    const grams = parseAmount(gramText);
     const next = quotePreview({
       side,
       edited,
@@ -107,33 +113,30 @@ export function TradeDesk({
       settings,
     });
     if (edited === "toman") {
-      const formatted = formatGramInput(next.grams);
-      setGramText((prev) => (prev === formatted ? prev : formatted));
+      setGrams((prev) => (Math.abs(prev - next.grams) < 1e-9 ? prev : next.grams));
     } else {
-      const formatted = String(next.toman);
-      setTomanText((prev) => (prev === formatted ? prev : formatted));
+      setToman((prev) => (prev === next.toman ? prev : next.toman));
     }
-  }, [price, locked, side, edited, plus, settings, tomanText, gramText]);
+  }, [price, locked, side, edited, plus, settings, toman, grams]);
 
   const preview = useMemo(
     () =>
       quotePreview({
         side,
         edited,
-        toman: parseAmount(tomanText),
-        grams: parseAmount(gramText),
+        toman,
+        grams,
         pricePerGram: price,
         plus,
         settings,
       }),
-    [side, edited, tomanText, gramText, price, plus, settings]
+    [side, edited, toman, grams, price, plus, settings]
   );
 
   const secondsLeft = locked
     ? Math.max(0, Math.ceil((new Date(locked.expiresAt).getTime() - now) / 1000))
     : 0;
   const lockedExpired = Boolean(locked) && secondsLeft === 0;
-  const done = store.transactions.find((tx) => tx.id === doneTx);
   const rate = feeRate(side, plus, settings);
   const rateLabel = (rate * 100).toLocaleString("fa-IR", { maximumFractionDigits: 2 });
   const history = store.transactions.filter(
@@ -141,9 +144,13 @@ export function TradeDesk({
   );
 
   const resetForm = () => {
-    setDoneTx(null);
+    setReceipt(null);
     setChecked(false);
     setLocked(null);
+    setError("");
+    setEdited("toman");
+    setToman(0);
+    setGrams(0);
   };
 
   const onInstrumentChange = (id: InstrumentId) => {
@@ -152,8 +159,8 @@ export function TradeDesk({
     setLocked(null);
     setError("");
     setEdited("toman");
-    setTomanText("0");
-    setGramText("0");
+    setToman(0);
+    setGrams(0);
     router.replace(
       routeInstrument
         ? tradePathForInstrument(id, side)
@@ -161,119 +168,152 @@ export function TradeDesk({
     );
   };
 
-  const onTomanChange = (raw: string) => {
+  const onTomanChange = (value: number) => {
     setEdited("toman");
-    setTomanText(raw);
+    setToman(value);
     setLocked(null);
     setChecked(false);
     const next = quotePreview({
       side,
       edited: "toman",
-      toman: parseAmount(raw),
+      toman: value,
       grams: 0,
       pricePerGram: price,
       plus,
       settings,
     });
-    setGramText(formatGramInput(next.grams));
+    setGrams(next.grams);
   };
 
-  const onGramChange = (raw: string) => {
+  const onGramChange = (value: number) => {
     setEdited("gram");
-    setGramText(raw);
+    setGrams(value);
     setLocked(null);
     setChecked(false);
     const next = quotePreview({
       side,
       edited: "gram",
       toman: 0,
-      grams: parseAmount(raw),
+      grams: value,
       pricePerGram: price,
       plus,
       settings,
     });
-    setTomanText(String(next.toman));
+    setToman(next.toman);
   };
 
-  const grouped = (value: number, digits = 0) =>
-    value.toLocaleString("en-US", { maximumFractionDigits: digits });
-
   const onRequestQuote = async () => {
+    if (pending.current) return;
+    pending.current = true;
     setError("");
-    if (kycBlocked) {
-      setError(TRADE_KYC_REQUIRED_MESSAGE);
-      return;
-    }
-    if (side === "buy") {
-      if (preview.toman < meta.minBuyToman) {
-        setError(`حداقل خرید ${formatToman(meta.minBuyToman)} است.`);
+    try {
+      if (kycBlocked) {
+        setError(TRADE_KYC_REQUIRED_MESSAGE);
         return;
       }
-    } else if (preview.goldMg <= 0 || preview.goldMg > heldMg) {
-      setError(`مقدار ${meta.label} قابل فروش کافی نیست.`);
-      return;
+      if (side === "buy") {
+        if (preview.toman < meta.minBuyToman) {
+          setError(`حداقل خرید ${formatToman(meta.minBuyToman)} است.`);
+          return;
+        }
+      } else if (preview.goldMg <= 0 || preview.goldMg > heldMg) {
+        setError(`مقدار ${meta.label} قابل فروش کافی نیست.`);
+        return;
+      }
+      setLoading(true);
+      const res = await store.requestQuote(
+        side === "buy"
+          ? { instrument, side: "BUY", toman: preview.toman }
+          : { instrument, side: "SELL", metalMg: preview.goldMg }
+      );
+      if (!res.ok || !res.quote) {
+        setError(tradeFailureMessage(res.error, "دریافت قیمت ممکن نشد."));
+        return;
+      }
+      setNow(Date.now());
+      setLocked(res.quote);
+    } finally {
+      pending.current = false;
+      setLoading(false);
     }
-    setLoading(true);
-    const res = await store.requestQuote(
-      side === "buy"
-        ? { instrument, side: "BUY", toman: preview.toman }
-        : { instrument, side: "SELL", metalMg: preview.goldMg }
-    );
-    setLoading(false);
-    if (!res.ok || !res.quote) {
-      setError(res.error ?? "دریافت قیمت ممکن نشد");
-      return;
-    }
-    setNow(Date.now());
-    setLocked(res.quote);
   };
 
   const onConfirm = async () => {
+    if (pending.current) return;
+    pending.current = true;
     setError("");
-    if (!locked || lockedExpired) {
-      setError("اعتبار قیمت تمام شد. قیمت جدید بگیرید.");
-      return;
-    }
-    if (side === "buy" && !checked) {
-      setError("لطفاً تأیید بررسی مبلغ و کارمزد را علامت بزنید.");
-      return;
-    }
-    setLoading(true);
-    const res = await store.executeQuote(locked.id);
-    setLoading(false);
-    if (!res.ok) {
-      setError(res.error ?? "خطا در ثبت معامله");
+    try {
+      if (!locked || lockedExpired) {
+        setError("اعتبار قیمت تمام شد. قیمت جدید بگیرید.");
+        return;
+      }
+      if (side === "buy" && !checked) {
+        setError("لطفاً تأیید بررسی مبلغ و کارمزد را علامت بزنید.");
+        return;
+      }
+      const quote = locked;
+      setLoading(true);
+      const res = await store.executeQuote(quote.id);
+      if (!res.ok || !res.txId) {
+        setError(
+          tradeFailureMessage(
+            res.error,
+            side === "buy" ? "خرید انجام نشد. دوباره تلاش کنید." : "فروش انجام نشد. دوباره تلاش کنید."
+          )
+        );
+        setLocked(null);
+        return;
+      }
+      const balance = res.balance;
+      const metalMg = balance
+        ? instrument === "silver925"
+          ? balance.silverMg
+          : instrument === "copper"
+            ? balance.copperMg
+            : balance.goldMg
+        : null;
+      setReceipt({
+        txId: res.txId,
+        trackingCode: res.trackingCode || res.trade?.trackingCode || res.txId,
+        goldMg: res.trade?.goldMg || quote.goldMg,
+        unitPrice: quote.pricePerGram || res.trade?.pricePerGram || 0,
+        total: res.trade?.amountRial || (side === "buy" ? quote.gross : quote.net),
+        fee: res.trade?.feeRial ?? quote.fee,
+        createdAt: res.createdAt || new Date().toISOString(),
+        walletToman: balance ? balance.rialAvailable : null,
+        metalMg,
+      });
       setLocked(null);
-      return;
+      setChecked(false);
+    } finally {
+      pending.current = false;
+      setLoading(false);
     }
-    setDoneTx(res.txId ?? null);
   };
 
-  const tomanShown =
-    focus === "toman" ? tomanText : grouped(parseAmount(tomanText));
-  const gramShown =
-    focus === "gram" ? gramText : grouped(parseAmount(gramText), 3);
+  const words = tomanInWords(toman);
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <TradeSuccessSheet
-        open={Boolean(doneTx && done)}
-        title={side === "buy" ? "خرید انجام شد" : "فروش ثبت شد"}
-        subtitle={
-          side === "buy"
-            ? `${meta.label} پس از کسر کارمزد به دارایی شما اضافه شد.`
-            : "مبلغ فروش به کیف پول گرم واریز شد."
-        }
-        goldLabel={done ? `${mgToGramsLabel(done.goldMg)} گرم` : undefined}
-        amountLabel={done ? formatToman(done.amountRial) : undefined}
-        feeLabel={done ? formatToman(done.feeRial) : undefined}
-        trackingCode={done?.trackingCode}
-        statusLabel={done?.status}
-        receiptHref={`/app/transactions/${doneTx}`}
-        secondaryLabel={side === "buy" ? "خرید دوباره" : "فروش دوباره"}
-        onSecondary={resetForm}
-        onClose={resetForm}
-      />
+      {receipt && (
+        <TradeSuccessSheet
+          open
+          title={side === "buy" ? "خرید با موفقیت انجام شد" : "فروش با موفقیت انجام شد"}
+          metalLabel={meta.label}
+          gramsLabel={`${mgToGramsLabel(receipt.goldMg)} گرم`}
+          unitPriceLabel={formatToman(receipt.unitPrice)}
+          totalLabel={formatToman(receipt.total)}
+          feeLabel={receipt.fee > 0 ? formatToman(receipt.fee) : undefined}
+          trackingCode={receipt.trackingCode}
+          whenLabel={formatTehranJalaliDateTime(receipt.createdAt)}
+          walletLabel={receipt.walletToman == null ? undefined : formatToman(receipt.walletToman)}
+          metalBalanceLabel={
+            receipt.metalMg == null ? undefined : `${mgToGramsLabel(receipt.metalMg)} گرم`
+          }
+          onNewTrade={resetForm}
+          onClose={resetForm}
+        />
+      )}
 
       <h1 className="text-[22px] font-extrabold text-text md:text-[26px]">
         خرید و فروش {meta.title}
@@ -328,19 +368,18 @@ export function TradeDesk({
           <label className="mt-4 block rounded-xl bg-[#F6F4F1] px-4 py-3">
             <span className="text-[12px] text-muted-app">مبلغ</span>
             <span className="mt-1 flex items-center gap-2">
-              <input
-                dir="ltr"
-                inputMode="decimal"
-                value={tomanShown}
-                onFocus={() => setFocus("toman")}
-                onBlur={() => setFocus(null)}
-                onChange={(event) => onTomanChange(event.target.value)}
-                className="w-full bg-transparent text-left text-[20px] font-bold tabular-nums text-text outline-none"
+              <AmountField
                 aria-label="مبلغ به تومان"
+                value={toman}
+                decimals={0}
+                onValueChange={onTomanChange}
+                wrapperClassName="flex-1"
+                className="w-full bg-transparent text-left text-[20px] font-bold tabular-nums text-text outline-none"
               />
               <span className="shrink-0 text-[13px] text-muted-app">تومان</span>
             </span>
           </label>
+          {words ? <p className="mt-1 px-1 text-[12px] text-muted-app">{words}</p> : null}
           <p className="mt-2 text-[12px] text-muted-app">
             {side === "buy"
               ? `حداقل خرید ${formatToman(meta.minBuyToman)}`
@@ -350,15 +389,13 @@ export function TradeDesk({
           <label className="mt-3 block rounded-xl bg-[#F6F4F1] px-4 py-3">
             <span className="text-[12px] text-muted-app">مقدار</span>
             <span className="mt-1 flex items-center gap-2">
-              <input
-                dir="ltr"
-                inputMode="decimal"
-                value={gramShown}
-                onFocus={() => setFocus("gram")}
-                onBlur={() => setFocus(null)}
-                onChange={(event) => onGramChange(event.target.value)}
-                className="w-full bg-transparent text-left text-[20px] font-bold tabular-nums text-text outline-none"
+              <AmountField
                 aria-label="مقدار به گرم"
+                value={grams}
+                decimals={3}
+                onValueChange={onGramChange}
+                wrapperClassName="flex-1"
+                className="w-full bg-transparent text-left text-[20px] font-bold tabular-nums text-text outline-none"
               />
               <span className="shrink-0 text-[13px] text-muted-app">گرم</span>
             </span>
@@ -398,7 +435,10 @@ export function TradeDesk({
           )}
 
           {error && (
-            <p className="mt-3 text-[13px] text-negative" role="alert">
+            <p
+              className="mt-3 rounded-xl border border-[#E5484D]/25 bg-[#FDECEC] px-3 py-2 text-[13px] leading-6 text-[#B42318]"
+              role="alert"
+            >
               {error}
             </p>
           )}

@@ -3,6 +3,7 @@
 import { AppCard } from "@/components/app/AppCard";
 import { PageHeader } from "@/components/app/PageHeader";
 import { GoldButton } from "@/components/ui/GoldButton";
+import { AmountField } from "@/components/ui/AmountField";
 import { useDemoStore } from "@/lib/app/demo-store";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -54,20 +55,22 @@ export default function NewGoalPage() {
         </label>
         <label className="mt-4 block text-[13px]">
           <span className="text-muted-app">مبلغ هدف (تومان)</span>
-          <input
-            dir="ltr"
+          <AmountField
+            aria-label="مبلغ هدف به تومان"
             value={targetRial}
-            onChange={(e) => setTargetRial(Number(e.target.value.replace(/\D/g, "") || 0))}
-            className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-3 text-left outline-none focus:border-gold"
+            words
+            onValueChange={setTargetRial}
+            className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-3 text-left text-text outline-none focus:border-gold"
           />
         </label>
         <label className="mt-4 block text-[13px]">
           <span className="text-muted-app">پس‌انداز ماهانه پیشنهادی</span>
-          <input
-            dir="ltr"
+          <AmountField
+            aria-label="پس‌انداز ماهانه به تومان"
             value={monthlyRial}
-            onChange={(e) => setMonthlyRial(Number(e.target.value.replace(/\D/g, "") || 0))}
-            className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-3 text-left outline-none focus:border-gold"
+            words
+            onValueChange={setMonthlyRial}
+            className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-3 text-left text-text outline-none focus:border-gold"
           />
         </label>
         <label className="mt-4 block text-[13px]">

@@ -1,8 +1,9 @@
 "use client";
 
 import { stripDemoFixtures } from "@/lib/app/demo-fixtures";
+import { tradeFailureMessage } from "@/lib/app/trade-errors";
 import type { KycStatus } from "@/lib/auth/auth-context";
-import type { UiQuote } from "@/lib/core-api";
+import type { UiQuote, UiTx } from "@/lib/core-api";
 import {
   DEFAULT_COMMERCE_SETTINGS,
   type CommerceSettings,
@@ -158,7 +159,20 @@ type DemoState = {
     toman?: number;
     metalMg?: number;
   }) => Promise<{ ok: boolean; error?: string; quote?: UiQuote }>;
-  executeQuote: (quoteId: string) => Promise<{ ok: boolean; error?: string; txId?: string }>;
+  executeQuote: (quoteId: string) => Promise<{
+    ok: boolean;
+    error?: string;
+    txId?: string;
+    trackingCode?: string;
+    createdAt?: string;
+    trade?: UiTx;
+    balance?: {
+      rialAvailable: number;
+      goldMg: number;
+      silverMg: number;
+      copperMg: number;
+    } | null;
+  }>;
   sellMetal: (
     instrument: InstrumentId,
     metalMg: number,
@@ -712,7 +726,10 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         return {
           ok: false,
-          error: err instanceof Error ? err.message : "دریافت قیمت ممکن نشد",
+          error: tradeFailureMessage(
+            err instanceof Error ? err.message : undefined,
+            "دریافت قیمت ممکن نشد."
+          ),
         };
       }
     },
@@ -728,12 +745,57 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             ? crypto.randomUUID()
             : uid("idem");
         const traded = await coreApi.executeTrade(quoteId, idem);
+        let balance: {
+          rialAvailable: number;
+          goldMg: number;
+          silverMg: number;
+          copperMg: number;
+        } | null = null;
+        try {
+          const balRes = await fetch("/api/me/balances", {
+            cache: "no-store",
+            credentials: "include",
+          });
+          if (balRes.ok) {
+            const data = (await balRes.json()) as {
+              ok?: boolean;
+              source?: string;
+              ui?: {
+                rialAvailable: number;
+                goldMg: number;
+                silverMg: number;
+                copperMg: number;
+              };
+            };
+            if (data.ok && data.source === "ledger" && data.ui) balance = data.ui;
+          }
+        } catch {
+          balance = null;
+        }
+        if (!balance) {
+          try {
+            const wallet = await coreApi.wallet();
+            balance = wallet.wallet.ui;
+          } catch {
+            balance = null;
+          }
+        }
         await refreshFinancial();
-        return { ok: true, txId: traded.trade.id };
+        return {
+          ok: true,
+          txId: traded.trade.id,
+          trackingCode: traded.trade.trackingCode,
+          createdAt: traded.trade.createdAt,
+          trade: traded.trade.ui,
+          balance,
+        };
       } catch (err) {
         return {
           ok: false,
-          error: err instanceof Error ? err.message : "ثبت معامله ممکن نشد",
+          error: tradeFailureMessage(
+            err instanceof Error ? err.message : undefined,
+            "ثبت معامله ممکن نشد."
+          ),
         };
       }
     },
