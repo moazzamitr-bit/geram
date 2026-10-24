@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { authMethod } from "@/lib/auth/method";
 import { otpMode, verifyOtp } from "@/lib/auth/otp";
-import { ensurePhoneUser } from "@/lib/db/phone-auth";
+import { createOtpSession } from "@/lib/db/phone-auth";
 import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { isSupabaseConfigured } from "@/lib/db/types";
-import { serverSupabaseUrl } from "@/lib/supabase/url";
 
 export const dynamic = "force-dynamic";
 
@@ -49,50 +47,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { email, password } = await ensurePhoneUser(phone);
-    const url = serverSupabaseUrl()!;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    const supabase = createClient(url, anon, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error || !data.session) {
-      console.error("phone_login_sign_in", error?.message);
-      return NextResponse.json({ ok: false, error: "sign_in_failed" }, { status: 500 });
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id, phone, first_name, last_name, kyc_status, onboarding_done")
-      .eq("id", data.user.id)
-      .maybeSingle();
-
+    const signedIn = await createOtpSession(phone);
     return NextResponse.json({
       ok: true,
-      session: {
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      },
-      profile: profile ?? {
-        id: data.user.id,
-        phone,
-        first_name: "",
-        last_name: "",
-        kyc_status: "UNVERIFIED",
-        onboarding_done: false,
-      },
+      session: signedIn.session,
+      profile: signedIn.profile,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "auth_failed";
     console.error("phone_login", message);
+    if (message === "phone_auth_misconfigured") {
+      return NextResponse.json({ ok: false, error: "service_unavailable" }, { status: 503 });
+    }
     if (/rate limit/i.test(message)) {
       return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
-    }
-    if (/invalid_otp|invalid_phone/i.test(message)) {
-      return NextResponse.json({ ok: false, error: "invalid_phone" }, { status: 400 });
     }
     return NextResponse.json({ ok: false, error: "auth_failed" }, { status: 500 });
   }

@@ -113,8 +113,8 @@ API: `POST /api/auth/phone-login` `{ phone, otp }`
 پیاده‌سازی [`lib/db/phone-auth.ts`](../lib/db/phone-auth.ts):
 
 - ایمیل مصنوعی: `p{digits}@geram.vercel.app`
-- رمز قطعی: `gram-{PHONE_AUTH_PEPPER}-{digits}`
-- با service role کاربر ساخته می‌شود؛ در غیر این صورت signUp با anon
+- بعد از تأیید کد، نشست با `generateLink` نوع magiclink و `verifyOtp` ساخته می‌شود
+- رمز عبور خوانده یا عوض نمی‌شود؛ ورود با رمز همان کاربر سر جایش می‌ماند
 - پاسخ: `access_token` + `refresh_token` → `supabase.auth.setSession`
 
 گیت `/app/*`: کلاینتی در `AppShell` (نه middleware). اگر لاگین نباشد → login؛ اگر onboarding تمام نشده → onboarding.
