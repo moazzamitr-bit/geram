@@ -43,8 +43,8 @@ export function finnotechConfigured() {
 }
 
 export function finnotechTimeoutMs() {
-  const parsed = Number(process.env.FINNOTECH_TIMEOUT_MS ?? 12_000);
-  if (!Number.isFinite(parsed) || parsed < 20 || parsed > 30_000) return 12_000;
+  const parsed = Number(process.env.FINNOTECH_TIMEOUT_MS ?? 8_000);
+  if (!Number.isFinite(parsed) || parsed < 20 || parsed > 30_000) return 8_000;
   return parsed;
 }
 

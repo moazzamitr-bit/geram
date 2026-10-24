@@ -1,8 +1,23 @@
+import { Agent } from "undici";
 import { FINNOTECH_SCOPES, finnotechBaseUrl, finnotechClientId, finnotechConfigured, finnotechTimeoutMs } from "@/lib/finnotech/config";
 import { redactSecrets } from "@/lib/finnotech/redact";
 
 const REFRESH_SKEW_MS = 60_000;
 const MAX_ATTEMPTS = 3;
+const CONNECT_TIMEOUT_MS = 4_000;
+
+/**
+ * Shared pool for token and API calls. A stalled TCP handshake fails in ~4s
+ * instead of waiting out the read timeout, and the socket stays open for the
+ * token request and the call that follows it.
+ */
+export const finnotechDispatcher = new Agent({
+  connectTimeout: CONNECT_TIMEOUT_MS,
+  keepAliveTimeout: 30_000,
+  keepAliveMaxTimeout: 60_000,
+});
+
+type FetchInit = RequestInit & { dispatcher?: Agent };
 
 export class FinnotechError extends Error {
   constructor(
@@ -28,6 +43,13 @@ type Envelope<T> = {
   error?: { code?: string; message?: string };
 };
 
+type ErrorNode = {
+  code?: unknown;
+  syscall?: unknown;
+  cause?: unknown;
+  name?: unknown;
+};
+
 let cache: CachedToken | null = null;
 let inflight: Promise<string> | null = null;
 
@@ -51,14 +73,80 @@ function dueForRefresh(token: CachedToken, now: number) {
   return now >= token.obtainedAt + token.lifeTimeMs - skew;
 }
 
-function isRetryable(err: unknown) {
+function errorNodes(err: unknown): ErrorNode[] {
+  const nodes: ErrorNode[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = err;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    nodes.push(current as ErrorNode);
+    current = (current as ErrorNode).cause;
+  }
+  return nodes;
+}
+
+function stringField(nodes: ErrorNode[], key: "code" | "syscall"): string[] {
+  return nodes.flatMap((node) => (typeof node[key] === "string" && node[key] ? [node[key] as string] : []));
+}
+
+/** Deepest cause code, else a useful error name. Safe to log. */
+export function networkCauseCode(err: unknown): string {
+  const nodes = errorNodes(err);
+  const codes = stringField(nodes, "code");
+  if (codes.length) return codes[codes.length - 1];
+  for (const node of nodes) {
+    if (typeof node.name === "string" && node.name !== "Error" && node.name !== "TypeError") return node.name;
+  }
+  return "unknown";
+}
+
+/**
+ * Nothing reached Finnotech. UND_ERR_CONNECT_TIMEOUT and ECONNREFUSED are
+ * connect-phase. ECONNRESET counts only when the syscall is still `connect`.
+ */
+export function isConnectFailure(err: unknown): boolean {
+  const nodes = errorNodes(err);
+  const codes = stringField(nodes, "code");
+  if (codes.includes("UND_ERR_CONNECT_TIMEOUT") || codes.includes("ECONNREFUSED")) return true;
+  return codes.includes("ECONNRESET") && stringField(nodes, "syscall").includes("connect");
+}
+
+function isReadTimeout(err: unknown): boolean {
+  if (isConnectFailure(err)) return false;
+  if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) return true;
+  const codes = stringField(errorNodes(err), "code");
+  return codes.includes("UND_ERR_HEADERS_TIMEOUT") || codes.includes("UND_ERR_BODY_TIMEOUT");
+}
+
+function isPostSendRetryable(err: unknown): boolean {
   if (err instanceof FinnotechError) {
     return err.httpStatus === 502 || err.httpStatus === 503 || err.httpStatus === 504;
   }
-  if (err instanceof Error) {
-    return err.name === "AbortError" || err.name === "TimeoutError" || err instanceof TypeError;
-  }
-  return false;
+  if (isReadTimeout(err)) return true;
+  return err instanceof TypeError;
+}
+
+function isOtpVerify(path: string) {
+  const clean = path.split("?")[0];
+  return clean.endsWith("/otp/verify");
+}
+
+function shouldRetry(input: FinnotechCall, err: unknown, attempt: number): boolean {
+  // A read timeout means the verify request may already have been accepted.
+  if (isOtpVerify(input.path) && isReadTimeout(err)) return false;
+  if (isConnectFailure(err)) return attempt < MAX_ATTEMPTS;
+  if (!isPostSendRetryable(err)) return false;
+  const idempotent = input.idempotent ?? input.method === "GET";
+  const budget = idempotent ? MAX_ATTEMPTS : 2;
+  return attempt < budget;
+}
+
+function backoffMs(attempt: number) {
+  return 50 * 2 ** (attempt - 1);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function readJson(res: Response): Promise<Envelope<Record<string, unknown>>> {
@@ -79,8 +167,9 @@ async function tokenRequest(body: Record<string, string>, path: string, now: num
       Accept: "application/json",
     },
     body: JSON.stringify(body),
+    dispatcher: finnotechDispatcher,
     signal: AbortSignal.timeout(finnotechTimeoutMs()),
-  });
+  } as FetchInit);
   const data = await readJson(res);
   const result = data.result ?? {};
   const accessToken = String(result.value ?? "");
@@ -93,16 +182,34 @@ async function tokenRequest(body: Record<string, string>, path: string, now: num
   return accessToken;
 }
 
+/** Mint or refresh. Retryable stalls get three attempts with backoff. */
+async function withTokenRetries(run: () => Promise<string>) {
+  let last: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await run();
+    } catch (err) {
+      last = err;
+      const retryable = isConnectFailure(err) || isPostSendRetryable(err);
+      if (!retryable || attempt === MAX_ATTEMPTS) break;
+      await sleep(backoffMs(attempt));
+    }
+  }
+  throw last;
+}
+
 async function mint(now: number) {
   if (!finnotechConfigured()) throw new FinnotechError("not_configured", 0);
-  return tokenRequest(
-    {
-      grant_type: "client_credentials",
-      nid: process.env.FINNOTECH_NID!.trim(),
-      scopes: FINNOTECH_SCOPES,
-    },
-    "/dev/v2/oauth2/token",
-    now
+  return withTokenRetries(() =>
+    tokenRequest(
+      {
+        grant_type: "client_credentials",
+        nid: process.env.FINNOTECH_NID!.trim(),
+        scopes: FINNOTECH_SCOPES,
+      },
+      "/dev/v2/oauth2/token",
+      now
+    )
   );
 }
 
@@ -110,21 +217,20 @@ async function refreshOrMint(now: number) {
   const refreshToken = cache?.refreshToken;
   if (!refreshToken) return mint(now);
   try {
-    return await tokenRequest(
-      {
-        grant_type: "refresh_token",
-        token_type: "CLIENT-CREDENTIAL",
-        refresh_token: refreshToken,
-      },
-      "/dev/v2/oauth2/token/refresh",
-      now
+    return await withTokenRetries(() =>
+      tokenRequest(
+        {
+          grant_type: "refresh_token",
+          token_type: "CLIENT-CREDENTIAL",
+          refresh_token: refreshToken,
+        },
+        "/dev/v2/oauth2/token/refresh",
+        now
+      )
     );
   } catch (err) {
     cache = null;
-    console.error(
-      "finnotech_refresh",
-      err instanceof FinnotechError ? err.code : "network"
-    );
+    console.error("finnotech_refresh", err instanceof FinnotechError ? err.code : networkCauseCode(err));
     return mint(now);
   }
 }
@@ -145,7 +251,11 @@ export type FinnotechCall = {
   path: string;
   query?: Record<string, string | number | undefined>;
   body?: unknown;
-  /** GET retries up to 3 times. POST retries once, and only on timeout or 502/503/504. */
+  /**
+   * GET retries up to 3 times. POST post-send errors retry once.
+   * Connect failures retry on every method, including POST, because nothing was sent.
+   * otp/verify is not retried on a read timeout.
+   */
   idempotent?: boolean;
 };
 
@@ -154,20 +264,18 @@ export async function finnotechCall<T>(
   now = Date.now()
 ): Promise<{ trackId: string; result: T }> {
   const trackId = newTrackId();
-  const idempotent = input.idempotent ?? input.method === "GET";
-  const attempts = idempotent ? MAX_ATTEMPTS : 2;
   let last: unknown;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       return await authorized(input, trackId, now, false);
     } catch (err) {
       last = err;
-      if (!isRetryable(err) || attempt === attempts) break;
-      await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+      if (!shouldRetry(input, err, attempt)) break;
+      await sleep(backoffMs(attempt));
     }
   }
   if (last instanceof FinnotechError) throw last;
-  console.error("finnotech_network", input.method, input.path);
+  console.error("finnotech_network", input.method, input.path, networkCauseCode(last));
   throw new FinnotechError("network", 0);
 }
 
@@ -204,8 +312,9 @@ async function once<T>(input: FinnotechCall, trackId: string, token: string) {
       ...(input.body !== undefined ? { "Content-Type": "application/json" } : {}),
     },
     body: input.body !== undefined ? JSON.stringify(input.body) : undefined,
+    dispatcher: finnotechDispatcher,
     signal: AbortSignal.timeout(finnotechTimeoutMs()),
-  });
+  } as FetchInit);
   let data: Envelope<T>;
   try {
     data = (await readJson(res)) as Envelope<T>;
