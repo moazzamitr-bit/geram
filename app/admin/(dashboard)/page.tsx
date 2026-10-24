@@ -3,10 +3,9 @@ import {
   AdminNotice,
   AdminPageHeader,
   AdminStatCard,
-  OpsBadge,
 } from "@/components/admin/AdminUI";
 import { isClosedBetaInactiveAdminPath } from "@/lib/admin/closed-beta";
-import { loadDashboardOps, metricText } from "@/lib/admin/ops";
+import { loadDashboardOps } from "@/lib/admin/ops";
 import { formatToman } from "@/lib/utils";
 import {
   Activity,
@@ -63,7 +62,9 @@ export default async function AdminDashboardPage() {
             <AdminBadge tone={ops.connected ? "positive" : "warning"}>
               {ops.connected ? "سوپابیس متصل" : "بدون DB"}
             </AdminBadge>
-            {ops.mode ? <OpsBadge state={ops.mode === "PRODUCTION" ? "LIVE" : "SANDBOX"} /> : (
+            {ops.mode ? (
+              <AdminBadge tone={ops.mode === "PRODUCTION" ? "positive" : "gold"}>{ops.mode}</AdminBadge>
+            ) : (
               <AdminBadge tone="warning">MODE نامشخص</AdminBadge>
             )}
           </div>
@@ -87,7 +88,7 @@ export default async function AdminDashboardPage() {
         <Card label="۳۰ روز" metric={ops.connected ? ops.customers.new30 : { kind: "unavailable" }} icon={Users} />
       </div>
 
-      <h2 className="mb-3 mt-8 text-[14px] font-bold text-white/70">معاملات (دفتر میراث transactions)</h2>
+      <h2 className="mb-3 mt-8 text-[14px] font-bold text-white/70">معاملات (core_trades)</h2>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card label="معامله امروز" metric={ops.connected ? ops.trading.tradesToday : { kind: "unavailable" }} icon={Landmark} tone="gold" />
         <Card label="حجم خرید امروز" metric={ops.connected ? ops.trading.buyVolumeToman : { kind: "unavailable" }} icon={Landmark} format={formatToman} />

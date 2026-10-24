@@ -5,14 +5,24 @@ import {
   OpsBadge,
 } from "@/components/admin/AdminUI";
 import { listProviders } from "@/lib/admin/providers";
+import { finnotechConfigured } from "@/lib/finnotech/config";
+import { getLivePrices } from "@/lib/market/price-provider";
 
-export default function AdminProvidersPage() {
-  const rows = listProviders();
+export const dynamic = "force-dynamic";
+
+export default async function AdminProvidersPage() {
+  let prices: Awaited<ReturnType<typeof getLivePrices>> = [];
+  try {
+    prices = await getLivePrices();
+  } catch {
+    prices = [];
+  }
+  const rows = listProviders({ finnotech: finnotechConfigured(), prices });
   return (
     <div>
       <AdminPageHeader
         title="وضعیت سرویس‌ها"
-        description="Mock هرگز production-ready نیست."
+        description="Mock هرگز production-ready نیست. Finnotech و قیمت لایو از پیکربندی و TGJU خوانده می‌شوند."
       />
       <AdminNotice title="قانون">اگر mode=MOCK باشد productionApproved همیشه false است.</AdminNotice>
       <AdminTable

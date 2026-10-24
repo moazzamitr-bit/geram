@@ -2,6 +2,7 @@ import { isSupabaseConfigured } from "@/lib/db/types";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { roleFromProfileRole } from "@/lib/admin/rbac";
+import { countCoreTrades, listAdminActivity } from "@/lib/admin/ledger-activity";
 import { sumCustomerLedger } from "@/lib/ledger/display";
 import { readLedgerAccountRows } from "@/lib/ledger/read";
 
@@ -36,7 +37,7 @@ export async function getAdminOverview() {
       price,
     ] = await Promise.all([
       supabase.from("profiles").select("id", { count: "exact", head: true }),
-      supabase.from("transactions").select("id", { count: "exact", head: true }),
+      Promise.resolve({ count: await countCoreTrades() }),
       supabase
         .from("support_tickets")
         .select("id", { count: "exact", head: true })
@@ -96,13 +97,7 @@ export async function listProfiles(limit = 50) {
 
 export async function listTransactions(limit = 50) {
   if (!isSupabaseConfigured()) return [];
-  const supabase = await getDb();
-  const { data } = await supabase
-    .from("transactions")
-    .select("*, profiles(first_name,last_name,phone)")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return data ?? [];
+  return listAdminActivity({ limit });
 }
 
 export async function listTickets(limit = 50) {

@@ -61,6 +61,8 @@ export interface CoreStore {
   listAccountsForHolder(holderId: string): Promise<LedgerAccount[]>;
   listAllAccounts(): Promise<LedgerAccount[]>;
   listJournals(): Promise<JournalEntry[]>;
+  /** Journals that post at least one line for this holder, newest first. */
+  listJournalsForHolder(holderId: string, limit?: number): Promise<JournalEntry[]>;
   /** First journal id for this ref, if one was already posted. */
   findJournalIdByRef(refType: string, refId: string): Promise<string | null>;
   /** First journal for this ref, including lines. */
@@ -306,6 +308,15 @@ export class MemoryCoreStore implements CoreStore {
       ...j,
       lines: j.lines.map((l) => ({ ...l })),
     }));
+  }
+
+  async listJournalsForHolder(holderId: string, limit = 200): Promise<JournalEntry[]> {
+    return this.journals
+      .filter((j) => j.lines.some((l) => l.holderId === holderId))
+      .slice()
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+      .slice(0, limit)
+      .map((j) => ({ ...j, lines: j.lines.map((l) => ({ ...l })) }));
   }
 
   async findJournalIdByRef(refType: string, refId: string): Promise<string | null> {

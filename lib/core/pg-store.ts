@@ -269,6 +269,47 @@ export class PostgresCoreStore implements CoreStore {
     }));
   }
 
+  async listJournalsForHolder(holderId: string, limit = 200): Promise<JournalEntry[]> {
+    const { rows: headers } = await this.sql().query(
+      `select j.* from core_journals j
+       where exists (
+         select 1 from core_journal_lines l
+         where l.journal_id = j.id and l.holder_id = $1
+       )
+       order by j.created_at desc
+       limit $2`,
+      [holderId, limit]
+    );
+    if (headers.length === 0) return [];
+    const ids = headers.map((h) => str(h.id));
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(",");
+    const { rows: lines } = await this.sql().query(
+      `select * from core_journal_lines where journal_id in (${placeholders}) order by id asc`,
+      ids
+    );
+    const byJournal = new Map<string, JournalEntry["lines"]>();
+    for (const row of lines) {
+      const jid = str(row.journal_id);
+      const list = byJournal.get(jid) ?? [];
+      list.push({
+        accountCode: str(row.account_code) as AccountCode,
+        holderId: str(row.holder_id),
+        asset: str(row.asset) as LedgerAsset,
+        debit: big(row.debit),
+        credit: big(row.credit),
+      });
+      byJournal.set(jid, list);
+    }
+    return headers.map((h) => ({
+      id: str(h.id),
+      createdAt: new Date(str(h.created_at)).toISOString(),
+      reason: str(h.reason),
+      refType: str(h.ref_type),
+      refId: str(h.ref_id),
+      lines: byJournal.get(str(h.id)) ?? [],
+    }));
+  }
+
   async findJournalIdByRef(refType: string, refId: string): Promise<string | null> {
     return (await this.findJournalByRef(refType, refId))?.id ?? null;
   }

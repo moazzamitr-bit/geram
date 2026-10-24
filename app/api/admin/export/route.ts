@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminGate } from "@/lib/admin/auth";
 import { writeAudit } from "@/lib/admin/audit";
+import { listAdminActivity } from "@/lib/admin/ledger-activity";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { maskEmail, maskIban, maskPhone } from "@/lib/admin/mask";
 
@@ -64,17 +65,22 @@ export async function GET(request: Request) {
       created_at: p.created_at,
     }));
   } else if (type === "trades" || type === "deposits" || type === "withdrawals") {
-    let q = db
-      .from("transactions")
-      .select("id, tracking_code, type, status, amount_toman, gold_mg, instrument, created_at")
-      .order("created_at", { ascending: false })
-      .limit(2000);
-    if (type === "trades") q = q.in("type", ["خرید", "فروش"]);
-    if (type === "deposits") q = q.eq("type", "واریز");
-    if (type === "withdrawals") q = q.eq("type", "برداشت");
-    const { data } = await q;
+    const activityType =
+      type === "trades" ? undefined : type === "deposits" ? "واریز" : "برداشت";
+    const activity = await listAdminActivity({ type: activityType, limit: 2000 });
+    const filtered =
+      type === "trades" ? activity.filter((row) => row.type === "خرید" || row.type === "فروش") : activity;
     headers = ["id", "tracking_code", "type", "status", "amount_toman", "gold_mg", "instrument", "created_at"];
-    rows = (data ?? []) as Record<string, unknown>[];
+    rows = filtered.map((row) => ({
+      id: row.id,
+      tracking_code: row.tracking_code,
+      type: row.type,
+      status: row.status,
+      amount_toman: row.amount_toman,
+      gold_mg: row.gold_mg,
+      instrument: row.instrument ?? "",
+      created_at: row.created_at,
+    }));
   } else if (type === "reconciliation") {
     const { data, error } = await db.from("admin_reconciliation_items").select("*").limit(2000);
     if (error) {

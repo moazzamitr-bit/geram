@@ -13,6 +13,7 @@ import {
   getUserTickets,
   getUserTransactions,
 } from "@/lib/admin/queries";
+import { finnotechConfigured } from "@/lib/finnotech/config";
 import { maskEmail, maskIban, maskPhone } from "@/lib/admin/mask";
 import { DISPLAY_METALS, formatUgAsGrams } from "@/lib/ledger/display";
 import { readHolderLedgerView } from "@/lib/ledger/read";
@@ -64,7 +65,10 @@ export default async function AdminUser360Page({
           <p>
             وضعیت: <AdminBadge tone={profile.kyc_status === "VERIFIED" ? "positive" : "warning"}>{profile.kyc_status}</AdminBadge>
           </p>
-          <p>هویت / مالکیت موبایل / مالکیت حساب: <span className="text-white/45">NOT READY (فروشنده KYC نیست)</span></p>
+          <p>
+            هویت و مالکیت موبایل:{" "}
+            {finnotechConfigured() ? "Finnotech تنظیم شده" : "Finnotech تنظیم نشده"}
+          </p>
           {!isClosedBetaInactiveAdminPath(`/admin/kyc/${id}`) ? (
             <Link className="text-gold" href={`/admin/kyc/${id}`}>صف بررسی KYC</Link>
           ) : null}

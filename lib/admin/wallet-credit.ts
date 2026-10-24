@@ -22,8 +22,24 @@ export function parseIdempotencyKey(raw: string | undefined): string | null {
   return key;
 }
 
+export type WalletDirection = "CREDIT" | "DEBIT";
+
+export function parseWalletDirection(raw: unknown): WalletDirection | null {
+  if (raw == null || raw === "" || raw === "CREDIT") return "CREDIT";
+  if (raw === "DEBIT") return "DEBIT";
+  return null;
+}
+
+export function walletAdjustmentRefId(direction: WalletDirection, idempotencyKey: string) {
+  return direction === "DEBIT" ? `wallet-debit:${idempotencyKey}` : `wallet-credit:${idempotencyKey}`;
+}
+
 export function walletCreditRefId(idempotencyKey: string) {
-  return `wallet-credit:${idempotencyKey}`;
+  return walletAdjustmentRefId("CREDIT", idempotencyKey);
+}
+
+export function walletDebitRefId(idempotencyKey: string) {
+  return walletAdjustmentRefId("DEBIT", idempotencyKey);
 }
 
 export function parseTomanAmount(raw: string): { toman: number; irr: Irr } | null {
@@ -81,6 +97,7 @@ export function planImmediateWalletCredit(input: {
   userId: string;
   amountToman: number;
   idempotencyKey: string;
+  direction?: WalletDirection;
   prior: { id: string; status: string; payload: unknown } | null;
 }):
   | { ok: false; error: string; status: number }
@@ -95,7 +112,8 @@ export function planImmediateWalletCredit(input: {
   if (!amount || amount.toman !== input.amountToman) {
     return { ok: false, error: "invalid_amount", status: 400 };
   }
-  const refId = walletCreditRefId(input.idempotencyKey);
+  const direction = input.direction ?? "CREDIT";
+  const refId = walletAdjustmentRefId(direction, input.idempotencyKey);
   if (!input.prior) {
     return { ok: true, refId, amountIrr: amount.irr, record: "insert", priorId: null };
   }
@@ -104,7 +122,8 @@ export function planImmediateWalletCredit(input: {
   const same =
     stored.userId === input.userId &&
     stored.amountToman === input.amountToman &&
-    stored.idempotencyKey === input.idempotencyKey;
+    stored.idempotencyKey === input.idempotencyKey &&
+    stored.direction === direction;
   if (!same) return { ok: false, error: "idempotency_conflict", status: 409 };
   if (input.prior.status === "REJECTED") {
     return { ok: false, error: "credit_rejected", status: 409 };
@@ -133,6 +152,7 @@ export function parseStoredWalletCredit(payload: unknown):
       userId: string;
       amountToman: number;
       amountIrr: Irr;
+      direction: WalletDirection;
       idempotencyKey: string;
       refId: string;
     }
@@ -141,12 +161,11 @@ export function parseStoredWalletCredit(payload: unknown):
   const userId = String(body.userId ?? "").trim();
   const amount = parseTomanAmount(String(body.amount ?? ""));
   const idempotencyKey = parseIdempotencyKey(String(body.idempotencyKey ?? ""));
+  const direction = parseWalletDirection(body.direction);
   if (!userId) return { ok: false, error: "user_required" };
   if (!amount) return { ok: false, error: "invalid_amount" };
   if (!idempotencyKey) return { ok: false, error: "idempotency_key_required" };
-  if (String(body.direction ?? "CREDIT") !== "CREDIT") {
-    return { ok: false, error: "only_credit" };
-  }
+  if (!direction) return { ok: false, error: "invalid_direction" };
   const asset = body.asset == null ? "IRR" : String(body.asset);
   if (asset !== "IRR") return { ok: false, error: "only_irr" };
   return {
@@ -154,7 +173,8 @@ export function parseStoredWalletCredit(payload: unknown):
     userId,
     amountToman: amount.toman,
     amountIrr: amount.irr,
+    direction,
     idempotencyKey,
-    refId: walletCreditRefId(idempotencyKey),
+    refId: walletAdjustmentRefId(direction, idempotencyKey),
   };
 }

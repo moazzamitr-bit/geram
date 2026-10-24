@@ -7,7 +7,6 @@ import {
   getFeatureFlags,
   isDeployedEnvironment,
   postgresRequired,
-  sandboxDepositAllowed,
 } from "@/lib/core/mode";
 import { DEFAULT_COMMERCE_SETTINGS } from "@/lib/commerce/types";
 import { tomanToIrr } from "@/lib/core/money";
@@ -163,7 +162,6 @@ export function resetFinancialCoreForTests() {
 
 export function readinessSnapshot() {
   const mode = getExecutionMode();
-  const flags = getFeatureFlags(mode);
   const url = Boolean(dbUrl());
   const databaseBacked = url || (g.__geramPg != null && g.__geramPg.persistence === "postgres");
   const marketDataProductionApproved =
@@ -174,8 +172,8 @@ export function readinessSnapshot() {
   return {
     executionMode: mode,
     databaseBacked,
-    sandboxSeedEnabled: flags.SANDBOX_SEED_ENABLED && mode === "SANDBOX",
-    userSandboxDepositEnabled: sandboxDepositAllowed(mode, flags),
+    sandboxSeedEnabled: false,
+    userSandboxDepositEnabled: false,
     marketDataProductionApproved,
     financialWritesAllowed,
     // Presence flags only — never values — so ops can see why login/trading fails.

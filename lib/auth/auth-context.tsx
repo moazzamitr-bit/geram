@@ -355,21 +355,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setKycStatus = useCallback(
     async (status: KycStatus) => {
       if (!user) return;
+      if (live) return;
       const next = { ...user, kycStatus: status };
       setUser(next);
-      if (live) {
-        try {
-          await fetch("/api/sandbox/kyc", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status }),
-          });
-        } catch {
-          /* ignore */
-        }
-      } else {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     },
     [live, user]
   );

@@ -192,7 +192,6 @@ type DemoState = {
   replyTicket: (id: string, text: string) => void;
   addScheduledPurchase: (amountRial: number, cadence: string) => { ok: boolean; error?: string };
   applyReferralCode: (code: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
-  activatePlusSandbox: () => Promise<{ ok: boolean; error?: string; message?: string }>;
   refreshMarketPrice: () => Promise<void>;
 };
 
@@ -752,26 +751,12 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     [sellMetal]
   );
 
-  const deposit = useCallback(
-    async (rial: number) => {
-      try {
-        const { coreApi } = await import("@/lib/core-api");
-        const idem =
-          typeof crypto !== "undefined" && "randomUUID" in crypto
-            ? crypto.randomUUID()
-            : uid("idem");
-        await coreApi.sandboxDeposit(rial, idem);
-        await refreshFinancial();
-        return { ok: true as const };
-      } catch (err) {
-        return {
-          ok: false as const,
-          error: err instanceof Error ? err.message : "واریز در این نسخه ممکن نیست",
-        };
-      }
-    },
-    [refreshFinancial]
-  );
+  const deposit = useCallback(async () => {
+    return {
+      ok: false as const,
+      error: "واریز شخصی در این نسخه خاموش است.",
+    };
+  }, []);
 
   const withdraw = useCallback(async () => {
     return {
@@ -973,25 +958,6 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           return { ok: true, message: data.message };
         } catch {
           return { ok: false, error: "خطا در ثبت کد دعوت" };
-        }
-      },
-      activatePlusSandbox: async () => {
-        try {
-          const res = await fetch("/api/commerce/plus/activate-sandbox", {
-            method: "POST",
-          });
-          const data = (await res.json()) as {
-            ok: boolean;
-            error?: string;
-            message?: string;
-          };
-          if (!data.ok) {
-            return { ok: false, error: data.error ?? "فعال‌سازی ممکن نیست" };
-          }
-          setState((s) => ({ ...s, plusActive: true }));
-          return { ok: true, message: data.message };
-        } catch {
-          return { ok: false, error: "فعال‌سازی ممکن نیست" };
         }
       },
       refreshMarketPrice,

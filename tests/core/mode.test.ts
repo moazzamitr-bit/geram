@@ -4,9 +4,6 @@ import {
   getFeatureFlags,
   isDeployedEnvironment,
   resolveExecutionMode,
-  sandboxDepositAllowed,
-  sandboxSeedAllowed,
-  CONSERVATIVE_FLAGS,
   SANDBOX_FLAGS,
 } from "@/lib/core/mode";
 
@@ -38,39 +35,22 @@ describe("execution mode fail-closed", () => {
 });
 
 describe("conservative feature flags", () => {
-  it("defaults demo flags OFF in PRODUCTION even if env tries to enable seed/deposit", () => {
+  it("defaults demo flags OFF in PRODUCTION even if env tries to enable them", () => {
     const flags = getFeatureFlags("PRODUCTION", {
-      SANDBOX_SEED_ENABLED: "true",
-      SANDBOX_DEPOSIT_ENABLED: "true",
       DCA_ENABLED: "true",
     });
-    expect(flags.SANDBOX_SEED_ENABLED).toBe(false);
-    expect(flags.SANDBOX_DEPOSIT_ENABLED).toBe(false);
-    expect(flags.DCA_ENABLED).toBe(true); // explicit env still honored for unused flags
+    expect(flags.DCA_ENABLED).toBe(true);
     expect(getFeatureFlags("PRODUCTION", {}).DCA_ENABLED).toBe(false);
     expect(getFeatureFlags("PRODUCTION", {}).GOALS_ENABLED).toBe(false);
     expect(getFeatureFlags("CLOSED_BETA", {}).REFERRAL_ENABLED).toBe(false);
-    expect(sandboxSeedAllowed("PRODUCTION", { ...SANDBOX_FLAGS, SANDBOX_SEED_ENABLED: true })).toBe(
-      false
-    );
+    expect(getFeatureFlags("CLOSED_BETA", {}).GERAM_PLUS_ENABLED).toBe(false);
+    expect("SANDBOX_DEPOSIT_ENABLED" in getFeatureFlags("SANDBOX", {})).toBe(false);
+    expect("SANDBOX_SEED_ENABLED" in getFeatureFlags("CLOSED_BETA", {})).toBe(false);
   });
 
-  it("keeps SANDBOX demo UI flags on by default but seed and self-deposit off unless explicit", () => {
+  it("keeps SANDBOX demo UI flags on by default", () => {
     expect(SANDBOX_FLAGS.GOALS_ENABLED).toBe(true);
-    expect(SANDBOX_FLAGS.SANDBOX_SEED_ENABLED).toBe(false);
-    expect(SANDBOX_FLAGS.SANDBOX_DEPOSIT_ENABLED).toBe(false);
-    expect(CONSERVATIVE_FLAGS.SANDBOX_DEPOSIT_ENABLED).toBe(false);
-    expect(getFeatureFlags("SANDBOX", {}).SANDBOX_SEED_ENABLED).toBe(false);
-    expect(getFeatureFlags("SANDBOX", {}).SANDBOX_DEPOSIT_ENABLED).toBe(false);
-    expect(sandboxDepositAllowed("SANDBOX", getFeatureFlags("SANDBOX", {}))).toBe(false);
-    expect(
-      sandboxDepositAllowed(
-        "SANDBOX",
-        getFeatureFlags("SANDBOX", { SANDBOX_DEPOSIT_ENABLED: "true" })
-      )
-    ).toBe(true);
-    expect(getFeatureFlags("SANDBOX", { SANDBOX_SEED_ENABLED: "true" }).SANDBOX_SEED_ENABLED).toBe(
-      true
-    );
+    expect(SANDBOX_FLAGS.REFERRAL_ENABLED).toBe(true);
+    expect(getFeatureFlags("CLOSED_BETA", {}).GOALS_ENABLED).toBe(false);
   });
 });

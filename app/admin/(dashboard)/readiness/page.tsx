@@ -1,8 +1,8 @@
 import { AdminBadge, AdminNotice, AdminPageHeader } from "@/components/admin/AdminUI";
-import { computeReleaseReadiness } from "@/lib/admin/readiness";
+import { loadReleaseReadiness } from "@/lib/admin/readiness";
 
-export default function AdminReadinessPage() {
-  const sections = computeReleaseReadiness();
+export default async function AdminReadinessPage() {
+  const sections = await loadReleaseReadiness();
   return (
     <div>
       <AdminPageHeader

@@ -1,5 +1,10 @@
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/db/types";
+import {
+  getAdminActivity,
+  listAdminActivity,
+  searchLedgerActivity,
+} from "./ledger-activity";
 
 export async function adminDb() {
   if (!isSupabaseConfigured()) return null;
@@ -18,15 +23,7 @@ export async function getProfile(id: string) {
 }
 
 export async function getUserTransactions(userId: string, limit = 50) {
-  const sb = await adminDb();
-  if (!sb) return [];
-  const { data } = await sb
-    .from("transactions")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return data ?? [];
+  return listAdminActivity({ userId, limit });
 }
 
 export async function getUserBanks(userId: string) {
@@ -70,30 +67,14 @@ export async function getTicket(id: string) {
 }
 
 export async function getTransaction(id: string) {
-  const sb = await adminDb();
-  if (!sb) return null;
-  const { data } = await sb
-    .from("transactions")
-    .select("*, profiles(first_name,last_name,phone,email)")
-    .eq("id", id)
-    .maybeSingle();
-  return data;
+  return getAdminActivity(id);
 }
 
 export async function listTransactionsFiltered(opts: {
   type?: string;
   limit?: number;
 }) {
-  const sb = await adminDb();
-  if (!sb) return [];
-  let q = sb
-    .from("transactions")
-    .select("*, profiles(first_name,last_name,phone,email)")
-    .order("created_at", { ascending: false })
-    .limit(opts.limit ?? 200);
-  if (opts.type) q = q.eq("type", opts.type);
-  const { data } = await q;
-  return data ?? [];
+  return listAdminActivity({ type: opts.type, limit: opts.limit ?? 200 });
 }
 
 export async function listNotifications(limit = 100) {
@@ -136,14 +117,14 @@ export async function searchOps(q: string) {
   const like = `%${term}%`;
   const [users, txs, tickets, banks, journals] = await Promise.all([
     sb.from("profiles").select("id, first_name, last_name, phone, email, role, kyc_status").or(`email.ilike.${like},phone.ilike.${like},first_name.ilike.${like},last_name.ilike.${like},id.eq.${term}`).limit(20),
-    sb.from("transactions").select("id, tracking_code, type, status, user_id").or(`tracking_code.ilike.${like},id.eq.${term},payment_ref.ilike.${like}`).limit(20),
+    searchLedgerActivity(term),
     sb.from("support_tickets").select("id, subject, status, user_id").or(`subject.ilike.${like},id.eq.${term}`).limit(20),
     sb.from("bank_accounts").select("id, iban, bank_name, user_id").ilike("iban", `%${term.slice(-4)}%`).limit(20),
     sb.from("core_journals").select("id, reason, ref_type, ref_id, created_at").or(`id.eq.${term},ref_id.eq.${term}`).limit(20),
   ]);
   return {
     users: users.data ?? [],
-    txs: txs.data ?? [],
+    txs,
     tickets: tickets.data ?? [],
     banks: banks.data ?? [],
     journals: journals.error ? [] : journals.data ?? [],

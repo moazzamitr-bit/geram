@@ -7,8 +7,6 @@ export type FeatureFlags = {
   REFERRAL_ENABLED: boolean;
   GERAM_PLUS_ENABLED: boolean;
   PHYSICAL_REDEMPTION_ENABLED: boolean;
-  SANDBOX_DEPOSIT_ENABLED: boolean;
-  SANDBOX_SEED_ENABLED: boolean;
 };
 
 export type KillSwitches = {
@@ -54,9 +52,6 @@ export const SANDBOX_FLAGS: FeatureFlags = {
   REFERRAL_ENABLED: true,
   GERAM_PLUS_ENABLED: true,
   PHYSICAL_REDEMPTION_ENABLED: false,
-  // Opt-in only. Closed beta on geram.co must not let users mint IRR.
-  SANDBOX_DEPOSIT_ENABLED: false,
-  SANDBOX_SEED_ENABLED: false,
 };
 
 export const CONSERVATIVE_FLAGS: FeatureFlags = {
@@ -66,8 +61,6 @@ export const CONSERVATIVE_FLAGS: FeatureFlags = {
   REFERRAL_ENABLED: false,
   GERAM_PLUS_ENABLED: false,
   PHYSICAL_REDEMPTION_ENABLED: false,
-  SANDBOX_DEPOSIT_ENABLED: false,
-  SANDBOX_SEED_ENABLED: false,
 };
 
 export class ExecutionModeError extends Error {
@@ -139,23 +132,8 @@ export function getFeatureFlags(
       "PHYSICAL_REDEMPTION_ENABLED",
       base.PHYSICAL_REDEMPTION_ENABLED
     ),
-    SANDBOX_DEPOSIT_ENABLED: envBool(env, "SANDBOX_DEPOSIT_ENABLED", base.SANDBOX_DEPOSIT_ENABLED),
-    SANDBOX_SEED_ENABLED: envBool(env, "SANDBOX_SEED_ENABLED", base.SANDBOX_SEED_ENABLED),
   };
-  if (mode === "PRODUCTION") {
-    flags.SANDBOX_SEED_ENABLED = false;
-    flags.SANDBOX_DEPOSIT_ENABLED = false;
-  }
   return flags;
-}
-
-export function sandboxDepositAllowed(mode: ExecutionMode, flags: FeatureFlags) {
-  return mode !== "PRODUCTION" && flags.SANDBOX_DEPOSIT_ENABLED;
-}
-
-export function sandboxSeedAllowed(mode: ExecutionMode, flags: FeatureFlags) {
-  if (mode !== "SANDBOX") return false;
-  return flags.SANDBOX_SEED_ENABLED;
 }
 
 export function getKillSwitches(env: EnvLike = process.env): KillSwitches {

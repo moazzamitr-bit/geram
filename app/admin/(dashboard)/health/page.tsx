@@ -7,7 +7,7 @@ import {
 import { isClosedBetaInactiveAdminPath } from "@/lib/admin/closed-beta";
 import { loadDashboardOps } from "@/lib/admin/ops";
 import { listProviders } from "@/lib/admin/providers";
-import { computeReleaseReadiness } from "@/lib/admin/readiness";
+import { loadReleaseReadiness } from "@/lib/admin/readiness";
 import { getKillSwitches } from "@/lib/core/mode";
 import { Activity, AlertTriangle, Shield } from "lucide-react";
 import Link from "next/link";
@@ -15,7 +15,7 @@ import Link from "next/link";
 export default async function AdminHealthPage() {
   const ops = await loadDashboardOps();
   const providers = listProviders();
-  const readiness = computeReleaseReadiness();
+  const readiness = await loadReleaseReadiness();
   const kills = getKillSwitches();
   const mockCount = providers.filter((p) => p.mode === "MOCK").length;
   const notReady = readiness.filter((s) => s.status === "NOT_READY").length;
@@ -27,7 +27,8 @@ export default async function AdminHealthPage() {
         description="وضعیت واقعی سیستم. Mock هرگز production-ready نمایش داده نمی‌شود."
       />
       <div className="mb-6 flex flex-wrap gap-2">
-        {ops.mode ? <OpsBadge state={ops.mode === "PRODUCTION" ? "LIVE" : "SANDBOX"} /> : <OpsBadge state="NOT_READY" />}
+        {ops.mode ? <OpsBadge state={ops.mode === "PRODUCTION" ? "LIVE" : ops.mode === "CLOSED_BETA" ? "DEGRADED" : "SANDBOX"} /> : <OpsBadge state="NOT_READY" />}
+        {ops.mode ? <span className="text-[13px] text-white/70">{ops.mode}</span> : null}
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AdminStatCard label="ارائه‌دهنده MOCK" value={String(mockCount)} icon={Activity} tone="warning" />
@@ -46,7 +47,7 @@ export default async function AdminHealthPage() {
         />
       </div>
       <AdminNotice title="موتور تطبیق / outbox / حوادث">
-        اگر جدول‌های admin_ops و financial core روی این پروژه اعمال نشده باشند، این شاخص‌ها NOT READY هستند — صفر جعلی نیست.
+        صف outbox از core_outbox خوانده می‌شود. تطبیق بانکی و رجیستری خطای provider ساخته نشده‌اند و صفر جعلی نشان داده نمی‌شوند.
       </AdminNotice>
       <div className="mt-4 flex flex-wrap gap-3 text-[13px]">
         <Link className="text-gold" href="/admin/providers">وضعیت سرویس‌ها</Link>

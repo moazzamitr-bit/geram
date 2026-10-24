@@ -23,6 +23,7 @@ export function WalletCreditForm({
   const [userId, setUserId] = useState(lockedUserId ?? "");
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState("");
+  const [direction, setDirection] = useState<"CREDIT" | "DEBIT">("CREDIT");
   const [reason, setReason] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState(newKey);
   const [msg, setMsg] = useState("");
@@ -44,6 +45,7 @@ export function WalletCreditForm({
           userId: userId.trim(),
           phone: phone.trim(),
           amount: amount.trim(),
+          direction,
           idempotencyKey,
           reason,
         }),
@@ -68,11 +70,21 @@ export function WalletCreditForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-white/10 bg-[#070B12] p-4">
-      <p className="text-[13px] font-bold">شارژ دستی کیف پول</p>
+      <p className="text-[13px] font-bold">شارژ یا برگشت شارژ</p>
       <p className="text-[12px] leading-6 text-white/45">
-        با ثبت شارژ، ژورنال APPROVED_OPENING_BALANCE همین حالا به موجودی قابل استفاده (USER_AVAILABLE) می‌نشیند.
-        جدول wallets مستقیم عوض نمی‌شود. تکرار همان درخواست موجودی را دوباره زیاد نمی‌کند. کاربر باید قبلاً یک بار وارد شده باشد.
+        شارژ، ژورنال APPROVED_OPENING_BALANCE را به موجودی قابل استفاده (USER_AVAILABLE) می‌نشاند.
+        برگشت شارژ همان مبلغ را از USER_AVAILABLE برمی‌دارد و به PLATFORM_OPENING برمی‌گرداند.
+        اگر موجودی کمتر از مبلغ باشد، دفترکل عوض نمی‌شود. تکرار همان درخواست دوباره اعمال نمی‌شود.
+        کاربر باید قبلاً یک بار وارد شده باشد.
       </p>
+      <select
+        value={direction}
+        onChange={(e) => setDirection(e.target.value === "DEBIT" ? "DEBIT" : "CREDIT")}
+        className="h-11 w-full rounded-xl border border-white/10 bg-[#0B1220] px-3 text-[13px] outline-none focus:border-gold"
+      >
+        <option value="CREDIT">شارژ (افزایش موجودی)</option>
+        <option value="DEBIT">برگشت شارژ (کاهش موجودی)</option>
+      </select>
       <input
         dir="ltr"
         value={userId}
@@ -109,7 +121,7 @@ export function WalletCreditForm({
         className="h-16 w-full rounded-xl border border-white/10 bg-[#0B1220] p-3 text-[13px] outline-none focus:border-gold"
       />
       <GoldButton type="submit" size="sm" disabled={loading}>
-        {loading ? "…" : "ثبت شارژ"}
+        {loading ? "…" : direction === "DEBIT" ? "ثبت برگشت" : "ثبت شارژ"}
       </GoldButton>
       {msg && <p className="text-[12px] text-positive">{msg}</p>}
       {err && <p className="text-[12px] text-negative">{err}</p>}
