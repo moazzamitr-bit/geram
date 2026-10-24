@@ -3,6 +3,9 @@ import { adminGate, readActionBody } from "@/lib/admin/auth";
 import { writeAudit } from "@/lib/admin/audit";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { hasPermission } from "@/lib/admin/rbac";
+import { safeFinnotechLog } from "@/lib/finnotech/client";
+import { refreshStoredIdentity } from "@/lib/kyc/actions";
+import { KycFlowError } from "@/lib/kyc/flow";
 
 const ACTIONS = new Set([
   "retry_provider",
@@ -43,6 +46,48 @@ export async function POST(request: Request) {
   const { data: profile } = await db.from("profiles").select("*").eq("id", userId).maybeSingle();
   if (!profile) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
 
+  if (action === "retry_provider") {
+    try {
+      const refreshed = await refreshStoredIdentity(userId);
+      await writeAudit({
+        actorId: gate.ctx.userId,
+        role: gate.ctx.role,
+        action: "kyc.retry_provider",
+        entity: "profile",
+        entityId: userId,
+        reason,
+        result: refreshed.ok ? "ok" : "error",
+        meta: {
+          oldStatus: profile.kyc_status,
+          provider: "finnotech",
+          outcome: refreshed.ok ? refreshed.status : refreshed.error,
+          trackId: refreshed.ok ? refreshed.trackId : null,
+        },
+      });
+      return NextResponse.json({
+        ok: refreshed.ok,
+        message: refreshed.ok
+          ? "استعلام ثبت احوال دوباره انجام شد."
+          : "کد ملی و تاریخ تولد ذخیره نشده؛ استعلام دوباره ممکن نیست.",
+      });
+    } catch (err) {
+      safeFinnotechLog("kyc_admin_retry", err);
+      const message =
+        err instanceof KycFlowError ? err.message : "استعلام فینوتک انجام نشد.";
+      await writeAudit({
+        actorId: gate.ctx.userId,
+        role: gate.ctx.role,
+        action: "kyc.retry_provider",
+        entity: "profile",
+        entityId: userId,
+        reason,
+        result: "error",
+        meta: { provider: "finnotech" },
+      });
+      return NextResponse.json({ ok: false, error: message }, { status: 502 });
+    }
+  }
+
   const patch: Record<string, unknown> = {};
   if (action === "request_resubmission") patch.kyc_status = "NEEDS_UPDATE";
   if (action === "manual_review") patch.kyc_status = "PENDING";
@@ -64,15 +109,8 @@ export async function POST(request: Request) {
     meta: {
       oldStatus: profile.kyc_status,
       newStatus: patch.kyc_status ?? profile.kyc_status,
-      provider: action === "retry_provider" ? "MOCK/NOT READY — no vendor call" : null,
     },
   });
 
-  return NextResponse.json({
-    ok: true,
-    message:
-      action === "retry_provider"
-        ? "ثبت شد. فروشنده KYC متصل نیست — فراخوان خارجی انجام نشد."
-        : "ثبت شد.",
-  });
+  return NextResponse.json({ ok: true, message: "ثبت شد." });
 }

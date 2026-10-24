@@ -65,7 +65,8 @@ and never leave production broken.
 | Core API | `app/api/core/*` (quotes, trades, wallet, transactions, limits, readiness) |
 | Fees / commerce settings | `lib/commerce/types.ts` (defaults), `platform_settings` table, admin form `components/admin/CommerceSettingsForm.tsx`; per-user fees in `lib/core/user-fees.ts` |
 | Daily limits | `lib/core/limits.ts`, page `app/app/profile/limits` |
-| Auth | `lib/auth/method.ts` (AUTH_METHOD), `app/api/auth/{register,password-login,config}`, OTP: `lib/auth/otp.ts` (sms.ir + Kavenegar), `app/api/auth/{otp/request,phone-login}`; client `lib/auth/auth-context.tsx`; middleware gates `/app` and `/admin` |
+| Auth | `lib/auth/method.ts` (AUTH_METHOD), `app/api/auth/{register,password-login,config}`, OTP: `lib/auth/otp.ts` (Finnotech, then sms.ir, then Kavenegar), `app/api/auth/{otp/request,phone-login}`; client `lib/auth/auth-context.tsx`; middleware gates `/app` and `/admin` |
+| KYC | `lib/finnotech/` (token, Shahkar, identification, OTP), `lib/kyc/`, `app/api/kyc/shahkar`, user page `/app/profile/kyc`, admin `/admin/kyc` |
 | Admin | `app/admin/*`, RBAC `lib/admin/rbac.ts`, approvals + opening inventory `app/api/admin/approvals/route.ts` |
 | Deploy | `Dockerfile`, `deploy/{install.sh,docker-compose.yml,Caddyfile,check-db.sh,create-admin.sh,set-sms.sh}`, guide `docs/DEPLOY.md` |
 | Tests | `tests/core/*` (vitest, PGlite for Postgres) |
@@ -79,12 +80,14 @@ and never leave production broken.
 - **Closed-beta admin nav**: pages listed in `lib/admin/closed-beta.ts` stay in the repo
   but are hidden and rewritten to a “not active in beta” screen. Remove a path from that
   list to turn the page back on. Inventory registration stays on `/admin/approvals`.
-- **SMS OTP**: sms.ir rejects templates without eNamad. Template `123456` (sandbox) only reaches the
-  panel owner's number. Before setting `AUTH_METHOD=otp`: the OTP service-role path rotates the user's
-  password on every login — switch it to `admin.generateLink` + `verifyOtp` first, or password
-  users will be locked out.
-- Password mode does not verify the number → require OTP + KYC (Shahkar) before real money.
-- Not built yet: payment gateway deposits, bank withdrawals (Paya/Satna), Shahkar KYC, supplier/custody
+- **SMS OTP**: default login stays `AUTH_METHOD=password`. Finnotech messaging OTP is used when
+  `AUTH_METHOD=otp` and Finnotech env is set; otherwise sms.ir / Kavenegar. sms.ir template `123456`
+  only reaches the panel owner's number. The OTP service-role path still rotates the user's password
+  on every OTP login — do not turn `AUTH_METHOD=otp` on for people who sign in with a password until
+  that rotation is replaced, or those passwords stop working.
+- Shahkar KYC is server-side (`/app/profile/kyc`). Buy/sell require `kyc_status=VERIFIED` when
+  `REQUIRE_KYC_FOR_TRADE` is unset and mode is `PRODUCTION` (off in SANDBOX / CLOSED_BETA).
+- Not built yet: payment gateway deposits, bank withdrawals (Paya/Satna), supplier/custody
   contracts, executable price source (TGJU is public data), eNamad/licence.
 - `lib/data.ts` → `contactInfo` still has placeholder phone/address; replace with real company data.
 - Unmerged `backup/treasury-mm-20260912` branch: has an unauthenticated `/api/treasury/book-trade`.

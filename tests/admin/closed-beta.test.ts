@@ -11,7 +11,6 @@ import { adminNav, adminNavCatalog, adminNavGroups } from "@/lib/admin/navigatio
 
 const HIDDEN = [
   "/admin/incidents",
-  "/admin/kyc",
   "/admin/bank-accounts",
   "/admin/sessions",
   "/admin/security",
@@ -37,6 +36,7 @@ const VISIBLE = [
   "/admin/health",
   "/admin/readiness",
   "/admin/users",
+  "/admin/kyc",
   "/admin/deposits",
   "/admin/approvals",
   "/admin/ledger",
@@ -76,8 +76,10 @@ describe("closed beta admin routes", () => {
   });
 
   it("rewrites hidden routes, including detail pages, and leaves the live ones", () => {
-    expect(isClosedBetaInactiveAdminPath("/admin/kyc/user-1")).toBe(true);
-    expect(closedBetaAdminRewrite("/admin/kyc/user-1")).toBe(CLOSED_BETA_INACTIVE_NOTICE_PATH);
+    expect(isClosedBetaInactiveAdminPath("/admin/incidents/inc-1")).toBe(true);
+    expect(closedBetaAdminRewrite("/admin/incidents/inc-1")).toBe(CLOSED_BETA_INACTIVE_NOTICE_PATH);
+    expect(closedBetaAdminRewrite("/admin/kyc")).toBeNull();
+    expect(closedBetaAdminRewrite("/admin/kyc/user-1")).toBeNull();
     expect(closedBetaAdminRewrite("/admin/treasury?asset=GOLD")).toBe(
       CLOSED_BETA_INACTIVE_NOTICE_PATH
     );

@@ -57,7 +57,19 @@ docker run -d --restart unless-stopped --env-file .env.production -p 3000:3000 g
 
 ## ۵٫۱ ورود (رمز عبور، نه پیامک)
 
-پیش‌فرض `AUTH_METHOD=password` است. صفحه `/auth/login` همان اول فرم شماره و رمز عبور را نشان می‌دهد و `/api/auth/phone-login` پاسخ `method_disabled` می‌دهد. پیامک فقط با `AUTH_METHOD=otp` فعال می‌شود (sms.ir یا کاوه‌نگار). ثبت‌نام به `SUPABASE_SERVICE_ROLE_KEY` نیاز دارد. ورود ادمین با ایمیل حسابی است که `profiles.role = admin` دارد؛ `admin@geram.ir` روی سرور خودمیزبان فعلی این نقش را ندارد.
+پیش‌فرض `AUTH_METHOD=password` است. صفحه `/auth/login` همان اول فرم شماره و رمز عبور را نشان می‌دهد و `/api/auth/phone-login` پاسخ `method_disabled` می‌دهد. پیامک فقط با `AUTH_METHOD=otp` فعال می‌شود. اگر فینوتک تنظیم شده باشد پیامک از فینوتک می‌رود (messaging، یا finnotext اگر `FINNOTECH_OTP_CHANNEL=finnotext`)؛ وگرنه sms.ir یا کاوه‌نگار. ورود با رمز عوض نمی‌شود. ثبت‌نام به `SUPABASE_SERVICE_ROLE_KEY` نیاز دارد.
+
+احراز هویت کاربر در `/app/profile/kyc` با شاهکار و استعلام ثبت احوال فینوتک است. این خط‌ها را در `/opt/geram/.env.production` بگذارید (مقادیر واقعی، نه در گیت):
+
+```
+FINNOTECH_BASE_URL=https://api.finnotech.ir
+FINNOTECH_CLIENT_ID=geram
+FINNOTECH_CLIENT_SECRET=
+FINNOTECH_NID=
+FINNOTECH_SMS_SENDER=
+```
+
+`FINNOTECH_NID` کد ملی کسی است که در کنسول فینوتک به کلاینت دسترسی دارد. `FINNOTECH_SMS_SENDER` فقط برای ارسال OTP با فینوتکست لازم است. خرید و فروش در حالت `PRODUCTION` بدون احراز هویت رد می‌شود؛ برای خاموش کردن موقت: `REQUIRE_KYC_FOR_TRADE=false`. بعد از گرفتن کد، مایگریشن `20261024120000_finnotech_kyc.sql` را با `check-db.sh --apply` اجرا کنید. ورود ادمین با ایمیل حسابی است که `profiles.role = admin` دارد؛ `admin@geram.ir` روی سرور خودمیزبان فعلی این نقش را ندارد.
 
 پروکسی `/sb` اگر همین الان GoTrue را جواب می‌دهد، برای این اصلاح لازم نیست عوض شود. فقط `Set-Cookie` را حذف نکنید و `NEXT_PUBLIC_SUPABASE_URL` همان آدرسی بماند که مرورگر می‌بیند (`https://geram.co/sb`). متغیر `GERAM_EXECUTION_MODE` را برای این تغییر عوض نکنید.
 

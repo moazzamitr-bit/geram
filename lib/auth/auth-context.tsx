@@ -47,6 +47,11 @@ type AuthState = {
   completeOnboarding: () => Promise<void>;
   logout: () => Promise<void>;
   setKycStatus: (status: KycStatus) => Promise<void>;
+  applyKycResult: (patch: {
+    kycStatus: KycStatus;
+    firstName?: string;
+    lastName?: string;
+  }) => void;
   setHasPin: (value: boolean) => void;
 };
 
@@ -369,6 +374,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [live, user]
   );
 
+  const applyKycResult = useCallback(
+    (patch: { kycStatus: KycStatus; firstName?: string; lastName?: string }) => {
+      setUser((current) => {
+        if (!current) return current;
+        const next = {
+          ...current,
+          kycStatus: patch.kycStatus,
+          firstName: patch.firstName || current.firstName,
+          lastName: patch.lastName || current.lastName,
+        };
+        if (!live) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        return next;
+      });
+    },
+    [live]
+  );
+
   const setHasPin = useCallback(
     (value: boolean) => {
       if (!user) return;
@@ -391,6 +413,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       completeOnboarding,
       logout,
       setKycStatus,
+      applyKycResult,
       setHasPin,
     }),
     [
@@ -403,6 +426,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       completeOnboarding,
       logout,
       setKycStatus,
+      applyKycResult,
       setHasPin,
     ]
   );
