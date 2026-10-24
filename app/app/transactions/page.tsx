@@ -72,7 +72,7 @@ export default function TransactionsPage() {
         <EmptyState
           title="تراکنشی ثبت نشده"
           description="پس از خرید یا فروش، تراکنش اینجا دیده می‌شود."
-          actionHref="/app/buy"
+          actionHref="/app/trade/gold"
           actionLabel="خرید طلا"
           icon={Receipt}
         />

@@ -7,6 +7,7 @@ import type { ChartRange } from "@/components/ui/PriceChart";
 import { useDemoStore } from "@/lib/app/demo-store";
 import { unrealizedPnl } from "@/lib/app/pnl";
 import { INSTRUMENTS, type InstrumentId } from "@/lib/market/instruments";
+import { tradePathForInstrument } from "@/lib/market/trade-routes";
 import { cn, formatFaNumber, formatToman } from "@/lib/utils";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -121,13 +122,13 @@ export default function DashboardPage() {
               </p>
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <Link
-                  href={`/app/sell?instrument=${row.id}`}
+                  href={tradePathForInstrument(row.id, "sell")}
                   className="flex h-10 items-center justify-center rounded-xl border border-black/10 text-[13px] font-bold text-text"
                 >
                   فروش
                 </Link>
                 <Link
-                  href={`/app/buy?instrument=${row.id}`}
+                  href={tradePathForInstrument(row.id)}
                   className="flex h-10 items-center justify-center rounded-xl bg-[#161616] text-[13px] font-bold text-white"
                 >
                   خرید

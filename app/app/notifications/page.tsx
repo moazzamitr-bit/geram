@@ -50,7 +50,7 @@ export default function NotificationsPage() {
           title="هنوز اعلانی ندارید"
           description="بعد از خرید، فروش یا رویداد امنیتی، پیام‌ها اینجا می‌آیند."
           icon={Bell}
-          actionHref="/app/buy"
+          actionHref="/app/trade/gold"
           actionLabel="اولین خرید طلا"
         />
       ) : (

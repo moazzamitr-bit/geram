@@ -2,6 +2,7 @@
 
 import { useDemoStore } from "@/lib/app/demo-store";
 import { INSTRUMENTS, type InstrumentId } from "@/lib/market/instruments";
+import { tradePathForInstrument } from "@/lib/market/trade-routes";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -33,7 +34,7 @@ export function PriceTicker({ className }: { className?: string }) {
         return (
           <Link
             key={id}
-            href={`/app/buy?instrument=${id}`}
+            href={tradePathForInstrument(id)}
             className="inline-flex items-center gap-1.5 text-[12px] text-text-secondary transition-colors hover:text-text"
           >
             <span className="h-2 w-2 rounded-full" style={{ background: DOT[id] }} />

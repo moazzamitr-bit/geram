@@ -14,6 +14,7 @@ import {
   instrumentLabel,
   type InstrumentId,
 } from "@/lib/market/instruments";
+import { tradePathForInstrument } from "@/lib/market/trade-routes";
 import { formatFaNumber, formatToman } from "@/lib/utils";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -91,10 +92,10 @@ export default function PortfolioPage() {
           </div>
         </div>
         <div className="relative mt-6 flex flex-wrap gap-3">
-          <Link href="/app/buy">
+          <Link href="/app/trade/gold">
             <GoldButton type="button">خرید</GoldButton>
           </Link>
-          <Link href="/app/sell">
+          <Link href="/app/trade/gold?side=sell">
             <GoldButton type="button" variant="secondary">
               فروش
             </GoldButton>
@@ -137,13 +138,13 @@ export default function PortfolioPage() {
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Link
-                href={`/app/sell?instrument=${row.id}`}
+                href={tradePathForInstrument(row.id, "sell")}
                 className="flex h-10 items-center justify-center rounded-xl border border-black/10 text-[13px] font-bold text-text"
               >
                 فروش
               </Link>
               <Link
-                href={`/app/buy?instrument=${row.id}`}
+                href={tradePathForInstrument(row.id)}
                 className="flex h-10 items-center justify-center rounded-xl bg-[#161616] text-[13px] font-bold text-white"
               >
                 خرید
