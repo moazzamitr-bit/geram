@@ -4,9 +4,11 @@ import { PriceTicker } from "@/components/app/PriceTicker";
 import { PwaInstallBanner } from "@/components/app/PwaInstallBanner";
 import { AppShellSkeleton } from "@/components/app/Skeleton";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { DesktopTradeMenu, MobileTradeButton } from "@/components/app/TradeNav";
 import {
   desktopBottomNav,
   desktopNavSections,
+  isTradeNavMenu,
   mobileBottomNav,
   notificationsNav,
   type AppNavItem,
@@ -22,9 +24,6 @@ import { useEffect, useMemo } from "react";
 function isNavActive(pathname: string, href: string) {
   if (href === "/app/dashboard") {
     return pathname === "/app/dashboard" || pathname === "/app";
-  }
-  if (href === "/app/buy") {
-    return pathname.startsWith("/app/buy") || pathname.startsWith("/app/sell");
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -43,7 +42,7 @@ function SideLink({
   active,
   unread,
 }: {
-  item: AppNavItem;
+  item: Extract<AppNavItem, { href: string }>;
   active: boolean;
   unread: number;
 }) {
@@ -106,27 +105,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {section.label}
                 </p>
               )}
-              {section.items.map((item) => (
-                <SideLink
-                  key={item.href}
-                  item={item}
-                  active={isNavActive(pathname, item.href)}
-                  unread={unread}
-                />
-              ))}
+              {section.items.map((item) =>
+                isTradeNavMenu(item) ? (
+                  <DesktopTradeMenu key={item.menuKey} item={item} pathname={pathname} />
+                ) : (
+                  <SideLink
+                    key={item.href}
+                    item={item}
+                    active={isNavActive(pathname, item.href)}
+                    unread={unread}
+                  />
+                )
+              )}
             </div>
           ))}
         </nav>
 
         <div className="space-y-1 border-t border-black/[0.06] px-3 py-3">
-          {desktopBottomNav.map((item) => (
-            <SideLink
-              key={item.href}
-              item={item}
-              active={isNavActive(pathname, item.href)}
-              unread={unread}
-            />
-          ))}
+          {desktopBottomNav.map((item) =>
+            isTradeNavMenu(item) ? null : (
+              <SideLink
+                key={item.href}
+                item={item}
+                active={isNavActive(pathname, item.href)}
+                unread={unread}
+              />
+            )
+          )}
           <button
             type="button"
             onClick={() => {
@@ -181,6 +186,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <ul className="mx-auto grid max-w-lg grid-cols-5 px-1 py-1.5">
           {mobileBottomNav.map((item) => {
+            if (isTradeNavMenu(item)) {
+              return (
+                <li key={item.menuKey}>
+                  <MobileTradeButton item={item} pathname={pathname} />
+                </li>
+              );
+            }
             const active = isNavActive(pathname, item.href);
             const Icon = item.icon;
             return (

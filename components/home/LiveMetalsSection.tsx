@@ -1,6 +1,7 @@
 "use client";
 
 import { isLiveDisplayQuote } from "@/lib/market/display-price";
+import { tradePathForInstrument } from "@/lib/market/trade-routes";
 import {
   INSTRUMENT_IDS,
   INSTRUMENTS,
@@ -128,7 +129,7 @@ export function LiveMetalsSection() {
 
                 <div className="mt-6 flex items-center gap-4">
                   <Link
-                    href={`/app/buy?instrument=${id}`}
+                    href={tradePathForInstrument(id)}
                     prefetch={false}
                     className="inline-flex items-center gap-1 text-[13px] font-semibold text-gold transition-colors hover:text-gold-highlight"
                   >

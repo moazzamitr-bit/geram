@@ -24,7 +24,7 @@ export default function DocumentsPage() {
         <EmptyState
           title="سندی نیست"
           description="پس از خرید یا فروش، رسید تراکنش اینجا قابل مشاهده است."
-          actionHref="/app/buy"
+          actionHref="/app/trade/gold"
           actionLabel="خرید طلا"
           icon={FileText}
         />

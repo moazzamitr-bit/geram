@@ -71,7 +71,7 @@ export default function ScheduledPurchasesPage() {
         <EmptyState
           title="برنامه فعالی ندارید"
           description="خرید دوره‌ای از کیف پول تعریف کنید تا بدون تصمیم روزانه پس‌انداز کنید."
-          actionHref="/app/buy"
+          actionHref="/app/trade/gold"
           actionLabel="یا همین حالا خرید کنید"
           icon={CalendarClock}
         />

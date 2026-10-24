@@ -12,6 +12,7 @@ import {
   INSTRUMENTS,
   type InstrumentId,
 } from "@/lib/market/instruments";
+import { tradePathForInstrument } from "@/lib/market/trade-routes";
 import { formatToman } from "@/lib/utils";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -156,10 +157,10 @@ export default function MarketPage() {
           />
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
-          <Link href={`/app/buy?instrument=${instrument}`}>
+          <Link href={tradePathForInstrument(instrument)}>
             <GoldButton type="button">خرید {meta.label}</GoldButton>
           </Link>
-          <Link href={`/app/sell?instrument=${instrument}`}>
+          <Link href={tradePathForInstrument(instrument, "sell")}>
             <GoldButton type="button" variant="secondary">
               فروش {meta.label}
             </GoldButton>

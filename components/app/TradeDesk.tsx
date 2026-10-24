@@ -16,9 +16,13 @@ import {
 import type { UiQuote } from "@/lib/core-api";
 import {
   INSTRUMENTS,
-  type InstrumentId,
   parseInstrumentId,
+  type InstrumentId,
 } from "@/lib/market/instruments";
+import {
+  instrumentFromTradeQuery,
+  tradePathForInstrument,
+} from "@/lib/market/trade-routes";
 import { cn, formatToman } from "@/lib/utils";
 import { Check } from "lucide-react";
 import Link from "next/link";
@@ -31,12 +35,22 @@ const STROKE: Record<InstrumentId, string> = {
   copper: "#C4784A",
 };
 
-export function TradeDesk({ side }: { side: "buy" | "sell" }) {
+export function TradeDesk({
+  side,
+  instrument: routeInstrument,
+}: {
+  side: "buy" | "sell";
+  instrument?: InstrumentId;
+}) {
   const store = useDemoStore();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [instrument, setInstrument] = useState<InstrumentId>(() =>
-    parseInstrumentId(searchParams.get("instrument"))
+  const queried = instrumentFromTradeQuery({
+    metal: searchParams.get("metal"),
+    instrument: searchParams.get("instrument"),
+  });
+  const [instrument, setInstrument] = useState<InstrumentId>(
+    () => routeInstrument ?? queried ?? "gold18"
   );
   const [edited, setEdited] = useState<AmountField>("toman");
   const [tomanText, setTomanText] = useState("0");
@@ -57,8 +71,15 @@ export function TradeDesk({ side }: { side: "buy" | "sell" }) {
   const settings = store.commerceSettings;
 
   useEffect(() => {
-    setInstrument(parseInstrumentId(searchParams.get("instrument")));
-  }, [searchParams]);
+    setInstrument(routeInstrument ?? queried ?? "gold18");
+  }, [routeInstrument, queried]);
+
+  useEffect(() => {
+    setLocked(null);
+    setChecked(false);
+    setError("");
+    setDoneTx(null);
+  }, [side, instrument]);
 
   useEffect(() => {
     if (!locked) return;
@@ -127,7 +148,11 @@ export function TradeDesk({ side }: { side: "buy" | "sell" }) {
     setEdited("toman");
     setTomanText("0");
     setGramText("0");
-    router.replace(`/app/${side}?instrument=${id}`);
+    router.replace(
+      routeInstrument
+        ? tradePathForInstrument(id, side)
+        : `/app/${side}?instrument=${id}`
+    );
   };
 
   const onTomanChange = (raw: string) => {
@@ -254,13 +279,21 @@ export function TradeDesk({ side }: { side: "buy" | "sell" }) {
         >
           <div className="grid grid-cols-2 rounded-xl bg-[#F3F1ED] p-1 text-[14px]">
             <SideLink
-              href={`/app/buy?instrument=${instrument}`}
+              href={
+                routeInstrument
+                  ? tradePathForInstrument(instrument, "buy")
+                  : `/app/buy?instrument=${instrument}`
+              }
               active={side === "buy"}
               tone="buy"
               label={`خرید ${meta.label}`}
             />
             <SideLink
-              href={`/app/sell?instrument=${instrument}`}
+              href={
+                routeInstrument
+                  ? tradePathForInstrument(instrument, "sell")
+                  : `/app/sell?instrument=${instrument}`
+              }
               active={side === "sell"}
               tone="sell"
               label={`فروش ${meta.label}`}
@@ -269,7 +302,9 @@ export function TradeDesk({ side }: { side: "buy" | "sell" }) {
 
           <div className="mt-4 flex items-center justify-between text-[12px] text-muted-app">
             <span>قیمت هر گرم</span>
-            <span className="tabular-nums text-text">{formatToman(price)}</span>
+            <span className="tabular-nums text-text">
+              {price > 0 ? formatToman(price) : "در حال دریافت قیمت لایو..."}
+            </span>
           </div>
 
           <label className="mt-4 block rounded-xl bg-[#F6F4F1] px-4 py-3">
@@ -399,7 +434,7 @@ export function TradeDesk({ side }: { side: "buy" | "sell" }) {
             <ChartRangeTabs value={range} onChange={setRange} />
           </div>
           <p className="mt-3 text-[13px] tabular-nums text-muted-app">
-            {price > 0 ? formatToman(price) : "—"}
+            {price > 0 ? formatToman(price) : "در حال دریافت قیمت لایو..."}
           </p>
           <div className="mt-2">
             <DeferredPriceChart

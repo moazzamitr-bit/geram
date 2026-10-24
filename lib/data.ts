@@ -87,11 +87,11 @@ export const footerGroups = [
   {
     title: "معامله",
     links: [
-      { label: "خرید طلا", href: "/app/buy?instrument=gold18" },
-      { label: "خرید نقره", href: "/app/buy?instrument=silver925" },
-      { label: "خرید مس", href: "/app/buy?instrument=copper" },
+      { label: "خرید طلا", href: "/app/trade/gold" },
+      { label: "خرید نقره", href: "/app/trade/silver" },
+      { label: "خرید مس", href: "/app/trade/copper" },
       { label: "بازار فلزات", href: "/app/market" },
-      { label: "فروش", href: "/app/sell" },
+      { label: "فروش", href: "/app/trade/gold?side=sell" },
     ],
   },
   {
