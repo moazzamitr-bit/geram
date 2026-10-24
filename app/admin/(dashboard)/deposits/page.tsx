@@ -24,12 +24,12 @@ export default async function AdminDepositsPage() {
     <div>
       <AdminPageHeader
         title="صف واریز"
-        description="واریز شخصی خاموش است. شارژ کیف پول فقط از ژورنال تأییدشده (USER_AVAILABLE) انجام می‌شود."
+        description="واریز شخصی خاموش است. یک ادمین شارژ را ثبت می‌کند و همان لحظه به USER_AVAILABLE می‌نشیند."
         action={<a className="text-[13px] text-gold" href="/api/admin/export?type=deposits">CSV</a>}
       />
       <OpsBadge state="MOCK" />
       <AdminNotice title="شارژ دستی">
-        درگاه بانکی وصل نیست. برای بتای بسته، درخواست شارژ بسازید؛ ادمین دوم Approve و سپس Execute journal می‌زند. موجودی wallets مستقیم تغییر نمی‌کند. خرید مشتری تا وقتی فلز در PLATFORM_AVAILABLE نباشد رد می‌شود.
+        درگاه بانکی وصل نیست و واریز شخصی خاموش است. فرم زیر شارژ را همان لحظه در دفترکل می‌نشاند و نام ادمین در لاگ حسابرسی می‌ماند. موجودی wallets مستقیم تغییر نمی‌کند. خرید مشتری تا وقتی فلز در PLATFORM_AVAILABLE نباشد رد می‌شود.
       </AdminNotice>
       <div className="mb-6 max-w-lg">
         <WalletCreditForm />

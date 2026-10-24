@@ -10,7 +10,8 @@ Read `AGENTS.md` at the repo root before any change. Non-negotiable:
   for routes/layouts), commit, push to `fix/p0-security`. The owner deploys with `deploy/install.sh`.
 - Never commit secrets; the repo is public. Settings go to `.env.example` (empty) + server `.env.production`.
 - Never update balances or `wallets` directly; money moves only through ledger journals
-  (`lib/core/ledger.ts` `postJournal`) and the maker-checker approvals flow.
+  (`lib/core/ledger.ts` `postJournal`). Closed-beta wallet credit is a single-admin journal
+  with an audit log. Opening inventory and other corrections stay on maker-checker.
 - Every new table: RLS on, user writes limited to safe columns; reuse `public.is_privileged()`.
   New migration file per change; never edit applied migrations.
 - Docker WORKDIR stays `/srv/geram` (not `/app`). No `next/font/google` or other build-time
