@@ -6,8 +6,8 @@ import {
   planImmediateWalletCredit,
   resolveCreditTarget,
   walletCreditRefId,
+  walletDebitRefId,
 } from "@/lib/admin/wallet-credit";
-import { SANDBOX_FLAGS } from "@/lib/core/mode";
 import { tomanToIrr } from "@/lib/core/money";
 import { PLATFORM_HOLDER } from "@/lib/core/types";
 import { makeMemoryCore } from "../core/helpers";
@@ -214,11 +214,48 @@ describe("wallet credit copy", () => {
   });
 });
 
-describe("user self-deposit flag", () => {
-  it("blocks sandboxDeposit in SANDBOX when the flag is off", async () => {
-    const { core } = makeMemoryCore({
-      flags: { ...SANDBOX_FLAGS, SANDBOX_DEPOSIT_ENABLED: false },
+describe("admin wallet debit", () => {
+  it("reverses a credit without driving USER_AVAILABLE negative", async () => {
+    const { core, store } = makeMemoryCore({ seed: false });
+    const user = "22222222-2222-4222-8222-222222222222";
+    await core.creditApprovedUserIrr({
+      userId: user,
+      amountIrr: tomanToIrr(1_000),
+      reason: "closed beta invite credit",
+      refId: walletCreditRefId("debit-setup"),
     });
+    await expect(
+      core.debitApprovedUserIrr({
+        userId: user,
+        amountIrr: tomanToIrr(1_500),
+        reason: "reversal larger than balance",
+        refId: walletDebitRefId("debit-over"),
+      })
+    ).rejects.toMatchObject({ code: "insufficient_funds" });
+
+    const first = await core.debitApprovedUserIrr({
+      userId: user,
+      amountIrr: tomanToIrr(400),
+      reason: "reverse part of the credit",
+      refId: walletDebitRefId("debit-part"),
+    });
+    const replay = await core.debitApprovedUserIrr({
+      userId: user,
+      amountIrr: tomanToIrr(400),
+      reason: "reverse part of the credit",
+      refId: walletDebitRefId("debit-part"),
+    });
+    expect(replay).toEqual({ journalId: first.journalId, replayed: true });
+    const cash = await store.getAccount(user, "USER_AVAILABLE", "IRR");
+    expect(cash?.balance).toBe(tomanToIrr(600));
+    const opening = await store.getAccount(PLATFORM_HOLDER, "PLATFORM_OPENING", "IRR");
+    expect(opening?.balance).toBe(tomanToIrr(600));
+  });
+});
+
+describe("user self-deposit flag", () => {
+  it("blocks sandboxDeposit unless a test harness opts in", async () => {
+    const { core } = makeMemoryCore({ allowSandboxDeposit: false, seed: false });
     await expect(core.sandboxDeposit("user-1", tomanToIrr(1_000), "dep-blocked")).rejects.toMatchObject({
       code: "sandbox_deposit_blocked",
     });

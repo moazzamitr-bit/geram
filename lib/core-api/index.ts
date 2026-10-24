@@ -103,24 +103,6 @@ export const coreApi = {
       }
     );
   },
-
-  async sandboxDeposit(toman: number, idempotencyKey: string) {
-    return coreFetch<{ ok: true; id: string; trackingCode: string }>(
-      "/api/core/sandbox/deposit",
-      {
-        method: "POST",
-        headers: { "Idempotency-Key": idempotencyKey },
-        body: JSON.stringify({ toman, idempotencyKey }),
-      }
-    );
-  },
-
-  async sandboxSession(userId: string) {
-    return coreFetch<{ ok: true; userId: string }>("/api/core/sandbox/session", {
-      method: "POST",
-      body: JSON.stringify({ userId }),
-    });
-  },
 };
 
 export { coreFetch };

@@ -24,22 +24,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "service_unavailable" }, { status: 503 });
   }
 
-  const { error } = await db.from("admin_kill_switches").upsert({
+  const updatedAt = new Date().toISOString();
+  let { error } = await db.from("core_kill_switches").upsert({
     key,
     enabled,
     reason,
     actor_id: gate.ctx.userId,
-    updated_at: new Date().toISOString(),
+    updated_at: updatedAt,
   });
-
-  let engineError: string | null = null;
-  if (!error) {
-    const res = await db.from("core_kill_switches").upsert({
+  if (error && /reason|actor_id|column/i.test(error.message)) {
+    ({ error } = await db.from("core_kill_switches").upsert({
       key,
       enabled,
-      updated_at: new Date().toISOString(),
-    });
-    engineError = res.error?.message ?? null;
+      updated_at: updatedAt,
+    }));
   }
 
   await writeAudit({
@@ -57,7 +55,7 @@ export async function POST(request: Request) {
     },
   });
 
-  if (error || engineError) {
+  if (error) {
     return NextResponse.json(
       {
         ok: false,

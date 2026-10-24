@@ -1,5 +1,6 @@
 import { ASSET_SPECS, type AssetCode } from "./assets";
-import { copperIrrPerGram } from "./copper-price";
+import { copperIrrPerGram, pickCopperObservation } from "./copper-price";
+import { isTimestampStale, observedAtIso, SPOT_STALE_AFTER_MS } from "@/lib/market/freshness";
 import { irr, tomanToIrr, type Irr } from "./money";
 import { CoreError, type PriceHealth, type PriceQuote } from "./types";
 
@@ -80,6 +81,8 @@ export function tgjuExecutableFeed(fetchCurrent: () => Promise<Record<string, un
         if (!p || p < 1_000_000n) {
           throw new CoreError("price_unavailable", "gold 18k price invalid", 503);
         }
+        const observedRaw = picked!.row.ts;
+        const stale = isTimestampStale(observedRaw, SPOT_STALE_AFTER_MS);
         return quote({
           instrument: "IRAN_GOLD_18K_IRR_PER_GRAM",
           asset,
@@ -87,8 +90,9 @@ export function tgjuExecutableFeed(fetchCurrent: () => Promise<Record<string, un
           source: picked!.key,
           sourceMode: "TEMPORARY_PUBLIC",
           permittedForProduction: false,
-          health: "LIVE",
-          observedAt: new Date().toISOString(),
+          health: stale ? "STALE" : "LIVE",
+          stale,
+          observedAt: observedAtIso(observedRaw),
         });
       }
 
@@ -105,6 +109,8 @@ export function tgjuExecutableFeed(fetchCurrent: () => Promise<Record<string, un
         if (!p || p < 10_000n) {
           throw new CoreError("price_unavailable", "silver 999 price invalid", 503);
         }
+        const observedRaw = picked!.row.ts;
+        const stale = isTimestampStale(observedRaw, SPOT_STALE_AFTER_MS);
         return quote({
           instrument: "IRAN_SILVER_999_IRR_PER_GRAM",
           asset,
@@ -112,36 +118,40 @@ export function tgjuExecutableFeed(fetchCurrent: () => Promise<Record<string, un
           source: picked!.key,
           sourceMode: "TEMPORARY_PUBLIC",
           permittedForProduction: false,
-          health: "LIVE",
-          observedAt: new Date().toISOString(),
+          health: stale ? "STALE" : "LIVE",
+          stale,
+          observedAt: observedAtIso(observedRaw),
         });
       }
 
       if (asset === "COPPER") {
-        const copper = pickRow(current, ["copper", "base_global_copper"]);
+        const copper = pickCopperObservation(current);
         const dollar = pickRow(current, [
           "price_dollar_rl",
           "price_dollar_dt",
           "price_dollar_afshar",
         ]);
-        const usdTonne = copper ? parseIntLoose(copper.row.p) : null;
         const usdIrr = dollar ? parseIntLoose(dollar.row.p) : null;
-        if (!usdTonne || usdTonne < 1000n || !usdIrr || usdIrr < 10_000n) {
+        if (!copper || !usdIrr || usdIrr < 10_000n) {
           throw new CoreError("price_unavailable", "copper theoretical price invalid", 503);
         }
-        const irrPerGram = copperIrrPerGram({
-          usdPerMetricTonne: usdTonne,
-          usdIrr,
-        });
+        const dollarStale = isTimestampStale(dollar!.row.ts, SPOT_STALE_AFTER_MS);
+        const irrPerGram = copperIrrPerGram(
+          copper.unit === "lb"
+            ? { usdPerLbMilli: copper.priceMilli, usdIrr }
+            : { usdPerTonneMilli: copper.priceMilli, usdIrr }
+        );
+        const stale = copper.stale || dollarStale;
         return quote({
           instrument: "GLOBAL_COPPER_THEORETICAL_IRR_PER_GRAM",
           asset,
           irrPerGram,
-          source: `${copper!.key}+${dollar!.key}`,
+          source: `${copper.sourceKey}+${dollar!.key}`,
           sourceMode: "TEMPORARY_PUBLIC",
           permittedForProduction: false,
-          health: "LIVE",
-          observedAt: new Date().toISOString(),
+          health: stale ? "STALE" : "LIVE",
+          stale,
+          observedAt: copper.observedAt,
         });
       }
 

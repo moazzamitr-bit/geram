@@ -12,7 +12,10 @@ const vazirmatn = localFont({
   display: "swap",
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://geram.co";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
     default: "گرم | طلا، نقره و مس در یک کیف‌پول",
     template: "%s | گرم",

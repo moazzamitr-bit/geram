@@ -14,8 +14,6 @@ import {
   getFeatureFlags,
   getKillSwitches,
   postgresRequired,
-  sandboxDepositAllowed,
-  sandboxSeedAllowed,
   type ExecutionMode,
   type FeatureFlags,
   type KillSwitches,
@@ -48,6 +46,13 @@ export type EngineDeps = {
   safetyBufferUg?: Partial<Record<AssetCode, Microgram>>;
   seedInventoryUg?: Partial<Record<AssetCode, Microgram>>;
   seedCashIrr?: Irr;
+  /**
+   * Test harness only. Runtime never sets this. CLOSED_BETA and PRODUCTION
+   * ignore it because bootstrap also requires mode SANDBOX.
+   */
+  seedForTests?: boolean;
+  /** Test harness only. The public sandbox deposit routes are gone. */
+  allowSandboxDeposit?: boolean;
 };
 
 export type IssueQuoteInput = {
@@ -155,7 +160,7 @@ export class FinancialCore {
   /**
    * Ensures the chart of accounts. Does NOT manufacture inventory or cash.
    * PRODUCTION / CLOSED_BETA start at 0 unless an approved opening is posted.
-   * SANDBOX may SYSTEM_SEED only when SANDBOX_SEED_ENABLED is explicitly true.
+   * SANDBOX may SYSTEM_SEED only when a test harness sets seedForTests.
    */
   async bootstrap() {
     this.assertStoreForMode();
@@ -163,7 +168,7 @@ export class FinancialCore {
     if (this.seeded) return;
     this.seeded = true;
 
-    if (!sandboxSeedAllowed(this.mode(), this.flags())) {
+    if (this.mode() !== "SANDBOX" || !this.deps.seedForTests) {
       return;
     }
     assertSystemSeedAllowed(this.mode());
@@ -210,8 +215,8 @@ export class FinancialCore {
         throw new CoreError("opening_forbidden", "SYSTEM_SEED is forbidden in PRODUCTION", 403);
       }
       assertSystemSeedAllowed(this.mode());
-      if (!this.flags().SANDBOX_SEED_ENABLED) {
-        throw new CoreError("opening_forbidden", "SANDBOX_SEED_ENABLED is not set", 403);
+      if (!this.deps.seedForTests) {
+        throw new CoreError("opening_forbidden", "SYSTEM_SEED is not enabled", 403);
       }
     }
     const holderId = input.holderId ?? PLATFORM_HOLDER;
@@ -284,6 +289,76 @@ export class FinancialCore {
         refType: "APPROVED_OPENING_BALANCE",
         reason,
         refId,
+      });
+      return { journalId, replayed: false };
+    });
+  }
+
+  /**
+   * Reverses an admin credit. Debits USER_AVAILABLE and credits PLATFORM_OPENING
+   * by the same amount. Refuses when available IRR would go negative.
+   * Same refId posts once. Does not write a balance outside the ledger.
+   */
+  async debitApprovedUserIrr(input: {
+    userId: string;
+    amountIrr: Irr;
+    reason: string;
+    refId: string;
+  }): Promise<{ journalId: string; replayed: boolean }> {
+    const userId = input.userId.trim();
+    const reason = input.reason.trim();
+    const refId = input.refId.trim();
+    if (!userId || userId === PLATFORM_HOLDER) {
+      throw new CoreError("invalid_user", "Target user is invalid", 400);
+    }
+    if (input.amountIrr <= 0n) {
+      throw new CoreError("invalid_amount", "Debit amount must be positive", 400);
+    }
+    if (reason.length < 8) {
+      throw new CoreError("invalid_reason", "Reason must be at least 8 characters", 400);
+    }
+    if (!refId) {
+      throw new CoreError("invalid_request", "Idempotency ref is required", 400);
+    }
+    await this.bootstrap();
+    await ensureUserAccounts(this.deps.store, userId);
+    return this.deps.store.withLock(`admin-debit:${refId}`, async () => {
+      const existing = await this.deps.store.findJournalByRef(
+        "APPROVED_OPENING_BALANCE",
+        refId
+      );
+      if (existing) {
+        const debitLine = existing.lines.find(
+          (l) => l.accountCode === "USER_AVAILABLE" && l.asset === "IRR" && l.holderId === userId
+        );
+        if (!debitLine || debitLine.debit !== input.amountIrr || debitLine.credit !== 0n) {
+          throw new CoreError(
+            "idempotency_conflict",
+            "Idempotency key reused with a different debit",
+            409
+          );
+        }
+        return { journalId: existing.id, replayed: true };
+      }
+      await requireBalance(
+        this.deps.store,
+        userId,
+        "USER_AVAILABLE",
+        "IRR",
+        input.amountIrr,
+        "موجودی قابل استفاده برای این برگشت کافی نیست."
+      );
+      const journalId = newId("jnl");
+      await postJournal(this.deps.store, {
+        id: journalId,
+        createdAt: this.now().toISOString(),
+        reason,
+        refType: "APPROVED_OPENING_BALANCE",
+        refId,
+        lines: [
+          line("USER_AVAILABLE", userId, "IRR", input.amountIrr, 0n),
+          line("PLATFORM_OPENING", PLATFORM_HOLDER, "IRR", 0n, input.amountIrr),
+        ],
       });
       return { journalId, replayed: false };
     });
@@ -368,10 +443,10 @@ export class FinancialCore {
 
   async sandboxDeposit(userId: string, amountIrr: Irr, idempotencyKey: string) {
     if (amountIrr <= 0n) throw new CoreError("invalid_amount", "deposit must be > 0");
-    if (!sandboxDepositAllowed(this.mode(), this.flags())) {
+    if (!this.deps.allowSandboxDeposit) {
       throw new CoreError(
         "sandbox_deposit_blocked",
-        "Sandbox deposit is not allowed in this execution mode",
+        "Sandbox deposit is not available",
         403
       );
     }
@@ -1054,8 +1129,8 @@ export class FinancialCore {
 
   listActivity = async (userId: string) => {
     const trades = await this.deps.store.listTradesForUser(userId, 100);
-    const deposits = await this.deps.store.listSandboxDeposits(userId);
-    return { trades, deposits };
+    const journals = await this.deps.store.listJournalsForHolder(userId, 200);
+    return { trades, journals };
   };
 
   getQuoteForUser = async (userId: string, quoteId: string) => {

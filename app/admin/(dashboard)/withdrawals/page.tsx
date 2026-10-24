@@ -20,10 +20,9 @@ export default async function AdminWithdrawalsPage() {
         description="Mark Paid وجود ندارد. UNKNOWN باید رزرو بماند."
         action={<a className="text-[13px] text-gold" href="/api/admin/export?type=withdrawals">CSV</a>}
       />
-      <OpsBadge state="NOT_READY" />
+      <OpsBadge state="DEGRADED" />
       <AdminNotice title="Payout provider">
-        گردش REQUESTED → RESERVED → PROVIDER_PENDING هنوز ساخته نشده. فهرست زیر میراث «برداشت» است.
-        لغو فقط قبل از ارسال خارجی وقتی workflow آماده شود.
+        پرداخت بانکی ساخته نشده. ردیف‌های زیر برگشت شارژ دفترکل هستند و موجودی را منفی نمی‌کنند.
       </AdminNotice>
       <AdminTable headers={["کد", "کاربر", "مبلغ", "وضعیت", "زمان", "اقدام"]} empty={rows.length === 0}>
         {rows.map((t) => {

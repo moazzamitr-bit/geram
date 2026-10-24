@@ -1,6 +1,6 @@
-import { assetToUiInstrument } from "@/lib/core/assets";
+import { assetToUiInstrument, type AssetCode } from "@/lib/core/assets";
 import { irrToSafeTomanNumber, ugToSafeMgNumber } from "@/lib/core/money";
-import type { Quote, Trade } from "@/lib/core/types";
+import type { JournalEntry, Quote, Trade } from "@/lib/core/types";
 import type { WalletView } from "@/lib/core/engine";
 import type { InstrumentId } from "@/lib/market/instruments";
 
@@ -61,6 +61,72 @@ export function tradeToDemoTx(trade: Trade, quote?: Quote): UiTransaction {
       { label: "ثبت نهایی", done: settled },
     ],
     paymentRef: trade.side === "BUY" ? `WALLET-${trade.id.slice(0, 8)}` : undefined,
+  };
+}
+
+function faStamp(iso: string) {
+  return new Intl.DateTimeFormat("fa-IR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(iso));
+}
+
+/** One user-visible row for a ledger journal that touches this holder. */
+export function journalToUi(entry: JournalEntry, userId: string): UiTransaction {
+  const mine = entry.lines.filter((line) => line.holderId === userId);
+  const irr = mine.find((line) => line.accountCode === "USER_AVAILABLE" && line.asset === "IRR");
+  const metal = mine.find((line) => line.accountCode === "USER_AVAILABLE" && line.asset !== "IRR");
+  const fee = entry.lines.find((line) => line.accountCode === "PLATFORM_FEE_REVENUE");
+  let type: UiTransaction["type"] = "کارمزد";
+  if (entry.reason === "BUY_SETTLE") type = "خرید";
+  else if (entry.reason === "SELL_SETTLE") type = "فروش";
+  else if (irr && irr.credit > irr.debit) type = "واریز";
+  else if (irr && irr.debit > irr.credit) type = "برداشت";
+  else if (metal && metal.credit > metal.debit) type = "خرید";
+  else if (metal && metal.debit > metal.credit) type = "فروش";
+  const amountIrr = irr ? (irr.credit > 0n ? irr.credit : irr.debit) : 0n;
+  const weightUg = metal ? (metal.credit > 0n ? metal.credit : metal.debit) : 0n;
+  const asset = metal && metal.asset !== "IRR" ? (metal.asset as AssetCode) : "GOLD";
+  const label =
+    type === "واریز"
+      ? "شارژ دفترکل"
+      : type === "برداشت"
+        ? "برگشت شارژ"
+        : entry.reason;
+  return {
+    id: entry.id,
+    trackingCode: entry.refId || entry.id,
+    type,
+    instrument: assetToUiInstrument(asset),
+    goldMg: ugToSafeMgNumber(weightUg),
+    amountRial: irrToSafeTomanNumber(amountIrr),
+    feeRial: fee ? irrToSafeTomanNumber(fee.credit) : 0,
+    pricePerGram: 0,
+    status: "تکمیل‌شده",
+    createdAt: faStamp(entry.createdAt),
+    timeline: [
+      { label, done: true },
+      { label: "ثبت در دفترکل", done: true },
+    ],
+    note: entry.reason,
+    paymentRef: entry.refType,
+  };
+}
+
+export function serializeJournal(entry: JournalEntry) {
+  return {
+    id: entry.id,
+    createdAt: entry.createdAt,
+    reason: entry.reason,
+    refType: entry.refType,
+    refId: entry.refId,
+    lines: entry.lines.map((line) => ({
+      accountCode: line.accountCode,
+      holderId: line.holderId,
+      asset: line.asset,
+      debit: line.debit.toString(),
+      credit: line.credit.toString(),
+    })),
   };
 }
 

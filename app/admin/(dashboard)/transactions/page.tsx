@@ -15,9 +15,9 @@ export default async function AdminTransactionsPage() {
     <div>
       <AdminPageHeader
         title="تراکنش‌ها"
-        description="فهرست میراث. برای معامله از صفحه Trades و برای دفترکل از Ledger استفاده کنید."
+        description="معاملات core_trades و ژورنال‌های شارژ و برگشت APPROVED_OPENING_BALANCE."
       />
-      <AdminNotice title="منبع">جدول transactions — نه core_journals.</AdminNotice>
+      <AdminNotice title="منبع">core_trades و core_journals. مبلغ به تومان است.</AdminNotice>
       <AdminTable
         headers={["کد", "نوع", "کاربر", "طلا", "مبلغ", "وضعیت", "زمان"]}
         empty={rows.length === 0}

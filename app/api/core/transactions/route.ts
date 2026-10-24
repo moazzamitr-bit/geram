@@ -1,7 +1,6 @@
+import { journalToUi, serializeJournal, serializeTrade, tradeToDemoTx } from "@/lib/core/adapters";
 import { jsonError, requireCoreUserId } from "@/lib/core/http";
 import { getFinancialCore } from "@/lib/core/runtime";
-import { serializeTrade, tradeToDemoTx } from "@/lib/core/adapters";
-import { irrToSafeTomanNumber } from "@/lib/core/money";
 
 export const dynamic = "force-dynamic";
 
@@ -9,34 +8,26 @@ export async function GET() {
   try {
     const userId = await requireCoreUserId();
     const core = getFinancialCore();
-    const { trades, deposits } = await core.listActivity(userId);
+    const { trades, journals } = await core.listActivity(userId);
+    const postedTradeIds = new Set(
+      journals.filter((journal) => journal.refType === "trade").map((journal) => journal.refId)
+    );
     const ui = [
-      ...trades.map((t) => tradeToDemoTx(t)),
-      ...deposits.map((d) => ({
-        id: d.id,
-        trackingCode: d.trackingCode,
-        type: "واریز" as const,
-        instrument: "gold18" as const,
-        goldMg: 0,
-        amountRial: irrToSafeTomanNumber(d.irr),
-        feeRial: 0,
-        pricePerGram: 0,
-        status: "تکمیل‌شده" as const,
-        createdAt: new Intl.DateTimeFormat("fa-IR", {
-          dateStyle: "short",
-          timeStyle: "short",
-        }).format(new Date(d.createdAt)),
-        timeline: [
-          { label: "درخواست واریز", done: true },
-          { label: "ثبت واریز", done: true },
-          { label: "افزایش موجودی", done: true },
-        ],
+      ...journals.map((journal) => ({
+        sortAt: journal.createdAt,
+        row: journalToUi(journal, userId),
       })),
-    ].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+      ...trades
+        .filter((trade) => !postedTradeIds.has(trade.id))
+        .map((trade) => ({ sortAt: trade.createdAt, row: tradeToDemoTx(trade) })),
+    ]
+      .sort((a, b) => (a.sortAt < b.sortAt ? 1 : a.sortAt > b.sortAt ? -1 : 0))
+      .map((item) => item.row);
 
     return Response.json({
       ok: true,
       trades: trades.map(serializeTrade),
+      journals: journals.map(serializeJournal),
       ui,
     });
   } catch (err) {

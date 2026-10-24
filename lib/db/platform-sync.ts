@@ -6,8 +6,6 @@ import type {
   DemoTransaction,
   SupportTicket,
 } from "@/lib/app/demo-store";
-import type { InstrumentId } from "@/lib/market/instruments";
-import { parseInstrumentId } from "@/lib/market/instruments";
 
 export type PlatformBundle = {
   goldMg: number;
@@ -108,7 +106,6 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
   const [
     ledger,
     banks,
-    txs,
     goals,
     deliveries,
     notifications,
@@ -118,12 +115,6 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
   ] = await Promise.all([
     loadLedgerBalances(),
     supabase.from("bank_accounts").select("*").eq("user_id", user.id),
-    supabase
-      .from("transactions")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(100),
     supabase.from("goals").select("*").eq("user_id", user.id).order("created_at", {
       ascending: false,
     }),
@@ -162,21 +153,7 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
       bank: b.bank_name,
       verified: b.verified,
     })),
-    transactions: (txs.data ?? []).map((tx) => ({
-      id: tx.id,
-      trackingCode: tx.tracking_code,
-      type: tx.type,
-      instrument: parseInstrumentId(tx.instrument),
-      goldMg: Number(tx.gold_mg),
-      amountRial: Number(tx.amount_toman),
-      feeRial: Number(tx.fee_toman),
-      pricePerGram: Number(tx.price_per_gram_toman),
-      status: tx.status,
-      createdAt: new Date(tx.created_at).toLocaleString("fa-IR"),
-      timeline: Array.isArray(tx.timeline) ? tx.timeline : [],
-      paymentRef: tx.payment_ref ?? undefined,
-      note: tx.note ?? undefined,
-    })),
+    transactions: [],
     goals: (goals.data ?? []).map((g) => ({
       id: g.id,
       name: g.name,
@@ -239,54 +216,6 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
       autoBuyToman: Number(a.auto_buy_toman ?? 0),
     })),
   };
-}
-
-export async function persistWallet(_input: {
-  goldMg: number;
-  silverMg: number;
-  copperMg: number;
-  rialAvailable: number;
-  rialPending: number;
-  avgBuyPriceRial: number;
-  avgBuyPriceSilverRial: number;
-  avgBuyPriceCopperRial: number;
-}) {
-  // Ledger is the only wallet authority. Client/app must not upsert balances.
-  return;
-}
-
-export async function persistTransaction(tx: DemoTransaction) {
-  const auth = await authedClient();
-  if (!auth) return;
-  const instrument: InstrumentId = parseInstrumentId(tx.instrument);
-  const row: Record<string, unknown> = {
-    user_id: auth.user.id,
-    tracking_code: tx.trackingCode,
-    type: tx.type,
-    gold_mg: tx.goldMg,
-    amount_toman: tx.amountRial,
-    fee_toman: tx.feeRial,
-    price_per_gram_toman: tx.pricePerGram,
-    status: tx.status,
-    payment_ref: tx.paymentRef ?? null,
-    note: tx.note ?? null,
-    timeline: tx.timeline,
-  };
-  if (isUuid(tx.id)) row.id = tx.id;
-
-  let { error } = await auth.supabase.from("transactions").upsert(
-    { ...row, instrument },
-    { onConflict: isUuid(tx.id) ? "id" : "tracking_code" }
-  );
-  if (error) {
-    const msg = error.message.toLowerCase();
-    if (msg.includes("instrument") || msg.includes("schema cache")) {
-      ({ error } = await auth.supabase.from("transactions").upsert(row, {
-        onConflict: isUuid(tx.id) ? "id" : "tracking_code",
-      }));
-    }
-  }
-  if (error) console.error("persistTransaction", error.message);
 }
 
 export async function persistGoal(goal: DemoGoal) {

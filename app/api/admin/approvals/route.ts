@@ -7,6 +7,7 @@ import {
   parseIdempotencyKey,
   parseStoredWalletCredit,
   parseTomanAmount,
+  parseWalletDirection,
   planImmediateWalletCredit,
   resolveCreditTarget,
 } from "@/lib/admin/wallet-credit";
@@ -251,11 +252,17 @@ async function createWalletCredit(
       { status: 503 }
     );
   }
+  const direction = parseWalletDirection(body.direction);
+  if (!direction) {
+    return NextResponse.json({ ok: false, error: "invalid_direction" }, { status: 400 });
+  }
+
   const prior = existing?.[0];
   const plan = planImmediateWalletCredit({
     userId: target.userId,
     amountToman: amount.toman,
     idempotencyKey,
+    direction,
     prior: prior
       ? { id: String(prior.id), status: String(prior.status), payload: prior.payload }
       : null,
@@ -273,24 +280,28 @@ async function createWalletCredit(
     phone: target.phone,
     amount: String(amount.toman),
     asset: "IRR",
-    direction: "CREDIT",
+    direction,
     idempotencyKey,
   };
 
   let posted: { journalId: string; replayed: boolean };
   try {
     const core = getFinancialCore();
-    posted = await core.creditApprovedUserIrr({
+    const postInput = {
       userId: target.userId,
       amountIrr: plan.amountIrr,
       reason,
       refId: plan.refId,
-    });
+    };
+    posted =
+      direction === "DEBIT"
+        ? await core.debitApprovedUserIrr(postInput)
+        : await core.creditApprovedUserIrr(postInput);
   } catch (err) {
     await writeAudit({
       actorId: ctx.userId,
       role: ctx.role,
-      action: "wallet.credit",
+      action: direction === "DEBIT" ? "wallet.debit" : "wallet.credit",
       entity: "ledger_journal",
       entityId: plan.priorId,
       reason,
@@ -298,14 +309,18 @@ async function createWalletCredit(
       meta: {
         kind: "FINANCIAL_ADJUSTMENT",
         userId: target.userId,
-        amountToman: amount.toman,
-        idempotencyKey,
-        error: err instanceof CoreError ? err.code : "post_failed",
-      },
-    });
-    if (err instanceof CoreError) {
-      return NextResponse.json({ ok: false, error: err.code }, { status: err.httpStatus });
-    }
+      direction,
+      amountToman: amount.toman,
+      idempotencyKey,
+      error: err instanceof CoreError ? err.code : "post_failed",
+    },
+  });
+  if (err instanceof CoreError) {
+    return NextResponse.json(
+      { ok: false, error: err.code === "insufficient_funds" ? err.message : err.code },
+      { status: err.httpStatus }
+    );
+  }
     return NextResponse.json(
       { ok: false, error: "ثبت در دفترکل ناموفق بود. اتصال دیتابیس معاملات را بررسی کنید." },
       { status: 500 }
@@ -340,13 +355,14 @@ async function createWalletCredit(
   await writeAudit({
     actorId: ctx.userId,
     role: ctx.role,
-    action: "wallet.credit",
+    action: direction === "DEBIT" ? "wallet.debit" : "wallet.credit",
     entity: "ledger_journal",
     entityId: posted.journalId,
     reason,
     result: "ok",
     meta: {
       kind: "FINANCIAL_ADJUSTMENT",
+      direction,
       userId: target.userId,
       amountToman: amount.toman,
       amountIrr: plan.amountIrr.toString(),
@@ -357,7 +373,10 @@ async function createWalletCredit(
       accountCode: "USER_AVAILABLE",
       approvalId: recordId,
       recordError,
-      note: "One admin posted the opening credit. wallets table was not mutated.",
+      note:
+        direction === "DEBIT"
+          ? "One admin posted a balanced debit. Balance cannot go negative."
+          : "One admin posted the opening credit.",
     },
   });
 
@@ -367,8 +386,10 @@ async function createWalletCredit(
     journalId: posted.journalId,
     replayed: posted.replayed,
     message: posted.replayed
-      ? "این شارژ قبلاً در دفترکل ثبت شده و دوباره اعمال نشد."
-      : `شارژ در دفترکل ثبت شد (${posted.journalId}).`,
+      ? "این درخواست قبلاً در دفترکل ثبت شده و دوباره اعمال نشد."
+      : direction === "DEBIT"
+        ? `برگشت شارژ در دفترکل ثبت شد (${posted.journalId}).`
+        : `شارژ در دفترکل ثبت شد (${posted.journalId}).`,
   });
 }
 
@@ -418,12 +439,16 @@ async function executeWalletCredit(input: {
 
   try {
     const core = getFinancialCore();
-    const posted = await core.creditApprovedUserIrr({
+    const postInput = {
       userId: parsed.userId,
       amountIrr: parsed.amountIrr,
       reason,
       refId: parsed.refId,
-    });
+    };
+    const posted =
+      parsed.direction === "DEBIT"
+        ? await core.debitApprovedUserIrr(postInput)
+        : await core.creditApprovedUserIrr(postInput);
     await writeAudit({
       actorId: ctx.userId,
       role: ctx.role,
@@ -435,13 +460,17 @@ async function executeWalletCredit(input: {
       meta: {
         kind: "FINANCIAL_ADJUSTMENT",
         userId: parsed.userId,
+        direction: parsed.direction,
         amountToman: parsed.amountToman,
         amountIrr: parsed.amountIrr.toString(),
         journalId: posted.journalId,
         replayed: posted.replayed,
         refType: "APPROVED_OPENING_BALANCE",
         accountCode: "USER_AVAILABLE",
-        note: "Ledger opening credit. wallets table was not mutated.",
+        note:
+          parsed.direction === "DEBIT"
+            ? "Ledger debit. Available balance was checked first."
+            : "Ledger opening credit.",
       },
     });
     return NextResponse.json({

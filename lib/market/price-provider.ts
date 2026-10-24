@@ -1,3 +1,9 @@
+import { pickCopperObservation } from "@/lib/core/copper-price";
+import {
+  isTimestampStale,
+  observedAtIso,
+  SPOT_STALE_AFTER_MS,
+} from "@/lib/market/freshness";
 import {
   type InstrumentId,
   parseInstrumentId,
@@ -110,9 +116,10 @@ function quoteFromRialRow(input: {
   const highRial = parseFaNumber(input.picked.row.h);
   const lowRial = parseFaNumber(input.picked.row.l);
   const changePercent = parseFaNumber(input.picked.row.dp);
+  const rawTs = input.picked.row.ts;
   const updatedAt =
-    typeof input.picked.row.ts === "string"
-      ? input.picked.row.ts
+    typeof rawTs === "string" && rawTs.trim()
+      ? observedAtIso(rawTs)
       : new Date().toISOString();
 
   return {
@@ -126,12 +133,22 @@ function quoteFromRialRow(input: {
     sourceKey: input.picked.key,
     updatedAt,
     fetchedAt: new Date().toISOString(),
-    stale: false,
+    stale: isTimestampStale(rawTs, SPOT_STALE_AFTER_MS),
   };
 }
 
+function usdToTomanPerGram(
+  unit: "lb" | "tonne",
+  usd: number,
+  dollarToman: number
+) {
+  const toman =
+    unit === "lb" ? (usd / 453.59237) * dollarToman : (usd / 1_000_000) * dollarToman;
+  return Math.max(1, Math.round(toman));
+}
+
 function buildCopperQuote(current: Record<string, unknown>): MarketPriceQuote {
-  const copper = pickRow(current, ["copper", "base_global_copper"]);
+  const copper = pickCopperObservation(current);
   const dollar = pickRow(current, [
     "price_dollar_rl",
     "price_dollar_dt",
@@ -140,46 +157,28 @@ function buildCopperQuote(current: Record<string, unknown>): MarketPriceQuote {
   if (!copper || !dollar) {
     throw new Error("TGJU copper/dollar instruments missing");
   }
-  const copperUsdPerTonne = parseFaNumber(copper.row.p);
   const dollarRial = parseFaNumber(dollar.row.p);
-  if (!copperUsdPerTonne || copperUsdPerTonne < 1000) {
-    throw new Error("TGJU copper USD invalid");
-  }
   if (!dollarRial || dollarRial < 10_000) {
     throw new Error("TGJU dollar rate invalid");
   }
   const dollarToman = rialToToman(dollarRial);
-  const priceToman = Math.max(
-    1,
-    Math.round((copperUsdPerTonne / 1_000_000) * dollarToman)
-  );
-
-  const highUsd = parseFaNumber(copper.row.h);
-  const lowUsd = parseFaNumber(copper.row.l);
-  const changePercent = parseFaNumber(copper.row.dp);
-  const updatedAt =
-    typeof copper.row.ts === "string"
-      ? copper.row.ts
-      : typeof dollar.row.ts === "string"
-        ? dollar.row.ts
-        : new Date().toISOString();
+  const usd = Number(copper.priceMilli) / 1000;
+  const highUsd = copper.highMilli == null ? null : Number(copper.highMilli) / 1000;
+  const lowUsd = copper.lowMilli == null ? null : Number(copper.lowMilli) / 1000;
+  const dollarStale = isTimestampStale(dollar.row.ts, SPOT_STALE_AFTER_MS);
 
   return {
     instrument: "copper",
-    priceToman,
-    priceRial: priceToman * 10,
-    highToman: highUsd
-      ? Math.max(1, Math.round((highUsd / 1_000_000) * dollarToman))
-      : null,
-    lowToman: lowUsd
-      ? Math.max(1, Math.round((lowUsd / 1_000_000) * dollarToman))
-      : null,
-    changePercent,
+    priceToman: usdToTomanPerGram(copper.unit, usd, dollarToman),
+    priceRial: usdToTomanPerGram(copper.unit, usd, dollarToman) * 10,
+    highToman: highUsd ? usdToTomanPerGram(copper.unit, highUsd, dollarToman) : null,
+    lowToman: lowUsd ? usdToTomanPerGram(copper.unit, lowUsd, dollarToman) : null,
+    changePercent: copper.changePercent,
     source: "بازار آزاد",
-    sourceKey: `${copper.key}+${dollar.key}`,
-    updatedAt,
+    sourceKey: `${copper.sourceKey}+${dollar.key}`,
+    updatedAt: copper.observedAt,
     fetchedAt: new Date().toISOString(),
-    stale: false,
+    stale: copper.stale || dollarStale,
   };
 }
 

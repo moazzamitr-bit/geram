@@ -44,7 +44,7 @@ export default async function AdminSearchPage({
               </tr>
             ))}
           </AdminTable>
-          <h2 className="mb-2 mt-6 font-bold">تراکنش‌ها</h2>
+          <h2 className="mb-2 mt-6 font-bold">معاملات و شارژ دفترکل</h2>
           <AdminTable headers={["کد", "نوع", "وضعیت"]} empty={result.txs.length === 0}>
             {result.txs.map((t) => (
               <tr key={t.id} className="border-b border-white/5">

@@ -7,7 +7,7 @@ import { staticPriceFeed } from "@/lib/core/price";
 import { tomanToIrr } from "@/lib/core/money";
 import { assertAccountPolicy } from "@/lib/core/account-policy";
 import { CONSERVATIVE_FLAGS } from "@/lib/core/mode";
-import { makeMemoryCore, makePgCore, makePgLite, TEST_PRICES, sandboxFlags } from "./helpers";
+import { makeMemoryCore, makePgCore, makePgLite, TEST_PRICES } from "./helpers";
 
 describe("production never auto-seeds", () => {
   it("PRODUCTION postgres bootstrap leaves metal and cash at 0 even if seed amounts are passed", async () => {
@@ -37,8 +37,8 @@ describe("production never auto-seeds", () => {
     ).rejects.toMatchObject({ code: "opening_forbidden" });
   });
 
-  it("SANDBOX without SANDBOX_SEED_ENABLED does not seed inventory", async () => {
-    const { core, store } = makeMemoryCore({ seed: false, flags: sandboxFlags(false) });
+  it("SANDBOX without test seeding does not seed inventory", async () => {
+    const { core, store } = makeMemoryCore({ seed: false });
     await core.bootstrap();
     const gold = await store.getAccount(PLATFORM_HOLDER, "PLATFORM_AVAILABLE", "GOLD");
     expect(gold?.balance ?? 0n).toBe(0n);
@@ -87,7 +87,7 @@ describe("opening account guard", () => {
   });
 
   it("allows APPROVED_OPENING_BALANCE", async () => {
-    const { core, store } = makeMemoryCore({ seed: false, flags: sandboxFlags(false) });
+    const { core, store } = makeMemoryCore({ seed: false });
     await core.postOpening({
       accountCode: "PLATFORM_AVAILABLE",
       asset: "GOLD",

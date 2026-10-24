@@ -23,21 +23,23 @@ export const DEFAULT_INVENTORY: Record<AssetCode, bigint> = {
   TEST_METAL: UG_PER_GRAM * 1_000n,
 };
 
-/** Trading tests still opt into simulated funding. The product default is off. */
-export function sandboxFlags(seed = true) {
-  return { ...SANDBOX_FLAGS, SANDBOX_SEED_ENABLED: seed, SANDBOX_DEPOSIT_ENABLED: true };
-}
-
 export function makeMemoryCore(
-  opts?: Partial<EngineDeps> & { inventory?: bigint; seed?: boolean }
+  opts?: Partial<EngineDeps> & {
+    inventory?: bigint;
+    seed?: boolean;
+    allowSandboxDeposit?: boolean;
+  }
 ) {
   const store = opts?.store ?? new MemoryCoreStore();
   const inventory = opts?.inventory;
+  const mode = opts?.mode ?? "SANDBOX";
   const core = new FinancialCore({
     store,
     prices: opts?.prices ?? staticPriceFeed(TEST_PRICES),
-    mode: opts?.mode ?? "SANDBOX",
-    flags: opts?.flags ?? sandboxFlags(opts?.seed !== false),
+    mode,
+    flags: opts?.flags ?? (mode === "SANDBOX" ? SANDBOX_FLAGS : CONSERVATIVE_FLAGS),
+    seedForTests: opts?.seedForTests ?? (mode === "SANDBOX" && opts?.seed !== false),
+    allowSandboxDeposit: opts?.allowSandboxDeposit ?? mode === "SANDBOX",
     fees: opts?.fees ?? {
       ...DEFAULT_FEE_SNAPSHOT,
       buyFeeMinIrr: 0n,
@@ -81,13 +83,14 @@ export function makePgCore(
 ) {
   const inventory = opts?.inventory;
   const mode = opts?.mode ?? "SANDBOX";
-  const flags =
-    mode === "SANDBOX" ? sandboxFlags(opts?.seed !== false) : { ...CONSERVATIVE_FLAGS };
+  const flags = mode === "SANDBOX" ? SANDBOX_FLAGS : { ...CONSERVATIVE_FLAGS };
   return new FinancialCore({
     store,
     prices: staticPriceFeed(TEST_PRICES),
     mode,
     flags,
+    seedForTests: mode === "SANDBOX" && opts?.seed !== false,
+    allowSandboxDeposit: mode === "SANDBOX",
     fees: { ...DEFAULT_FEE_SNAPSHOT, buyFeeMinIrr: 0n, sellFeeMinIrr: 0n },
     seedInventoryUg: {
       GOLD: inventory ?? UG_PER_GRAM * 100n,

@@ -12,9 +12,8 @@ import { useDemoStore } from "@/lib/app/demo-store";
 import { formatToman } from "@/lib/utils";
 import { useState } from "react";
 
-export function WalletClient({ selfDepositEnabled }: { selfDepositEnabled: boolean }) {
+export function WalletClient() {
   const store = useDemoStore();
-  const [depositAmount, setDepositAmount] = useState(0);
   const [withdrawAmount, setWithdrawAmount] = useState(0);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -51,44 +50,10 @@ export function WalletClient({ selfDepositEnabled }: { selfDepositEnabled: boole
 
       <div className="grid gap-5 lg:grid-cols-2">
         <AppCard>
-          {selfDepositEnabled ? (
-            <>
-              <h2 className="text-[15px] font-bold">واریز</h2>
-              <input
-                dir="ltr"
-                className="mt-3 h-12 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-4 text-left tabular-nums outline-none focus:border-gold"
-                value={depositAmount}
-                onChange={(e) =>
-                  setDepositAmount(Number(e.target.value.replace(/\D/g, "") || 0))
-                }
-              />
-              <GoldButton
-                type="button"
-                className="mt-4 w-full"
-                onClick={() => {
-                  void (async () => {
-                    const res = await store.deposit(depositAmount);
-                    if (!res.ok) {
-                      setErr(res.error ?? "خطا در واریز");
-                      setMsg("");
-                      return;
-                    }
-                    setMsg("واریز انجام شد.");
-                    setErr("");
-                  })();
-                }}
-              >
-                واریز
-              </GoldButton>
-            </>
-          ) : (
-            <>
-              <h2 className="text-[15px] font-bold">واریز</h2>
-              <p className="mt-3 text-[13px] leading-7 text-muted-app">
-                واریز شخصی در این نسخه خاموش است. موجودی کیف پول را ادمین از دفترکل شارژ می‌کند. درگاه بانکی فعال نیست.
-              </p>
-            </>
-          )}
+          <h2 className="text-[15px] font-bold">واریز</h2>
+          <p className="mt-3 text-[13px] leading-7 text-muted-app">
+            واریز شخصی در این نسخه خاموش است. موجودی کیف پول را ادمین از دفترکل شارژ می‌کند. درگاه بانکی فعال نیست.
+          </p>
         </AppCard>
 
         <AppCard>

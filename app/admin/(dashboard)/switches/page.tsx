@@ -10,7 +10,7 @@ import { probeTable } from "@/lib/admin/probe";
 export default async function AdminSwitchesPage() {
   const env = getKillSwitches();
   const db = await probeTable<{ key: string; enabled: boolean; reason?: string; actor_id?: string; updated_at?: string }>(
-    "admin_kill_switches",
+    "core_kill_switches",
     "*",
     { limit: 50 }
   );
@@ -20,7 +20,7 @@ export default async function AdminSwitchesPage() {
     <div>
       <AdminPageHeader
         title="کلیدهای اضطراری"
-        description="مرجع تولید باید Postgres باشد. موتور معامله فعلاً env می‌خواند — اختلاف DEGRADED است. Step-up OTP ادمین هنوز پیاده نشده."
+        description="موتور env و core_kill_switches را با هم می‌خواند. خاموش در هر کدام جریان را می‌بندد. Step-up OTP ادمین هنوز پیاده نشده."
       />
       {!db.ready ? <OpsBadge state="NOT_READY" /> : <OpsBadge state="DEGRADED" />}
       <AdminNotice title="OTP / step-up">
