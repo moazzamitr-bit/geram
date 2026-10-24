@@ -6,6 +6,7 @@ import {
   parseIdempotencyKey,
   parseStoredWalletCredit,
   parseTomanAmount,
+  planImmediateWalletCredit,
   resolveCreditTarget,
 } from "@/lib/admin/wallet-credit";
 import { PRODUCTION_ASSETS, type AssetCode } from "@/lib/core/assets";
@@ -140,6 +141,12 @@ export async function POST(request: Request) {
   }
 
   if (action === "reject") {
+    if (row.kind === "FINANCIAL_ADJUSTMENT" && row.status === "EXECUTED") {
+      return NextResponse.json(
+        { ok: false, error: "شارژ ثبت‌شده در دفترکل را نمی‌توان رد کرد." },
+        { status: 400 }
+      );
+    }
     await db
       .from("admin_approval_requests")
       .update({ status: "REJECTED", checker_id: gate.ctx.userId, updated_at: new Date().toISOString() })
@@ -157,14 +164,14 @@ export async function POST(request: Request) {
   }
 
   if (action === "execute") {
+    if (row.kind === "FINANCIAL_ADJUSTMENT") {
+      return executeWalletCredit({ db, row, reason, ctx: gate.ctx });
+    }
     if (row.status !== "APPROVED") {
       return NextResponse.json({ ok: false, error: "فقط درخواست APPROVED قابل اجراست." }, { status: 400 });
     }
     if (row.kind === "INVENTORY_ADJUSTMENT") {
       return executeOpeningInventory({ db, row, reason, ctx: gate.ctx });
-    }
-    if (row.kind === "FINANCIAL_ADJUSTMENT") {
-      return executeWalletCredit({ db, row, reason, ctx: gate.ctx });
     }
     return NextResponse.json(
       { ok: false, error: "اجرای این نوع درخواست هنوز پیاده نشده (NOT READY)." },
@@ -230,30 +237,25 @@ async function createWalletCredit(
     .limit(1);
   if (lookupError) {
     return NextResponse.json(
-      { ok: false, error: "جدول تأیید دو مرحله‌ای NOT READY است." },
+      { ok: false, error: "جدول ثبت شارژ NOT READY است." },
       { status: 503 }
     );
   }
   const prior = existing?.[0];
-  if (prior) {
-    const stored = parseStoredWalletCredit(prior.payload);
-    const same =
-      stored.ok &&
-      stored.userId === target.userId &&
-      stored.amountToman === amount.toman &&
-      stored.idempotencyKey === idempotencyKey;
-    if (!same) {
-      return NextResponse.json(
-        { ok: false, error: "idempotency_conflict" },
-        { status: 409 }
-      );
-    }
-    return NextResponse.json({
-      ok: true,
-      replayed: true,
-      id: prior.id,
-      message: "این کلید قبلاً ثبت شده است.",
-    });
+  const plan = planImmediateWalletCredit({
+    userId: target.userId,
+    amountToman: amount.toman,
+    idempotencyKey,
+    prior: prior
+      ? { id: String(prior.id), status: String(prior.status), payload: prior.payload }
+      : null,
+  });
+  if (!plan.ok) {
+    const error =
+      plan.error === "credit_rejected"
+        ? "این کلید شارژ قبلاً رد شده است. صفحه را تازه کنید و دوباره ثبت کنید."
+        : plan.error;
+    return NextResponse.json({ ok: false, error }, { status: plan.status });
   }
 
   const payload = {
@@ -265,49 +267,106 @@ async function createWalletCredit(
     idempotencyKey,
   };
 
-  const { data, error } = await db
-    .from("admin_approval_requests")
-    .insert({
-      kind: "FINANCIAL_ADJUSTMENT",
-      payload,
-      status: "PENDING_APPROVAL",
-      maker_id: ctx.userId,
+  let posted: { journalId: string; replayed: boolean };
+  try {
+    const core = getFinancialCore();
+    posted = await core.creditApprovedUserIrr({
+      userId: target.userId,
+      amountIrr: plan.amountIrr,
       reason,
-    })
-    .select("id")
-    .maybeSingle();
+      refId: plan.refId,
+    });
+  } catch (err) {
+    await writeAudit({
+      actorId: ctx.userId,
+      role: ctx.role,
+      action: "wallet.credit",
+      entity: "ledger_journal",
+      entityId: plan.priorId,
+      reason,
+      result: "error",
+      meta: {
+        kind: "FINANCIAL_ADJUSTMENT",
+        userId: target.userId,
+        amountToman: amount.toman,
+        idempotencyKey,
+        error: err instanceof CoreError ? err.code : "post_failed",
+      },
+    });
+    if (err instanceof CoreError) {
+      return NextResponse.json({ ok: false, error: err.code }, { status: err.httpStatus });
+    }
+    return NextResponse.json(
+      { ok: false, error: "ثبت در دفترکل ناموفق بود. اتصال دیتابیس معاملات را بررسی کنید." },
+      { status: 500 }
+    );
+  }
+
+  let recordId = plan.priorId;
+  let recordError: string | null = null;
+  if (plan.record === "insert") {
+    const { data, error } = await db
+      .from("admin_approval_requests")
+      .insert({
+        kind: "FINANCIAL_ADJUSTMENT",
+        payload,
+        status: "EXECUTED",
+        maker_id: ctx.userId,
+        reason,
+      })
+      .select("id")
+      .maybeSingle();
+    recordId = data?.id ? String(data.id) : null;
+    recordError = error?.message ?? null;
+  } else if (plan.record === "mark_executed" && plan.priorId) {
+    const { error } = await db
+      .from("admin_approval_requests")
+      .update({ status: "EXECUTED", updated_at: new Date().toISOString() })
+      .eq("id", plan.priorId)
+      .in("status", ["PENDING_APPROVAL", "APPROVED", "DRAFT"]);
+    recordError = error?.message ?? null;
+  }
+
   await writeAudit({
     actorId: ctx.userId,
     role: ctx.role,
-    action: "approval.create",
-    entity: "approval_request",
-    entityId: data?.id ?? null,
+    action: "wallet.credit",
+    entity: "ledger_journal",
+    entityId: posted.journalId,
     reason,
-    result: error ? "error" : "ok",
+    result: "ok",
     meta: {
       kind: "FINANCIAL_ADJUSTMENT",
       userId: target.userId,
       amountToman: amount.toman,
+      amountIrr: plan.amountIrr.toString(),
       idempotencyKey,
+      journalId: posted.journalId,
+      replayed: posted.replayed,
+      refType: "APPROVED_OPENING_BALANCE",
+      accountCode: "USER_AVAILABLE",
+      approvalId: recordId,
+      recordError,
+      note: "One admin posted the opening credit. wallets table was not mutated.",
     },
   });
-  if (error) {
-    return NextResponse.json(
-      { ok: false, error: "جدول تأیید دو مرحله‌ای NOT READY است." },
-      { status: 503 }
-    );
-  }
+
   return NextResponse.json({
     ok: true,
-    id: data?.id,
-    message: "درخواست شارژ کیف پول در صف تأیید قرار گرفت.",
+    id: recordId,
+    journalId: posted.journalId,
+    replayed: posted.replayed,
+    message: posted.replayed
+      ? "این شارژ قبلاً در دفترکل ثبت شده و دوباره اعمال نشد."
+      : `شارژ در دفترکل ثبت شد (${posted.journalId}).`,
   });
 }
 
 /**
  * Posts APPROVED_OPENING_BALANCE to USER_AVAILABLE IRR.
- * Claim APPROVED → EXECUTED before the journal so a double click cannot post twice.
- * The ledger ref id is the idempotency key. The wallets table is never updated.
+ * New credits post on create. This path finishes a row still waiting in the queue,
+ * including one the same admin created. Claim the open status before the journal
+ * so a double click cannot post twice. The wallets table is never updated.
  */
 async function executeWalletCredit(input: {
   db: ServiceDb;
@@ -331,11 +390,16 @@ async function executeWalletCredit(input: {
     return NextResponse.json({ ok: false, error: "user_not_found" }, { status: 404 });
   }
 
+  const previous = String(row.status);
+  if (previous !== "PENDING_APPROVAL" && previous !== "APPROVED") {
+    return NextResponse.json({ ok: false, error: "فقط درخواست باز شارژ قابل اجراست." }, { status: 400 });
+  }
+
   const { data: claimed } = await db
     .from("admin_approval_requests")
     .update({ status: "EXECUTED", updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("status", "APPROVED")
+    .eq("status", previous)
     .select("id")
     .maybeSingle();
   if (!claimed) {
@@ -379,7 +443,7 @@ async function executeWalletCredit(input: {
   } catch (err) {
     await db
       .from("admin_approval_requests")
-      .update({ status: "APPROVED", updated_at: new Date().toISOString() })
+      .update({ status: previous, updated_at: new Date().toISOString() })
       .eq("id", id);
     await writeAudit({
       actorId: ctx.userId,

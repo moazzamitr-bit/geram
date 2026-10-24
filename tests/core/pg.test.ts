@@ -204,5 +204,14 @@ describe("PostgreSQL ledger integration (PGlite)", () => {
     });
     expect(second).toEqual({ journalId: first.journalId, replayed: true });
     expect((await core.wallet(user)).rialAvailable).toBe(amount);
+    await expect(
+      core.creditApprovedUserIrr({
+        userId: user,
+        amountIrr: tomanToIrr(10),
+        reason: "closed beta pg credit",
+        refId,
+      })
+    ).rejects.toMatchObject({ code: "idempotency_conflict" });
+    expect((await core.wallet(user)).rialAvailable).toBe(amount);
   });
 });

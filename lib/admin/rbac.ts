@@ -38,7 +38,7 @@ export type AdminPermission =
   | "search.sensitive"
   | "export.run";
 
-/** Never create or grant these. Financial mutation is journal + maker-checker only. */
+/** Never create or grant these. Wallet credit is one ledger journal, not a balance edit. */
 export const NEVER_ISSUED_PERMISSIONS = ["wallet.edit", "balance.edit"] as const;
 
 const ALL: AdminPermission[] = [

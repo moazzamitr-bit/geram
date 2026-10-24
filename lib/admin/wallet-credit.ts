@@ -71,6 +71,62 @@ export async function resolveCreditTarget(input: {
   return { ok: true, userId: rows[0].id, phone: rows[0].phone };
 }
 
+export type WalletCreditRecordPlan = "insert" | "mark_executed" | "already_recorded";
+
+/**
+ * Closed-beta wallet credit posts on the submitting admin's request.
+ * A prior row with the same key must match; a rejected key is not revived.
+ */
+export function planImmediateWalletCredit(input: {
+  userId: string;
+  amountToman: number;
+  idempotencyKey: string;
+  prior: { id: string; status: string; payload: unknown } | null;
+}):
+  | { ok: false; error: string; status: number }
+  | {
+      ok: true;
+      refId: string;
+      amountIrr: Irr;
+      record: WalletCreditRecordPlan;
+      priorId: string | null;
+    } {
+  const amount = parseTomanAmount(String(input.amountToman));
+  if (!amount || amount.toman !== input.amountToman) {
+    return { ok: false, error: "invalid_amount", status: 400 };
+  }
+  const refId = walletCreditRefId(input.idempotencyKey);
+  if (!input.prior) {
+    return { ok: true, refId, amountIrr: amount.irr, record: "insert", priorId: null };
+  }
+  const stored = parseStoredWalletCredit(input.prior.payload);
+  if (!stored.ok) return { ok: false, error: stored.error, status: 400 };
+  const same =
+    stored.userId === input.userId &&
+    stored.amountToman === input.amountToman &&
+    stored.idempotencyKey === input.idempotencyKey;
+  if (!same) return { ok: false, error: "idempotency_conflict", status: 409 };
+  if (input.prior.status === "REJECTED") {
+    return { ok: false, error: "credit_rejected", status: 409 };
+  }
+  if (input.prior.status === "EXECUTED") {
+    return {
+      ok: true,
+      refId,
+      amountIrr: amount.irr,
+      record: "already_recorded",
+      priorId: input.prior.id,
+    };
+  }
+  return {
+    ok: true,
+    refId,
+    amountIrr: amount.irr,
+    record: "mark_executed",
+    priorId: input.prior.id,
+  };
+}
+
 export function parseStoredWalletCredit(payload: unknown):
   | {
       ok: true;

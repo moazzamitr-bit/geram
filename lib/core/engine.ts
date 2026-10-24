@@ -259,11 +259,23 @@ export class FinancialCore {
     await this.bootstrap();
     await ensureUserAccounts(this.deps.store, userId);
     return this.deps.store.withLock(`admin-credit:${refId}`, async () => {
-      const existing = await this.deps.store.findJournalIdByRef(
+      const existing = await this.deps.store.findJournalByRef(
         "APPROVED_OPENING_BALANCE",
         refId
       );
-      if (existing) return { journalId: existing, replayed: true };
+      if (existing) {
+        const creditLine = existing.lines.find(
+          (l) => l.accountCode === "USER_AVAILABLE" && l.asset === "IRR" && l.holderId === userId
+        );
+        if (!creditLine || creditLine.credit !== input.amountIrr || creditLine.debit !== 0n) {
+          throw new CoreError(
+            "idempotency_conflict",
+            "Idempotency key reused with a different credit",
+            409
+          );
+        }
+        return { journalId: existing.id, replayed: true };
+      }
       const journalId = await this.postOpening({
         accountCode: "USER_AVAILABLE",
         holderId: userId,

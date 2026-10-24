@@ -31,8 +31,11 @@ and never leave production broken.
    New settings go in `.env.example` (empty value) and are set on the server in `.env.production`.
 3. **Never change money balances directly.** Balances are ledger projections
    (`core_ledger_accounts` updated only by `postJournal` in `lib/core/ledger.ts`). No
-   `UPDATE wallets ...`, no "edit balance" admin button. Corrections = a new journal via the
-   maker-checker approvals flow (`app/api/admin/approvals`). The legacy `wallets` table is read-only.
+   `UPDATE wallets ...`, no "edit balance" admin button. Manual wallet credit (ثبت شارژ) is
+   one admin: the form posts an idempotent `APPROVED_OPENING_BALANCE` journal to
+   `USER_AVAILABLE` and writes an audit row. Treasury opening inventory still needs a
+   second admin (`app/api/admin/approvals`, kind `INVENTORY_ADJUSTMENT`). The legacy
+   `wallets` table is read-only.
 4. **Keep the RLS lockdown.** `supabase/migrations/20261021120000_rls_lockdown.sql` stops users from
    changing `profiles.role/kyc_status/plan_*`, verifying their own IBAN, forging support replies or
    choosing referral bonuses. Any new user-writable table needs RLS + a guard for privileged columns.
@@ -69,6 +72,7 @@ and never leave production broken.
 
 - **Trading needs opening inventory**: platform metal starts at 0. Two admins (maker + checker)
   register real stock in Admin → تأیید دو مرحله‌ای → ثبت موجودی اولیه خزانه, then Approve + Execute.
+  Wallet toman credit does not use that queue: one admin submits ثبت شارژ and the journal posts.
   Admins are created with `deploy/create-admin.sh`.
 - **SMS OTP**: sms.ir rejects templates without eNamad. Template `123456` (sandbox) only reaches the
   panel owner's number. Before setting `AUTH_METHOD=otp`: the OTP service-role path rotates the user's

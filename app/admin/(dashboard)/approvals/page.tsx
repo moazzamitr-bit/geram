@@ -26,7 +26,7 @@ export default async function AdminApprovalsPage() {
         ثبت موجودی اولیه فلز یا نقدینگی عملیاتی صف تأیید می‌سازد. Execute ژورنال APPROVED_OPENING_BALANCE را به PLATFORM_AVAILABLE یا PLATFORM_CASH_CONTROL پست می‌کند.
       </AdminNotice>
       <AdminNotice title="شارژ کیف پول">
-        FINANCIAL_ADJUSTMENT موجودی قابل استفاده کاربر را با ژورنال APPROVED_OPENING_BALANCE زیاد می‌کند. سازنده نمی‌تواند درخواست خودش را تأیید کند. جدول wallets عوض نمی‌شود.
+        ثبت فرم شارژ، ژورنال APPROVED_OPENING_BALANCE را همان لحظه به USER_AVAILABLE پست می‌کند. جدول wallets عوض نمی‌شود.
       </AdminNotice>
       <div className="mb-6 max-w-lg">
         <InventoryRequestForm />
@@ -58,9 +58,22 @@ export default async function AdminApprovalsPage() {
               <td className="px-4 py-3 font-mono text-[12px]">{String(r.checker_id ?? "—").slice(0, 8)}</td>
               <td className="px-4 py-3 text-white/45">{new Date(String(r.created_at)).toLocaleString("fa-IR")}</td>
               <td className="px-4 py-3 min-w-[220px] space-y-2">
-                <AdminActionForm action="approve" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="Approve" />
-                <AdminActionForm action="reject" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="Reject" danger />
-                <AdminActionForm action="execute" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="Execute journal" />
+                {r.kind === "FINANCIAL_ADJUSTMENT" ? (
+                  <>
+                    {r.status === "PENDING_APPROVAL" && (
+                      <AdminActionForm action="reject" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="رد شارژ باز" danger />
+                    )}
+                    {(r.status === "PENDING_APPROVAL" || r.status === "APPROVED") && (
+                      <AdminActionForm action="execute" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="ثبت در دفترکل" />
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <AdminActionForm action="approve" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="Approve" />
+                    <AdminActionForm action="reject" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="Reject" danger />
+                    <AdminActionForm action="execute" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="Execute journal" />
+                  </>
+                )}
               </td>
             </tr>
           ))}

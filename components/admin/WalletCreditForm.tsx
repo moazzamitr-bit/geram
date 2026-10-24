@@ -9,8 +9,8 @@ function newKey() {
 }
 
 /**
- * Maker step for a closed-beta wallet credit.
- * A different treasury admin approves, then Execute journal posts USER_AVAILABLE.
+ * Closed-beta wallet credit. Submit posts USER_AVAILABLE immediately.
+ * The same idempotency key credits the ledger once.
  */
 export function WalletCreditForm({
   userId: lockedUserId,
@@ -70,8 +70,8 @@ export function WalletCreditForm({
     <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-white/10 bg-[#070B12] p-4">
       <p className="text-[13px] font-bold">شارژ دستی کیف پول</p>
       <p className="text-[12px] leading-6 text-white/45">
-        مبلغ بعد از تأیید ادمین دوم، با ژورنال APPROVED_OPENING_BALANCE به موجودی قابل استفاده (USER_AVAILABLE) می‌نشیند.
-        جدول wallets مستقیم عوض نمی‌شود. کاربر باید قبلاً یک بار وارد شده باشد.
+        با ثبت شارژ، ژورنال APPROVED_OPENING_BALANCE همین حالا به موجودی قابل استفاده (USER_AVAILABLE) می‌نشیند.
+        جدول wallets مستقیم عوض نمی‌شود. تکرار همان درخواست موجودی را دوباره زیاد نمی‌کند. کاربر باید قبلاً یک بار وارد شده باشد.
       </p>
       <input
         dir="ltr"
@@ -109,7 +109,7 @@ export function WalletCreditForm({
         className="h-16 w-full rounded-xl border border-white/10 bg-[#0B1220] p-3 text-[13px] outline-none focus:border-gold"
       />
       <GoldButton type="submit" size="sm" disabled={loading}>
-        {loading ? "…" : "ثبت درخواست شارژ (نیازمند تأیید ادمین دوم)"}
+        {loading ? "…" : "ثبت شارژ"}
       </GoldButton>
       {msg && <p className="text-[12px] text-positive">{msg}</p>}
       {err && <p className="text-[12px] text-negative">{err}</p>}
