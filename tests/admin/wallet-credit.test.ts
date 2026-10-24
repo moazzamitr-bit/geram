@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { normalizeIranMobile, resolveCreditTarget, walletCreditRefId } from "@/lib/admin/wallet-credit";
+import {
+  approvalRequiresDistinctChecker,
+  normalizeIranMobile,
+  parseTomanAmount,
+  resolveCreditTarget,
+  walletCreditIdempotentAction,
+  walletCreditRefId,
+} from "@/lib/admin/wallet-credit";
 import { SANDBOX_FLAGS } from "@/lib/core/mode";
 import { tomanToIrr } from "@/lib/core/money";
 import { PLATFORM_HOLDER } from "@/lib/core/types";
@@ -90,6 +97,29 @@ describe("credit target", () => {
       lookupByPhones: async () => [],
     });
     expect(missing).toMatchObject({ ok: false, error: "user_not_found", status: 404 });
+  });
+});
+
+describe("single-admin wallet credit policy", () => {
+  it("lets the same admin credit a wallet and still dual-controls inventory", () => {
+    expect(approvalRequiresDistinctChecker("FINANCIAL_ADJUSTMENT")).toBe(false);
+    expect(approvalRequiresDistinctChecker("INVENTORY_ADJUSTMENT")).toBe(true);
+    expect(approvalRequiresDistinctChecker("SETTINGS_CHANGE")).toBe(true);
+    expect(approvalRequiresDistinctChecker("RECONCILIATION_CORRECTION")).toBe(true);
+  });
+
+  it("posts a new or unfinished credit and does not revive a rejected one", () => {
+    expect(walletCreditIdempotentAction("EXECUTED")).toBe("replay");
+    expect(walletCreditIdempotentAction("PENDING_APPROVAL")).toBe("post");
+    expect(walletCreditIdempotentAction("APPROVED")).toBe("post");
+    expect(walletCreditIdempotentAction("DRAFT")).toBe("post");
+    expect(walletCreditIdempotentAction("REJECTED")).toBe("conflict");
+  });
+
+  it("keeps the fat-finger cap and rejects empty amounts", () => {
+    expect(parseTomanAmount("0")).toBeNull();
+    expect(parseTomanAmount("1000000001")).toBeNull();
+    expect(parseTomanAmount("250000")?.toman).toBe(250_000);
   });
 });
 

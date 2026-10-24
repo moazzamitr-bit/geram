@@ -31,8 +31,10 @@ and never leave production broken.
    New settings go in `.env.example` (empty value) and are set on the server in `.env.production`.
 3. **Never change money balances directly.** Balances are ledger projections
    (`core_ledger_accounts` updated only by `postJournal` in `lib/core/ledger.ts`). No
-   `UPDATE wallets ...`, no "edit balance" admin button. Corrections = a new journal via the
-   maker-checker approvals flow (`app/api/admin/approvals`). The legacy `wallets` table is read-only.
+   `UPDATE wallets ...`, no "edit balance" admin button. Closed-beta wallet IRR credit is one
+   admin action: `FINANCIAL_ADJUSTMENT` posts `APPROVED_OPENING_BALANCE` to `USER_AVAILABLE`
+   immediately and writes an audit log (`app/api/admin/approvals`). Opening metal inventory and
+   other corrections stay on the maker-checker queue. The legacy `wallets` table is read-only.
 4. **Keep the RLS lockdown.** `supabase/migrations/20261021120000_rls_lockdown.sql` stops users from
    changing `profiles.role/kyc_status/plan_*`, verifying their own IBAN, forging support replies or
    choosing referral bonuses. Any new user-writable table needs RLS + a guard for privileged columns.
@@ -70,6 +72,8 @@ and never leave production broken.
 - **Trading needs opening inventory**: platform metal starts at 0. Two admins (maker + checker)
   register real stock in Admin → تأیید دو مرحله‌ای → ثبت موجودی اولیه خزانه, then Approve + Execute.
   Admins are created with `deploy/create-admin.sh`.
+- **Wallet credit is single-admin**: واریز or the user page posts rial balance immediately.
+  A second approver is not required. User self-deposit stays off unless `SANDBOX_DEPOSIT_ENABLED`.
 - **SMS OTP**: sms.ir rejects templates without eNamad. Template `123456` (sandbox) only reaches the
   panel owner's number. Before setting `AUTH_METHOD=otp`: the OTP service-role path rotates the user's
   password on every login — switch it to `admin.generateLink` + `verifyOtp` first, or password

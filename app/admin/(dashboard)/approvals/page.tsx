@@ -19,14 +19,14 @@ export default async function AdminApprovalsPage() {
     <div>
       <AdminPageHeader
         title="تأیید دو مرحله‌ای"
-        description="سازنده نمی‌تواند درخواست خودش را تأیید کند. اجرا فقط از ژورنال — هرگز mutation مستقیم موجودی."
+        description="شارژ کیف پول با یک ادمین همان لحظه در دفترکل می‌نشیند. برای موجودی اولیه خزانه و بقیه درخواست‌ها، سازنده نمی‌تواند درخواست خودش را تأیید کند. اجرا فقط از ژورنال است."
       />
       {!rows.ready ? <OpsBadge state="NOT_READY" /> : <OpsBadge state="SANDBOX" />}
       <AdminNotice title="موجودی اولیه خزانه">
         ثبت موجودی اولیه فلز یا نقدینگی عملیاتی صف تأیید می‌سازد. Execute ژورنال APPROVED_OPENING_BALANCE را به PLATFORM_AVAILABLE یا PLATFORM_CASH_CONTROL پست می‌کند.
       </AdminNotice>
       <AdminNotice title="شارژ کیف پول">
-        FINANCIAL_ADJUSTMENT موجودی قابل استفاده کاربر را با ژورنال APPROVED_OPENING_BALANCE زیاد می‌کند. سازنده نمی‌تواند درخواست خودش را تأیید کند. جدول wallets عوض نمی‌شود.
+        شارژ کاربر تأیید ادمین دوم نمی‌خواهد. ثبت فرم، ژورنال APPROVED_OPENING_BALANCE را همان لحظه به USER_AVAILABLE پست می‌کند و در لاگ حسابرسی می‌ماند. درخواست قدیمیِ در صف را همان ادمین با «اعمال شارژ» تمام می‌کند. جدول wallets عوض نمی‌شود.
       </AdminNotice>
       <div className="mb-6 max-w-lg">
         <InventoryRequestForm />
@@ -58,9 +58,24 @@ export default async function AdminApprovalsPage() {
               <td className="px-4 py-3 font-mono text-[12px]">{String(r.checker_id ?? "—").slice(0, 8)}</td>
               <td className="px-4 py-3 text-white/45">{new Date(String(r.created_at)).toLocaleString("fa-IR")}</td>
               <td className="px-4 py-3 min-w-[220px] space-y-2">
-                <AdminActionForm action="approve" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="Approve" />
-                <AdminActionForm action="reject" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="Reject" danger />
-                <AdminActionForm action="execute" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="Execute journal" />
+                {String(r.status) === "EXECUTED" || String(r.status) === "REJECTED" ? (
+                  <span className="text-[12px] text-white/40">تمام شده</span>
+                ) : r.kind === "FINANCIAL_ADJUSTMENT" ? (
+                  <>
+                    {String(r.status) === "APPROVED" ? (
+                      <AdminActionForm action="execute" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="تلاش دوباره ژورنال" />
+                    ) : (
+                      <AdminActionForm action="approve" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="اعمال شارژ" />
+                    )}
+                    <AdminActionForm action="reject" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="رد" danger />
+                  </>
+                ) : (
+                  <>
+                    <AdminActionForm action="approve" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="Approve" />
+                    <AdminActionForm action="reject" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="Reject" danger />
+                    <AdminActionForm action="execute" endpoint="/api/admin/approvals" extra={{ id: String(r.id) }} submitLabel="Execute journal" />
+                  </>
+                )}
               </td>
             </tr>
           ))}

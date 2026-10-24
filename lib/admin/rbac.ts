@@ -38,7 +38,11 @@ export type AdminPermission =
   | "search.sensitive"
   | "export.run";
 
-/** Never create or grant these. Financial mutation is journal + maker-checker only. */
+/**
+ * Never create or grant these. Balances move only through journals.
+ * Wallet IRR credit is one admin's journal plus an audit log.
+ * Other adjustments stay on the maker-checker queue.
+ */
 export const NEVER_ISSUED_PERMISSIONS = ["wallet.edit", "balance.edit"] as const;
 
 const ALL: AdminPermission[] = [

@@ -102,3 +102,18 @@ export function parseStoredWalletCredit(payload: unknown):
     refId: walletCreditRefId(idempotencyKey),
   };
 }
+
+/**
+ * Closed beta has one operator. Wallet IRR credit does not need a second admin.
+ * Opening inventory and every other approval kind still do.
+ */
+export function approvalRequiresDistinctChecker(kind: string): boolean {
+  return kind !== "FINANCIAL_ADJUSTMENT";
+}
+
+/** What to do when the same wallet-credit idempotency key already exists. */
+export function walletCreditIdempotentAction(status: string): "replay" | "post" | "conflict" {
+  if (status === "EXECUTED") return "replay";
+  if (status === "PENDING_APPROVAL" || status === "APPROVED" || status === "DRAFT") return "post";
+  return "conflict";
+}
