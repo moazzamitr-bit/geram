@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FINNOTECH_SCOPES } from "@/lib/finnotech/config";
+import { FINNOTECH_SCOPES, finnotechTimeoutMs } from "@/lib/finnotech/config";
 import {
   finnotechCall,
+  finnotechDispatcher,
   FinnotechError,
   getFinnotechAccessToken,
+  isConnectFailure,
+  networkCauseCode,
   resetFinnotechAuthCache,
 } from "@/lib/finnotech/client";
 import { redactSecrets } from "@/lib/finnotech/redact";
@@ -154,4 +157,130 @@ describe("finnotech client", () => {
       finnotechCall({ method: "GET", path: "/kyc/v2/clients/geram/identificationInquiry" })
     ).rejects.toBeInstanceOf(FinnotechError);
   });
+
+  it("defaults the read timeout to 8 seconds and passes one keep-alive agent", async () => {
+    expect(finnotechTimeoutMs()).toBe(8_000);
+    vi.stubEnv("FINNOTECH_TIMEOUT_MS", "0");
+    expect(finnotechTimeoutMs()).toBe(8_000);
+    configure();
+    const inits: RequestInit[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        inits.push(init);
+        if (String(url).includes("/oauth2/token")) return Response.json(tokenBody());
+        return Response.json({ status: "DONE", result: { ok: true } });
+      })
+    );
+    await finnotechCall({ method: "GET", path: "/kyc/v2/clients/geram/identificationInquiry" });
+    expect(inits.length).toBeGreaterThanOrEqual(2);
+    for (const init of inits) {
+      expect((init as { dispatcher?: unknown }).dispatcher).toBe(finnotechDispatcher);
+    }
+  });
+
+  it("retries token mint on a connect timeout, then uses the token", async () => {
+    configure();
+    let tokenHits = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (!String(url).includes("/oauth2/token")) return Response.json({ status: "DONE", result: { ok: true } });
+        tokenHits += 1;
+        if (tokenHits < 3) throw connectFailure("UND_ERR_CONNECT_TIMEOUT");
+        return Response.json(tokenBody());
+      })
+    );
+    await expect(getFinnotechAccessToken(1_000)).resolves.toBe("access-token-value");
+    expect(tokenHits).toBe(3);
+  });
+
+  it("retries a POST when the connection never sent, and logs the cause code", async () => {
+    configure();
+    let apiHits = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (String(url).includes("/oauth2/token")) return Response.json(tokenBody());
+        apiHits += 1;
+        if (apiHits < 3) throw connectFailure("ECONNREFUSED", "connect");
+        return Response.json({ status: "DONE", result: { sent: true } });
+      })
+    );
+    const logs: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    await expect(
+      finnotechCall({ method: "POST", path: "/facility/v2/clients/geram/finnotextOtp", body: { to: "09120000000" } })
+    ).resolves.toMatchObject({ result: { sent: true } });
+    expect(apiHits).toBe(3);
+
+    apiHits = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (String(url).includes("/oauth2/token")) return Response.json(tokenBody());
+        apiHits += 1;
+        throw connectFailure("UND_ERR_CONNECT_TIMEOUT");
+      })
+    );
+    resetFinnotechAuthCache();
+    await expect(
+      finnotechCall({ method: "POST", path: "/messaging/v2/clients/geram/otp/initiate", body: {} })
+    ).rejects.toMatchObject({ code: "network" });
+    expect(apiHits).toBe(3);
+    expect(logs.join("\n")).toContain("finnotech_network POST /messaging/v2/clients/geram/otp/initiate UND_ERR_CONNECT_TIMEOUT");
+  });
+
+  it("retries a POST once after the request was sent, and not at all for otp/verify read timeouts", async () => {
+    configure();
+    let apiHits = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (String(url).includes("/oauth2/token")) return Response.json(tokenBody());
+        apiHits += 1;
+        return Response.json({ status: "FAILED" }, { status: 503 });
+      })
+    );
+    await expect(
+      finnotechCall({ method: "POST", path: "/facility/v2/clients/geram/finnotextOtp", body: { to: "09120000000" } })
+    ).rejects.toBeInstanceOf(FinnotechError);
+    expect(apiHits).toBe(2);
+
+    apiHits = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (String(url).includes("/oauth2/token")) return Response.json(tokenBody());
+        apiHits += 1;
+        throw Object.assign(new Error("timeout"), { name: "TimeoutError" });
+      })
+    );
+    resetFinnotechAuthCache();
+    const logs: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    await expect(
+      finnotechCall({ method: "POST", path: "/messaging/v2/clients/geram/otp/verify", body: { traceId: "t", otp: "12345" } })
+    ).rejects.toMatchObject({ code: "network" });
+    expect(apiHits).toBe(1);
+    expect(logs.join("\n")).toContain("TimeoutError");
+  });
+
+  it("treats ECONNRESET during connect as unsent, and after send as a normal POST retry", () => {
+    const duringConnect = connectFailure("ECONNRESET", "connect");
+    const afterSend = connectFailure("ECONNRESET", "read");
+    expect(isConnectFailure(duringConnect)).toBe(true);
+    expect(isConnectFailure(afterSend)).toBe(false);
+    expect(networkCauseCode(duringConnect)).toBe("ECONNRESET");
+    expect(networkCauseCode(afterSend)).toBe("ECONNRESET");
+  });
 });
+
+function connectFailure(code: string, syscall?: string) {
+  const cause = Object.assign(new Error(code), { code, syscall });
+  return Object.assign(new TypeError("fetch failed"), { cause });
+}
