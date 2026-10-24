@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { authMethod } from "@/lib/auth/method";
 import { requestOtp } from "@/lib/auth/otp";
+import { isIranMobile, normalizeIranMobile } from "@/lib/auth/phone";
 import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +14,8 @@ export async function POST(request: Request) {
   if (!ip.ok) return tooManyRequests(ip.retryAfterSec);
 
   const body = (await request.json().catch(() => ({}))) as { phone?: string };
-  const phone = (body.phone ?? "").replace(/\D/g, "").replace(/^98/, "0");
-  if (!/^09\d{9}$/.test(phone)) {
+  const phone = normalizeIranMobile(body.phone ?? "");
+  if (!isIranMobile(phone)) {
     return NextResponse.json({ ok: false, error: "invalid_phone" }, { status: 400 });
   }
 
@@ -31,5 +32,11 @@ export async function POST(request: Request) {
       { status }
     );
   }
-  return NextResponse.json({ ok: true, sandbox: result.mode === "sandbox", resendInSec: result.resendInSec });
+  // Same body whether the number is new or already registered.
+  return NextResponse.json({
+    ok: true,
+    sandbox: result.mode === "sandbox",
+    resendInSec: result.resendInSec,
+    codeLength: result.codeLength,
+  });
 }

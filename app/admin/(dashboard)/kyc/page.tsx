@@ -60,7 +60,7 @@ export default async function AdminKycQueuePage({
         ))}
       </div>
       <AdminTable
-        headers={["کاربر", "تماس", "کد ملی", "وضعیت", "زمان تأیید", "سرویس", "صف"]}
+        headers={["کاربر", "تماس", "کد ملی", "سطح", "وضعیت", "حساب", "زمان تأیید", "سرویس", "صف"]}
         empty={filtered.length === 0}
       >
         {filtered.map((u) => {
@@ -68,6 +68,8 @@ export default async function AdminKycQueuePage({
             national_code?: string | null;
             kyc_verified_at?: string | null;
             kyc_provider?: string | null;
+            kyc_level?: number | null;
+            kyc_bank_mask?: string | null;
           };
           return (
             <tr key={u.id} className="border-b border-white/5">
@@ -78,11 +80,13 @@ export default async function AdminKycQueuePage({
               </td>
               <td className="px-4 py-3" dir="ltr">{maskPhone(u.phone)} · {maskEmail(u.email)}</td>
               <td className="px-4 py-3" dir="ltr">{row.national_code ? maskNationalCode(row.national_code) : "—"}</td>
+              <td className="px-4 py-3">{row.kyc_level ?? (u.kyc_status === "VERIFIED" ? 1 : 0)}</td>
               <td className="px-4 py-3">
                 <AdminBadge tone={u.kyc_status === "VERIFIED" ? "positive" : u.kyc_status === "REJECTED" ? "negative" : "warning"}>
                   {MAP[u.kyc_status] ?? u.kyc_status}
                 </AdminBadge>
               </td>
+              <td className="px-4 py-3 text-white/70">{row.kyc_bank_mask || "—"}</td>
               <td className="px-4 py-3 text-white/70">{when(row.kyc_verified_at)}</td>
               <td className="px-4 py-3 text-white/45">{row.kyc_provider || "—"}</td>
               <td className="px-4 py-3">

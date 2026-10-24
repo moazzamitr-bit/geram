@@ -1,3 +1,4 @@
+import { authMethod } from "@/lib/auth/method";
 import { UserLoginForm } from "./form";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ export default async function LoginPage({
     <UserLoginForm
       initialError={params.error ?? ""}
       initialTab={params.tab === "register" ? "register" : "login"}
+      initialMethod={authMethod()}
     />
   );
 }

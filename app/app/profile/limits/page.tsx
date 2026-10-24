@@ -9,6 +9,9 @@ type LimitsResponse = {
   ok: boolean;
   limits?: { dailyBuyToman: number; dailySellToman: number; dailyWithdrawToman: number };
   used?: { buyToman: number; sellToman: number; withdrawToman: number };
+  kycLevel?: number;
+  kycRequired?: boolean;
+  withdrawUnlocked?: boolean;
   message?: string;
 };
 
@@ -61,7 +64,16 @@ export default function LimitsPage() {
                   <div className="h-full rounded-full bg-gold" style={{ width: `${pct}%` }} />
                 </div>
                 <div className="mt-2 flex justify-between text-[12px] tabular-nums text-muted-app">
-                  <span>سقف: {row.cap > 0 ? formatToman(row.cap) : "بدون محدودیت"}</span>
+                  <span>
+                    سقف:{" "}
+                    {row.label.startsWith("برداشت") && data?.withdrawUnlocked === false
+                      ? "بعد از تطبیق کارت یا شبا"
+                      : row.cap > 0
+                        ? formatToman(row.cap)
+                        : data?.kycRequired && (data.kycLevel ?? 0) < 1
+                          ? "بعد از احراز هویت"
+                          : "بدون محدودیت"}
+                  </span>
                   <span>
                     باقیمانده:{" "}
                     {row.cap > 0 ? formatToman(Math.max(0, row.cap - row.used)) : "—"}

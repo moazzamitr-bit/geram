@@ -5,6 +5,7 @@ import {
   AdminTable,
 } from "@/components/admin/AdminUI";
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
+import { PlanTierForm } from "@/components/admin/PlanTierForm";
 import { WalletCreditForm } from "@/components/admin/WalletCreditForm";
 import { isClosedBetaInactiveAdminPath } from "@/lib/admin/closed-beta";
 import {
@@ -58,6 +59,10 @@ export default async function AdminUser360Page({
           <p>ایمیل: <span dir="ltr">{maskEmail(profile.email)}</span></p>
           <p>عضویت: {new Date(profile.created_at).toLocaleString("fa-IR")}</p>
           <p>پلن: {profile.plan_tier ?? "free"}</p>
+          <p>سطح احراز: {profile.kyc_level ?? (profile.kyc_status === "VERIFIED" ? 1 : 0)}</p>
+          <div className="mt-3">
+            <PlanTierForm userId={id} current={profile.plan_tier ?? "free"} />
+          </div>
           <p>کد رفرال: {profile.referral_code ?? "—"}</p>
         </div>
         <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5 text-[13px] leading-7">

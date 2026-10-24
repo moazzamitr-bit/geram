@@ -21,6 +21,7 @@ import {
 import { irr, irrToSafeTomanNumber, mulDivFloor, UG_PER_GRAM, type Irr, type Microgram } from "./money";
 import type { PriceFeed } from "./price";
 import { computeQuote, applySpread } from "./quote-math";
+import { userFundsLockKey } from "./locks";
 import { ensurePlatformAccounts, ensureUserAccounts, newId, type CoreStore } from "./store";
 import {
   assertTradeTransition,
@@ -322,6 +323,7 @@ export class FinancialCore {
     }
     await this.bootstrap();
     await ensureUserAccounts(this.deps.store, userId);
+    return this.deps.store.withLock(userFundsLockKey(userId), async () => {
     return this.deps.store.withLock(`admin-debit:${refId}`, async () => {
       const existing = await this.deps.store.findJournalByRef(
         "APPROVED_OPENING_BALANCE",
@@ -361,6 +363,7 @@ export class FinancialCore {
         ],
       });
       return { journalId, replayed: false };
+    });
     });
   }
 
@@ -801,7 +804,7 @@ export class FinancialCore {
     };
 
     const lockKey =
-      input.side === "BUY" ? `asset:${input.asset}:inventory` : `user:${input.userId}`;
+      input.side === "BUY" ? `asset:${input.asset}:inventory` : userFundsLockKey(input.userId);
 
     return this.deps.store.withTransaction(async () => {
       return this.deps.store.withAdvisoryLock(lockKey, async () => {
@@ -920,7 +923,7 @@ export class FinancialCore {
         throw new CoreError("internal", "Idempotent trade missing", 500);
       }
 
-      return this.deps.store.withAdvisoryLock(`user:${input.userId}`, async () => {
+      return this.deps.store.withAdvisoryLock(userFundsLockKey(input.userId), async () => {
       return this.deps.store.withAdvisoryLock(`quote:${input.quoteId}`, async () => {
       const quote0 = await this.deps.store.getQuote(input.quoteId);
       if (!quote0) throw new CoreError("not_found", "Quote not found", 404);

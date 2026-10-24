@@ -31,6 +31,9 @@ select 'migration 1021 fees:        ' || coalesce((select (value->>'buyFeeMinTom
 select 'migration 1021 otp:         ' || (to_regclass('public.auth_otp_codes') is not null);
 select 'migration 1024 finnotech kyc:' || exists(select 1 from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='kyc_verified_at');
 select 'migration 1024 legacy drop: ' || (to_regclass('public.wallets') is null and to_regclass('public.transactions') is null);
+select 'migration 1024 kyc level:   ' || exists(select 1 from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='kyc_level');
+select 'tracked migrations:         ' || case when to_regclass('public.geram_schema_migrations') is null then 'NOT TRACKED'
+  else (select count(*)::text from public.geram_schema_migrations) end;
 select 'wallets:                    ' || case when to_regclass('public.wallets') is null then 'DROPPED' else 'STILL PRESENT' end;
 select 'transactions:               ' || case when to_regclass('public.transactions') is null then 'DROPPED' else 'STILL PRESENT' end;
 select 'core_sandbox_deposits:      ' || case when to_regclass('public.core_sandbox_deposits') is null then 'DROPPED' else 'STILL PRESENT' end;
@@ -43,10 +46,43 @@ SQL
 
 if [ "${1:-}" = "--apply" ]; then
   [ -d "$APP_DIR/supabase/migrations" ] || { echo "No migrations at $APP_DIR"; exit 1; }
-  echo "== Applying Geram migrations (idempotent, one transaction each)"
+  # Files at or after this timestamp are NOT assumed to be applied on an
+  # existing database. Older files were re-run by the previous script.
+  BASELINE_BEFORE=20261024210000
+  echo "== Migration ledger"
+  psql_q <<'SQL'
+create table if not exists public.geram_schema_migrations (
+  filename text primary key,
+  applied_at timestamptz not null default now()
+);
+SQL
+  tracked=$(psql_q -c "select count(*) from public.geram_schema_migrations")
+  profiles=$(psql_q -c "select to_regclass('public.profiles') is not null")
+  if [ "$tracked" = "0" ] && [ "$profiles" = "t" ]; then
+    echo "Existing database. Recording migrations before ${BASELINE_BEFORE} without running them again."
+    for f in "$APP_DIR"/supabase/migrations/*.sql; do
+      base=$(basename "$f")
+      ts=${base%%_*}
+      if [[ "$base" =~ ^[0-9]+_[A-Za-z0-9_]+\.sql$ ]] && [[ "$ts" =~ ^[0-9]+$ ]] && [ "$ts" -lt "$BASELINE_BEFORE" ]; then
+        psql_q -c "insert into public.geram_schema_migrations (filename) values ('${base}') on conflict do nothing"
+      fi
+    done
+  fi
+  echo "== Applying migrations that are not in geram_schema_migrations"
   for f in "$APP_DIR"/supabase/migrations/*.sql; do
-    printf '  %s ... ' "$(basename "$f")"
+    base=$(basename "$f")
+    if ! [[ "$base" =~ ^[0-9]+_[A-Za-z0-9_]+\.sql$ ]]; then
+      echo "  $base ... SKIPPED (unexpected name)"
+      continue
+    fi
+    already=$(psql_q -c "select 1 from public.geram_schema_migrations where filename = '${base}'")
+    if [ "$already" = "1" ]; then
+      echo "  $base ... skip"
+      continue
+    fi
+    printf '  %s ... ' "$base"
     if docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres -q -v ON_ERROR_STOP=1 -1 >/dev/null 2>/tmp/geram-mig.err <"$f"; then
+      psql_q -c "insert into public.geram_schema_migrations (filename) values ('${base}') on conflict do nothing"
       echo ok
     else
       echo FAILED; sed 's/^/      /' /tmp/geram-mig.err | head -5; exit 1

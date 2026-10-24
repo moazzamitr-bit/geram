@@ -77,6 +77,12 @@ export function supabaseKycStore(): KycStore {
       await db.from("kyc_challenges").delete().eq("user_id", userId);
     },
     async markVerified(userId, identity: VerifiedIdentity) {
+      const { data: current } = await db
+        .from("profiles")
+        .select("kyc_level")
+        .eq("id", userId)
+        .maybeSingle();
+      const currentLevel = Number(current?.kyc_level ?? 0);
       const { error } = await db
         .from("profiles")
         .update({
@@ -86,6 +92,7 @@ export function supabaseKycStore(): KycStore {
           national_code: identity.nationalCode,
           kyc_birth_date: identity.birthDate,
           kyc_status: "VERIFIED",
+          kyc_level: Math.max(1, Number.isFinite(currentLevel) ? currentLevel : 0),
           kyc_verified_at: identity.verifiedAt,
           kyc_checked_at: identity.checkedAt ?? identity.verifiedAt,
           kyc_provider: "finnotech",
