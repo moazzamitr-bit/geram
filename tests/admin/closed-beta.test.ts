@@ -40,6 +40,7 @@ const VISIBLE = [
   "/admin/deposits",
   "/admin/approvals",
   "/admin/ledger",
+  "/admin/wallets",
   "/admin/trades",
   "/admin/quotes",
   "/admin/market",

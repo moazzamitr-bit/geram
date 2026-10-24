@@ -56,13 +56,57 @@ async function authedClient() {
   return { supabase, user };
 }
 
+const EMPTY_LEDGER_BALANCES = {
+  goldMg: 0,
+  silverMg: 0,
+  copperMg: 0,
+  rialAvailable: 0,
+  rialPending: 0,
+  avgBuyPriceRial: 0,
+  avgBuyPriceSilverRial: 0,
+  avgBuyPriceCopperRial: 0,
+};
+
+/** Session-scoped ledger balances. A failed read stays at zero — never `wallets`. */
+async function loadLedgerBalances() {
+  try {
+    const res = await fetch("/api/me/balances", { credentials: "include", cache: "no-store" });
+    if (!res.ok) return EMPTY_LEDGER_BALANCES;
+    const data = (await res.json()) as {
+      ok?: boolean;
+      source?: string;
+      ui?: {
+        goldMg?: number;
+        silverMg?: number;
+        copperMg?: number;
+        rialAvailable?: number;
+        rialPending?: number;
+      };
+      avgBuyTomanPerGram?: { gold18?: number; silver925?: number; copper?: number };
+    };
+    if (!data.ok || data.source !== "ledger" || !data.ui) return EMPTY_LEDGER_BALANCES;
+    return {
+      goldMg: Number(data.ui.goldMg ?? 0),
+      silverMg: Number(data.ui.silverMg ?? 0),
+      copperMg: Number(data.ui.copperMg ?? 0),
+      rialAvailable: Number(data.ui.rialAvailable ?? 0),
+      rialPending: Number(data.ui.rialPending ?? 0),
+      avgBuyPriceRial: Number(data.avgBuyTomanPerGram?.gold18 ?? 0),
+      avgBuyPriceSilverRial: Number(data.avgBuyTomanPerGram?.silver925 ?? 0),
+      avgBuyPriceCopperRial: Number(data.avgBuyTomanPerGram?.copper ?? 0),
+    };
+  } catch {
+    return EMPTY_LEDGER_BALANCES;
+  }
+}
+
 export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
   const auth = await authedClient();
   if (!auth) return null;
   const { supabase, user } = auth;
 
   const [
-    wallet,
+    ledger,
     banks,
     txs,
     goals,
@@ -72,7 +116,7 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
     scheduled,
     alerts,
   ] = await Promise.all([
-    supabase.from("wallets").select("*").eq("user_id", user.id).maybeSingle(),
+    loadLedgerBalances(),
     supabase.from("bank_accounts").select("*").eq("user_id", user.id),
     supabase
       .from("transactions")
@@ -104,14 +148,14 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
   ]);
 
   return {
-    goldMg: Number(wallet.data?.gold_mg ?? 0),
-    silverMg: Number(wallet.data?.silver_mg ?? 0),
-    copperMg: Number(wallet.data?.copper_mg ?? 0),
-    rialAvailable: Number(wallet.data?.toman_available ?? 0),
-    rialPending: Number(wallet.data?.toman_pending ?? 0),
-    avgBuyPriceRial: Number(wallet.data?.avg_buy_price_toman ?? 0),
-    avgBuyPriceSilverRial: Number(wallet.data?.avg_buy_price_silver_toman ?? 0),
-    avgBuyPriceCopperRial: Number(wallet.data?.avg_buy_price_copper_toman ?? 0),
+    goldMg: ledger.goldMg,
+    silverMg: ledger.silverMg,
+    copperMg: ledger.copperMg,
+    rialAvailable: ledger.rialAvailable,
+    rialPending: ledger.rialPending,
+    avgBuyPriceRial: ledger.avgBuyPriceRial,
+    avgBuyPriceSilverRial: ledger.avgBuyPriceSilverRial,
+    avgBuyPriceCopperRial: ledger.avgBuyPriceCopperRial,
     bankAccounts: (banks.data ?? []).map((b) => ({
       id: b.id,
       iban: b.iban,

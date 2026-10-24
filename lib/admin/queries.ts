@@ -17,13 +17,6 @@ export async function getProfile(id: string) {
   return data;
 }
 
-export async function getWallet(userId: string) {
-  const sb = await adminDb();
-  if (!sb) return null;
-  const { data } = await sb.from("wallets").select("*").eq("user_id", userId).maybeSingle();
-  return data;
-}
-
 export async function getUserTransactions(userId: string, limit = 50) {
   const sb = await adminDb();
   if (!sb) return [];

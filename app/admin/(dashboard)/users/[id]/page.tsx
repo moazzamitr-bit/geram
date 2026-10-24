@@ -12,9 +12,10 @@ import {
   getUserBanks,
   getUserTickets,
   getUserTransactions,
-  getWallet,
 } from "@/lib/admin/queries";
 import { maskEmail, maskIban, maskPhone } from "@/lib/admin/mask";
+import { DISPLAY_METALS, formatUgAsGrams } from "@/lib/ledger/display";
+import { readHolderLedgerView } from "@/lib/ledger/read";
 import { formatToman } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -27,8 +28,8 @@ export default async function AdminUser360Page({
   const { id } = await params;
   const profile = await getProfile(id);
   if (!profile) notFound();
-  const [wallet, txs, banks, tickets] = await Promise.all([
-    getWallet(id),
+  const [ledger, txs, banks, tickets] = await Promise.all([
+    readHolderLedgerView(id),
     getUserTransactions(id, 30),
     getUserBanks(id),
     getUserTickets(id),
@@ -40,7 +41,7 @@ export default async function AdminUser360Page({
     <div>
       <AdminPageHeader
         title={name}
-        description="نمای ۳۶۰ مشتری. شارژ با ژورنال دفترکل است، نه ویرایش wallets."
+        description="نمای ۳۶۰ مشتری. موجودی از دفترکل است. شارژ با ژورنال ثبت می‌شود."
         action={<AdminBadge tone={profile.role === "admin" ? "gold" : "neutral"}>{profile.role}</AdminBadge>}
       />
       <AdminNotice title="شارژ دفترکل">دکمه Edit Balance وجود ندارد. ثبت شارژ زیر همین حالا USER_AVAILABLE را در دفترکل زیاد می‌کند.</AdminNotice>
@@ -71,16 +72,30 @@ export default async function AdminUser360Page({
       </section>
 
       <section className="mb-6 rounded-2xl border border-white/10 bg-[#0F1724] p-5">
-        <h2 className="font-bold">مالی (جدول wallets — میراث)</h2>
-        <p className="mt-1 text-[12px] text-white/45">رزرو دفترکل عملیاتی در این محیط موجود نیست.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-[13px]">
-          <p>IRR موجود: {formatToman(Number(wallet?.toman_available ?? 0))}</p>
-          <p>IRR رزرو/انتظار: {formatToman(Number(wallet?.toman_pending ?? 0))}</p>
-          <p>طلا: {(Number(wallet?.gold_mg ?? 0) / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم</p>
-          <p>نقره: {(Number(wallet?.silver_mg ?? 0) / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم</p>
-          <p>مس: {(Number(wallet?.copper_mg ?? 0) / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم</p>
-          <p>رزرو فلز: داده در دسترس نیست</p>
-        </div>
+        <h2 className="font-bold">موجودی دفترکل</h2>
+        <p className="mt-1 text-[12px] text-white/45">
+          تومان = ریال USER_AVAILABLE ÷ ۱۰. طلا، نقره و مس در دفترکل میکروگرم‌اند و اینجا گرم نشان داده می‌شوند.
+        </p>
+        {!ledger.ok ? (
+          <AdminNotice title="دفترکل">{ledger.error}</AdminNotice>
+        ) : (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-[13px]">
+            <p>تومان قابل استفاده: {formatToman(ledger.view.availableToman)}</p>
+            <p>تومان رزرو: {formatToman(ledger.view.reservedToman)}</p>
+            <p className="text-white/45">ریال قابل استفاده: {ledger.view.availableIrr.toLocaleString("fa-IR")}</p>
+            <p className="text-white/45">ریال رزرو: {ledger.view.reservedIrr.toLocaleString("fa-IR")}</p>
+            {DISPLAY_METALS.map((asset) => {
+              const label = asset === "GOLD" ? "طلا" : asset === "SILVER" ? "نقره" : "مس";
+              const metal = ledger.view.metals[asset];
+              return (
+                <div key={asset}>
+                  <p>{label} قابل استفاده: {formatUgAsGrams(metal.availableUg)}</p>
+                  <p>{label} رزرو: {formatUgAsGrams(metal.reservedUg)}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <section className="mb-6">

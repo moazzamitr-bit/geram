@@ -4,11 +4,9 @@ import {
   AdminTable,
   OpsBadge,
 } from "@/components/admin/AdminUI";
-import { listWallets } from "@/lib/db/admin-queries";
 import { probeTable } from "@/lib/admin/probe";
 import { recomputeFromJournal } from "@/lib/admin/queries";
-import { formatToman } from "@/lib/utils";
-import { maskPhone } from "@/lib/admin/mask";
+import { formatLedgerAmount, parseLedgerBalance } from "@/lib/ledger/display";
 import Link from "next/link";
 
 export default async function AdminLedgerPage({
@@ -17,7 +15,6 @@ export default async function AdminLedgerPage({
   searchParams: Promise<{ user?: string; journal?: string }>;
 }) {
   const sp = await searchParams;
-  const wallets = await listWallets(150);
   const accounts = await probeTable<Record<string, unknown>>("core_ledger_accounts", "*", { limit: 200 });
   const journals = await probeTable<Record<string, unknown>>("core_journals", "*", {
     order: "created_at",
@@ -34,7 +31,7 @@ export default async function AdminLedgerPage({
       <AdminNotice title="ممنوع">Edit Balance / mutation مستقیم wallets.balance وجود ندارد.</AdminNotice>
       {!accounts.ready ? (
         <AdminNotice title="core_ledger_accounts">
-          {accounts.error ?? "NOT READY"}. موجودی‌های زیر از جدول میراث wallets است و بدهی دفترکل محسوب نمی‌شود.
+          {accounts.error ?? "NOT READY"}. موجودی از دفترکل خوانده می‌شود و جدول wallets جایگزین آن نیست.
         </AdminNotice>
       ) : (
         <OpsBadge state="SANDBOX" />
@@ -73,33 +70,43 @@ export default async function AdminLedgerPage({
         </div>
       ) : null}
 
-      <h2 className="mb-3 font-bold">موجودی میراث wallets</h2>
-      <AdminTable
-        headers={["کاربر", "IRR", "طلا", "نقره", "مس", "دفترکل"]}
-        empty={wallets.length === 0}
-      >
-        {wallets.map((w) => {
-          const profile = Array.isArray(w.profiles) ? w.profiles[0] : w.profiles;
-          return (
-            <tr key={w.id} className="border-b border-white/5">
-              <td className="px-4 py-3">
-                <Link className="text-gold" href={`/admin/users/${w.user_id}`}>
-                  {profile
-                    ? `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || maskPhone(profile.phone)
-                    : w.user_id.slice(0, 8)}
-                </Link>
-              </td>
-              <td className="px-4 py-3">{formatToman(Number(w.toman_available))}</td>
-              <td className="px-4 py-3">{(Number(w.gold_mg) / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })}</td>
-              <td className="px-4 py-3">{(Number((w as { silver_mg?: number }).silver_mg ?? 0) / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })}</td>
-              <td className="px-4 py-3">{(Number((w as { copper_mg?: number }).copper_mg ?? 0) / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })}</td>
-              <td className="px-4 py-3">
-                <Link className="text-[12px] text-gold" href={`/admin/ledger?user=${w.user_id}`}>recompute</Link>
-              </td>
-            </tr>
-          );
-        })}
-      </AdminTable>
+      <h2 className="mb-3 font-bold">حساب‌های دفترکل</h2>
+      {accounts.ready ? (
+        <AdminTable
+          headers={["دارنده", "حساب", "دارایی", "موجودی", "recompute"]}
+          empty={accounts.rows.length === 0}
+        >
+          {accounts.rows.map((row) => {
+            const holderId = String(row.holder_id ?? "");
+            const asset = String(row.asset ?? "");
+            let shown = String(row.balance ?? "");
+            try {
+              shown = formatLedgerAmount(asset, parseLedgerBalance(row.balance as string | number | null));
+            } catch {
+              shown = "داده نامعتبر";
+            }
+            return (
+              <tr key={String(row.id)} className="border-b border-white/5">
+                <td className="px-4 py-3">
+                  <Link className="text-gold" href={`/admin/users/${holderId}`}>
+                    {holderId.slice(0, 8)}
+                  </Link>
+                </td>
+                <td className="px-4 py-3">{String(row.account_code)}</td>
+                <td className="px-4 py-3">{asset}</td>
+                <td className="px-4 py-3">{shown}</td>
+                <td className="px-4 py-3">
+                  <Link className="text-[12px] text-gold" href={`/admin/ledger?user=${holderId}`}>
+                    recompute
+                  </Link>
+                </td>
+              </tr>
+            );
+          })}
+        </AdminTable>
+      ) : (
+        <p className="text-[13px] text-white/45">core_ledger_accounts: NOT READY — {accounts.error}</p>
+      )}
 
       <h2 className="mb-3 mt-8 font-bold">ژورنال‌ها</h2>
       {journals.ready ? (

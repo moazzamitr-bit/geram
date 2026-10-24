@@ -101,9 +101,9 @@ export default async function AdminDashboardPage() {
 
       <h2 className="mb-3 mt-8 text-[14px] font-bold text-white/70">پول</h2>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <Card label="بدهی IRR مشتری (دفترکل)" metric={ops.connected ? ops.money.userIrrLiability : { kind: "unavailable" }} icon={Wallet} />
-        <Card label="تومان دفتری wallets (میراث)" metric={ops.connected ? ops.money.legacyTomanBook : { kind: "unavailable" }} icon={Wallet} format={formatToman} tone="positive" />
-        <Card label="تومان در انتظار" metric={ops.connected ? ops.money.pendingDeposits : { kind: "unavailable" }} icon={Wallet} format={formatToman} tone="warning" />
+        <Card label="بدهی تومان مشتری (دفترکل)" metric={ops.connected ? ops.money.userIrrLiability : { kind: "unavailable" }} icon={Wallet} format={formatToman} />
+        <Card label="تومان قابل استفاده (دفترکل)" metric={ops.connected ? ops.money.ledgerTomanAvailable : { kind: "unavailable" }} icon={Wallet} format={formatToman} tone="positive" />
+        <Card label="تومان رزرو (دفترکل)" metric={ops.connected ? ops.money.pendingDeposits : { kind: "unavailable" }} icon={Wallet} format={formatToman} tone="warning" />
         <Card label="PSP clearing" metric={ops.connected ? ops.money.pspClearing : { kind: "unavailable" }} icon={Landmark} />
         <Card label="تسویه بانک" metric={ops.connected ? ops.money.bankSettlement : { kind: "unavailable" }} icon={Landmark} />
         <Card label="کنترل نقد داخلی" metric={ops.connected ? ops.money.controlledCash : { kind: "unavailable" }} icon={Wallet} />
@@ -111,9 +111,9 @@ export default async function AdminDashboardPage() {
 
       <h2 className="mb-3 mt-8 text-[14px] font-bold text-white/70">فلزات</h2>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <Card label="طلای دفتری wallets" metric={ops.connected ? ops.metals.customerGoldBookMg : { kind: "unavailable" }} icon={Wallet} format={(n) => `${(n / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم`} tone="gold" />
-        <Card label="نقره دفتری wallets" metric={ops.connected ? ops.metals.customerSilverBookMg : { kind: "unavailable" }} icon={Wallet} format={(n) => `${(n / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم`} />
-        <Card label="مس دفتری wallets" metric={ops.connected ? ops.metals.customerCopperBookMg : { kind: "unavailable" }} icon={Wallet} format={(n) => `${(n / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم`} />
+        <Card label="طلای قابل استفاده (دفترکل)" metric={ops.connected ? ops.metals.customerGoldBookMg : { kind: "unavailable" }} icon={Wallet} format={(n) => `${(n / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم`} tone="gold" />
+        <Card label="نقره قابل استفاده (دفترکل)" metric={ops.connected ? ops.metals.customerSilverBookMg : { kind: "unavailable" }} icon={Wallet} format={(n) => `${(n / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم`} />
+        <Card label="مس قابل استفاده (دفترکل)" metric={ops.connected ? ops.metals.customerCopperBookMg : { kind: "unavailable" }} icon={Wallet} format={(n) => `${(n / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم`} />
         <Card label="بدهی فلز مشتری (ledger)" metric={ops.connected ? ops.metals.customerGoldLiability : { kind: "unavailable" }} icon={AlertTriangle} />
         <Card label="موجودی خزانه قابل فروش" metric={ops.connected ? ops.metals.availableTreasury : { kind: "unavailable" }} icon={Wallet} />
         <Card label="پوشش حضانت" metric={ops.connected ? ops.metals.custodyCoverage : { kind: "unavailable" }} icon={ShieldAlert} />

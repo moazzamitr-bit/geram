@@ -1,13 +1,10 @@
-import { randomBytes, randomUUID } from "crypto";
 import { getFeatureFlags } from "@/lib/core/mode";
-import { buyQuote, dcaExecutionFee, isPlusActive } from "@/lib/commerce/fees";
+import { dcaExecutionFee, isPlusActive } from "@/lib/commerce/fees";
+import { buyGoldFromLedger } from "@/lib/commerce/ledger-buy";
 import { loadCommerceSettings } from "@/lib/commerce/settings-server";
+import { ledgerCoversToman, parseLedgerBalance } from "@/lib/ledger/display";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { getLiveGold18Price } from "@/lib/market/price-provider";
-
-function trackingCode() {
-  return `GRM-${randomBytes(3).toString("hex").toUpperCase()}`;
-}
 
 function cadenceDays(cadence: string): number {
   if (/هفته|weekly/i.test(cadence)) return 7;
@@ -18,6 +15,29 @@ export type CronRunSummary = {
   dca: { processed: number; success: number; failed: number };
   alerts: { checked: number; triggered: number; orders: number };
 };
+
+async function readUserAvailableIrr(
+  admin: ReturnType<typeof createServiceClient>,
+  userId: string
+): Promise<{ ok: true; irr: bigint } | { ok: false; error: string }> {
+  const { data, error } = await admin
+    .from("core_ledger_accounts")
+    .select("balance")
+    .eq("holder_id", userId)
+    .eq("account_code", "USER_AVAILABLE")
+    .eq("asset", "IRR")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  try {
+    return { ok: true, irr: parseLedgerBalance(data?.balance ?? 0) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "bad_balance" };
+  }
+}
+
+function scheduleStamp(row: { id: string; next_run_at?: string | null }, now: Date) {
+  return `${row.id}:${row.next_run_at ?? now.toISOString()}`;
+}
 
 async function notifyUser(
   admin: ReturnType<typeof createServiceClient>,
@@ -61,8 +81,8 @@ export async function runDcaCron(): Promise<CronRunSummary["dca"]> {
     const userId = row.user_id as string;
     const amount = Number(row.amount_toman);
 
-    const [{ data: wallet }, { data: profile }] = await Promise.all([
-      admin.from("wallets").select("*").eq("user_id", userId).maybeSingle(),
+    const [funds, { data: profile }] = await Promise.all([
+      readUserAvailableIrr(admin, userId),
       admin
         .from("profiles")
         .select("plan_tier, plan_expires_at")
@@ -76,17 +96,7 @@ export async function runDcaCron(): Promise<CronRunSummary["dca"]> {
     );
     const dcaFee = dcaExecutionFee(plus, settings.fees);
     const totalDebit = amount + dcaFee;
-    const available = Number(wallet?.toman_available ?? 0);
-
-    if (available < totalDebit) {
-      summary.failed += 1;
-      await notifyUser(
-        admin,
-        userId,
-        "خرید دوره‌ای انجام نشد",
-        `موجودی کیف پول برای خرید ${amount.toLocaleString("fa-IR")} تومان (به‌علاوه کارمزد) کافی نیست.`,
-        "/app/wallet"
-      );
+    const advance = async () => {
       const next = new Date(now);
       next.setDate(next.getDate() + cadenceDays(row.cadence));
       await admin
@@ -96,56 +106,41 @@ export async function runDcaCron(): Promise<CronRunSummary["dca"]> {
           next_run: next.toLocaleDateString("fa-IR"),
         })
         .eq("id", row.id);
-      continue;
-    }
+    };
 
-    const { fee, goldMg } = buyQuote(amount, price, plus, settings);
-    const totalFee = fee + dcaFee;
-    const totalCost = amount + dcaFee;
-    if (goldMg <= 0) {
+    if (!funds.ok || !ledgerCoversToman(funds.irr, totalDebit)) {
       summary.failed += 1;
+      await notifyUser(
+        admin,
+        userId,
+        "خرید دوره‌ای انجام نشد",
+        funds.ok
+          ? `موجودی دفترکل برای خرید ${amount.toLocaleString("fa-IR")} تومان (به‌علاوه کارمزد) کافی نیست.`
+          : "موجودی دفترکل خوانده نشد.",
+        "/app/wallet"
+      );
+      if (funds.ok) await advance();
       continue;
     }
 
-    const txId = randomUUID();
-    const tracking = trackingCode();
-    const prevGold = Number(wallet?.gold_mg ?? 0);
-    const prevAvg = Number(wallet?.avg_buy_price_toman ?? 0);
-    const nextGold = prevGold + goldMg;
-    const nextAvg =
-      nextGold > 0
-        ? Math.floor(
-            (prevGold * prevAvg + goldMg * price) / nextGold
-          )
-        : price;
-
-    await admin.from("transactions").insert({
-      id: txId,
-      user_id: userId,
-      tracking_code: tracking,
-      type: "خرید",
-      gold_mg: goldMg,
-      amount_toman: amount,
-      fee_toman: totalFee,
-      price_per_gram_toman: price,
-      status: "تکمیل‌شده",
-      payment_ref: `DCA-${row.id}`,
-      note: `خرید دوره‌ای · ${row.cadence}`,
-      timeline: [
-        { label: "اجرای خودکار DCA", done: true },
-        { label: "تخصیص طلا", done: true },
-      ],
+    const bought = await buyGoldFromLedger({
+      userId,
+      amountToman: amount,
+      idempotencyKey: `dca:${scheduleStamp(row, now)}`,
+      plus,
+      settings,
     });
-
-    await admin
-      .from("wallets")
-      .update({
-        gold_mg: nextGold,
-        toman_available: available - totalCost,
-        toman_pending: Number(wallet?.toman_pending ?? 0),
-        avg_buy_price_toman: nextAvg,
-      })
-      .eq("user_id", userId);
+    if (!bought.ok) {
+      summary.failed += 1;
+      await notifyUser(
+        admin,
+        userId,
+        "خرید دوره‌ای انجام نشد",
+        "ثبت خرید در دفترکل ممکن نشد.",
+        "/app/wallet"
+      );
+      continue;
+    }
 
     const next = new Date(now);
     next.setDate(next.getDate() + cadenceDays(row.cadence));
@@ -162,8 +157,8 @@ export async function runDcaCron(): Promise<CronRunSummary["dca"]> {
       admin,
       userId,
       "خرید دوره‌ای انجام شد",
-      `${(goldMg / 1000).toFixed(3)} گرم طلا خریداری شد.`,
-      `/app/transactions/${txId}`
+      "خرید طلا در دفترکل ثبت شد.",
+      "/app/transactions"
     );
     summary.success += 1;
   }
@@ -231,8 +226,8 @@ export async function runAlertsCron(): Promise<
     }
 
     const buyAmount = Number(alert.auto_buy_toman);
-    const [{ data: wallet }, { data: profile }] = await Promise.all([
-      admin.from("wallets").select("*").eq("user_id", userId).maybeSingle(),
+    const [funds, { data: profile }] = await Promise.all([
+      readUserAvailableIrr(admin, userId),
       admin
         .from("profiles")
         .select("plan_tier, plan_expires_at")
@@ -243,69 +238,55 @@ export async function runAlertsCron(): Promise<
       (profile?.plan_tier as "free" | "plus") ?? "free",
       profile?.plan_expires_at
     );
-    const { fee, goldMg } = buyQuote(buyAmount, price, plus, settings);
-    const available = Number(wallet?.toman_available ?? 0);
-    const orderId = randomUUID();
 
-    if (available < buyAmount) {
+    if (!funds.ok || !ledgerCoversToman(funds.irr, buyAmount)) {
       await admin.from("price_alert_orders").insert({
-        id: orderId,
         user_id: userId,
         alert_id: alert.id,
         amount_toman: buyAmount,
         status: "FAILED",
-        error_message: "موجودی کافی نیست",
+        error_message: funds.ok ? "موجودی دفترکل کافی نیست" : "موجودی دفترکل خوانده نشد",
       });
       await notifyUser(
         admin,
         userId,
         "سفارش خودکار انجام نشد",
-        "موجودی کیف پول برای خرید خودکار پس از هشدار کافی نبود.",
+        "موجودی دفترکل برای خرید خودکار پس از هشدار کافی نبود.",
         "/app/wallet"
       );
       continue;
     }
 
-    const txId = randomUUID();
-    const prevGold = Number(wallet?.gold_mg ?? 0);
-    const prevAvg = Number(wallet?.avg_buy_price_toman ?? 0);
-    const nextGold = prevGold + goldMg;
-    const nextAvg =
-      nextGold > 0
-        ? Math.floor((prevGold * prevAvg + goldMg * price) / nextGold)
-        : price;
-
-    await admin.from("transactions").insert({
-      id: txId,
-      user_id: userId,
-      tracking_code: trackingCode(),
-      type: "خرید",
-      gold_mg: goldMg,
-      amount_toman: buyAmount,
-      fee_toman: fee,
-      price_per_gram_toman: price,
-      status: "تکمیل‌شده",
-      note: "خرید خودکار پس از هشدار قیمت",
-      timeline: [{ label: "اجرای سفارش محدود", done: true }],
+    const bought = await buyGoldFromLedger({
+      userId,
+      amountToman: buyAmount,
+      idempotencyKey: `alert:${alert.id}:${new Date().toISOString()}`,
+      plus,
+      settings,
     });
-
-    await admin
-      .from("wallets")
-      .update({
-        gold_mg: nextGold,
-        toman_available: available - buyAmount,
-        toman_pending: Number(wallet?.toman_pending ?? 0),
-        avg_buy_price_toman: nextAvg,
-      })
-      .eq("user_id", userId);
+    if (!bought.ok) {
+      await admin.from("price_alert_orders").insert({
+        user_id: userId,
+        alert_id: alert.id,
+        amount_toman: buyAmount,
+        status: "FAILED",
+        error_message: "ثبت خرید در دفترکل ممکن نشد",
+      });
+      await notifyUser(
+        admin,
+        userId,
+        "سفارش خودکار انجام نشد",
+        "ثبت خرید در دفترکل ممکن نشد.",
+        "/app/wallet"
+      );
+      continue;
+    }
 
     await admin.from("price_alert_orders").insert({
-      id: orderId,
       user_id: userId,
       alert_id: alert.id,
       amount_toman: buyAmount,
       status: "EXECUTED",
-      transaction_id: txId,
       executed_at: new Date().toISOString(),
     });
 
@@ -314,8 +295,8 @@ export async function runAlertsCron(): Promise<
       admin,
       userId,
       "خرید خودکار انجام شد",
-      `${(goldMg / 1000).toFixed(3)} گرم طلا پس از هشدار قیمت خریداری شد.`,
-      `/app/transactions/${txId}`
+      "خرید طلا پس از هشدار قیمت در دفترکل ثبت شد.",
+      "/app/transactions"
     );
   }
 
