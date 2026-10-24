@@ -3,6 +3,7 @@ import { createClient as createBrowserOrServer } from "@supabase/supabase-js";
 import { phoneE164, phoneEmail } from "@/lib/auth/phone";
 import { getExecutionMode } from "@/lib/core/mode";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { serverSupabaseUrl } from "@/lib/supabase/url";
 import { isSupabaseConfigured } from "@/lib/db/types";
 
 /**
@@ -33,7 +34,7 @@ function randomPassword() {
 }
 
 function anonClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const url = serverSupabaseUrl()!;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   return createBrowserOrServer(url, anon, {
     auth: { persistSession: false, autoRefreshToken: false },

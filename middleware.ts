@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { closedBetaAdminRewrite } from "@/lib/admin/closed-beta";
 import { fetchWithTimeout } from "@/lib/supabase/fetch";
+import { serverAuthCookieOptions, serverSupabaseUrl } from "@/lib/supabase/url";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -25,19 +26,23 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const publicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // Without env, let the dashboard layout show configuration guidance.
-  if (!url || !key) {
+  if (!publicUrl || !key) {
     return NextResponse.next();
   }
+
+  const url = serverSupabaseUrl() ?? publicUrl;
+  const cookieOptions = serverAuthCookieOptions();
 
   let response = NextResponse.next({
     request: { headers: request.headers },
   });
 
   const supabase = createServerClient(url, key, {
+    ...(cookieOptions ? { cookieOptions } : {}),
     global: { fetch: fetchWithTimeout(8_000) },
     cookies: {
       getAll() {

@@ -15,7 +15,7 @@ and never leave production broken.
 |---|---|
 | Live site | https://geram.co (ArvanCloud CDN, HTTPS at the edge, origin HTTPS) |
 | Server | Ubuntu VM `80.91.208.136`, app + Caddy in Docker (`deploy/docker-compose.yml`) |
-| Supabase | **Self-hosted** on the same server (`supabase-*` containers, gateway on host port 8000). The browser reaches it at `https://geram.co/sb` (Caddy proxies only API paths). The old cloud project is no longer used. |
+| Supabase | **Self-hosted** on the same server (`supabase-*` containers, gateway on host port 8000). The browser reaches it at `https://geram.co/sb` (Caddy proxies only API paths). The app service in `deploy/docker-compose.yml` is attached to external network `supabase_default` so `supabase-db` survives container recreate. Optional server-only `SUPABASE_INTERNAL_URL` (fallback: the public URL) lets route handlers skip the CDN; the exact line for the current gateway is `SUPABASE_INTERNAL_URL=http://supabase-envoy:8000` (no `/sb`). The old cloud project is no longer used. |
 | Code on the server | `/opt/geram`, a clean checkout of branch **`fix/p0-security`** |
 | Settings / secrets | `/opt/geram/.env.production` on the server only (root-only). Never in git. |
 | Execution mode | `SANDBOX` (simulated deposits; no real payment rails yet) |
