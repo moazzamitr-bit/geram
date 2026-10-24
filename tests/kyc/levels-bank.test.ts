@@ -20,10 +20,10 @@ describe("iran mobile", () => {
 });
 
 describe("login code", () => {
-  it("uses a two-minute resend and Finnotech's 6-digit sample length", () => {
+  it("uses a two-minute resend and Finnotech's 5-digit SMS length", () => {
     expect(OTP_RESEND_SEC).toBe(120);
-    expect(otpCodeLength()).toBe(6);
-    expect(newLoginCode()).toMatch(/^\d{6}$/);
+    expect(otpCodeLength()).toBe(5);
+    expect(newLoginCode()).toMatch(/^\d{5}$/);
   });
 });
 

@@ -10,7 +10,7 @@ describe("otp mode", () => {
     vi.stubEnv("KAVENEGAR_API_KEY", "");
     vi.stubEnv("KAVENEGAR_OTP_TEMPLATE", "");
     expect(otpMode()).toBe("sandbox");
-    expect(await verifyOtp("09120000000", "123456")).toEqual({ ok: true });
+    expect(await verifyOtp("09120000000", "12345")).toEqual({ ok: true });
     expect(await verifyOtp("09120000000", "000000")).toMatchObject({ ok: false });
   });
 

@@ -117,14 +117,26 @@ describe("login routes", () => {
     await expect(res.json()).resolves.toEqual({ ok: false, error: "method_disabled" });
   });
 
-  it("rejects a short OTP before checking whether Supabase is configured", async () => {
+  it("rejects a code shorter than 4 digits before checking Supabase", async () => {
     vi.stubEnv("AUTH_METHOD", "otp");
     vi.stubEnv("GERAM_EXECUTION_MODE", "SANDBOX");
     const res = await phoneLogin(
-      jsonRequest("/api/auth/phone-login", { phone: "۰۹۱۲۰۰۰۰۰۰۰", otp: "۱۲۳۴۵" }, "203.0.113.24")
+      jsonRequest("/api/auth/phone-login", { phone: "۰۹۱۲۰۰۰۰۰۰۰", otp: "۱۲۳" }, "203.0.113.24")
     );
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({ ok: false, error: "invalid_otp" });
+  });
+
+  it("does not reject Finnotech's 5-digit code before Supabase is checked", async () => {
+    vi.stubEnv("AUTH_METHOD", "otp");
+    vi.stubEnv("GERAM_EXECUTION_MODE", "SANDBOX");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "");
+    const res = await phoneLogin(
+      jsonRequest("/api/auth/phone-login", { phone: "۰۹۱۲۰۰۰۰۰۰۰", otp: "۱۲۳۴۵" }, "203.0.113.26")
+    );
+    expect(res.status).toBe(503);
+    await expect(res.json()).resolves.toEqual({ ok: false, error: "supabase_not_configured" });
   });
 
   it("rejects a bad phone before checking whether Supabase is configured", async () => {
