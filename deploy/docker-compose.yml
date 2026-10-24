@@ -13,6 +13,12 @@ services:
     restart: unless-stopped
     expose:
       - "3000"
+    # A `docker network connect` done by hand is lost on every recreate.
+    # Stay on the Supabase stack network so supabase-db and the API gateway
+    # (supabase-envoy, also aliased as kong) keep resolving.
+    networks:
+      - default
+      - supabase
 
   caddy:
     image: caddy:2-alpine
@@ -35,3 +41,8 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+
+networks:
+  supabase:
+    external: true
+    name: supabase_default
