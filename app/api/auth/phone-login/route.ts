@@ -5,6 +5,7 @@ import { otpMode, verifyOtp } from "@/lib/auth/otp";
 import { ensurePhoneUser } from "@/lib/db/phone-auth";
 import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { isSupabaseConfigured } from "@/lib/db/types";
+import { serverSupabaseUrl } from "@/lib/supabase/url";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
 
   try {
     const { email, password } = await ensurePhoneUser(phone);
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const url = serverSupabaseUrl()!;
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     const supabase = createClient(url, anon, {
       auth: { persistSession: false, autoRefreshToken: false },

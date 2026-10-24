@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { fetchWithTimeout } from "@/lib/supabase/fetch";
+import { serverAuthCookieOptions, serverSupabaseUrl } from "@/lib/supabase/url";
 
 type PendingCookie = { name: string; value: string; options: CookieOptions };
 
@@ -11,7 +12,7 @@ type PendingCookie = { name: string; value: string; options: CookieOptions };
  * see the same `sb-<host>-auth-token` cookies.
  */
 export async function createCookieAuthClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = serverSupabaseUrl();
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) {
     throw new Error("Supabase env missing: NEXT_PUBLIC_SUPABASE_URL / ANON_KEY");
@@ -19,7 +20,9 @@ export async function createCookieAuthClient() {
 
   const cookieStore = await cookies();
   const pending: PendingCookie[] = [];
+  const cookieOptions = serverAuthCookieOptions();
   const supabase = createServerClient(url, key, {
+    ...(cookieOptions ? { cookieOptions } : {}),
     global: { fetch: fetchWithTimeout(12_000) },
     cookies: {
       getAll() {

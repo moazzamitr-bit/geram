@@ -1,4 +1,4 @@
-import { CacheFirst, ExpirationPlugin, NetworkFirst, NetworkOnly, Serwist } from "serwist";
+import { CacheFirst, ExpirationPlugin, NetworkFirst, Serwist } from "serwist";
 import type { PrecacheEntry } from "serwist";
 import {
   isBypassedRequest,
@@ -6,6 +6,28 @@ import {
   isStaticAssetPath,
   shouldStorePage,
 } from "@/lib/pwa/cache-policy";
+
+/**
+ * /api and /sb must not be intercepted. A NetworkOnly route still calls
+ * respondWith, so auth and the Supabase proxy would depend on this worker.
+ * Stopping the fetch event before Serwist sees it leaves those requests on
+ * the browser's own network path, and no runtime rule stores them.
+ */
+const workerScope = self as unknown as {
+  addEventListener: (
+    type: "fetch",
+    listener: (event: { request: { url: string }; stopImmediatePropagation: () => void }) => void
+  ) => void;
+};
+workerScope.addEventListener("fetch", (event) => {
+  let url: URL;
+  try {
+    url = new URL(event.request.url);
+  } catch {
+    return;
+  }
+  if (isBypassedRequest(url)) event.stopImmediatePropagation();
+});
 
 const pagesCache = {
   cacheWillUpdate: async ({ response }: { response?: Response }) => {
@@ -26,7 +48,7 @@ const pagesCache = {
 
 /**
  * Precache is the app shell (build assets + public icons/fonts/offline page).
- * /api and /sb are NetworkOnly. There is no runtime rule that stores JSON APIs,
+ * /api and /sb match no runtime route. There is no rule that stores JSON APIs,
  * so a quote, wallet, or auth response cannot be replayed offline.
  */
 const serwist = new Serwist({
@@ -36,10 +58,6 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: false,
   runtimeCaching: [
-    {
-      matcher: ({ url }) => isBypassedRequest(url),
-      handler: new NetworkOnly(),
-    },
     {
       matcher: ({ url, sameOrigin }) =>
         sameOrigin && !isBypassedRequest(url) && isStaticAssetPath(url.pathname),
