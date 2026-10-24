@@ -1,5 +1,14 @@
 import { createHash, randomInt, timingSafeEqual } from "crypto";
 import { getExecutionMode } from "@/lib/core/mode";
+import { finnotechConfigured, finnotechOtpChannel, finnotechSmsSender } from "@/lib/finnotech/config";
+import { safeFinnotechLog } from "@/lib/finnotech/client";
+import {
+  initiateMessagingOtp,
+  messagingScopeMissing,
+  sendFinnotextOtp,
+  verifyMessagingOtp,
+} from "@/lib/finnotech/otp";
+import { rateLimit } from "@/lib/rate-limit";
 import { createServiceClient } from "@/lib/supabase/admin";
 
 const CODE_TTL_MS = 2 * 60 * 1000;
@@ -9,13 +18,27 @@ const MAX_SENDS_PER_HOUR = 5;
 
 export type OtpMode = "sms" | "sandbox" | "unavailable";
 
-export type SmsProvider = "smsir" | "kavenegar";
+export type SmsProvider = "finnotech" | "smsir" | "kavenegar";
 
-/** First configured provider; sms.ir wins when both are set. */
+/** Finnotech wins when configured. Otherwise sms.ir, then Kavenegar. */
 export function smsProvider(): SmsProvider | null {
+  if (finnotechConfigured()) return "finnotech";
   if (process.env.SMSIR_API_KEY && process.env.SMSIR_TEMPLATE_ID) return "smsir";
   if (process.env.KAVENEGAR_API_KEY && process.env.KAVENEGAR_OTP_TEMPLATE) return "kavenegar";
   return null;
+}
+
+/** In-memory cap on OTP sends: 8 per hour per IP and 5 per hour per phone. */
+export function consumeOtpSendRate(phone: string, ip: string, now = Date.now()) {
+  const ipHit = rateLimit(`otp-send:ip:${ip || "unknown"}`, 8, 60 * 60 * 1000, now);
+  if (!ipHit.ok) {
+    return { ok: false as const, error: "too_many" as const, retryAfterSec: ipHit.retryAfterSec };
+  }
+  const phoneHit = rateLimit(`otp-send:phone:${phone}`, 5, 60 * 60 * 1000, now);
+  if (!phoneHit.ok) {
+    return { ok: false as const, error: "too_many" as const, retryAfterSec: phoneHit.retryAfterSec };
+  }
+  return { ok: true as const };
 }
 
 /**
@@ -83,7 +106,7 @@ export type RequestOtpResult =
   | { ok: true; mode: OtpMode; resendInSec: number }
   | { ok: false; error: "cooldown" | "too_many" | "unavailable" | "send_failed"; retryAfterSec?: number };
 
-export async function requestOtp(phone: string): Promise<RequestOtpResult> {
+export async function requestOtp(phone: string, ip = "unknown"): Promise<RequestOtpResult> {
   const mode = otpMode();
   if (mode === "sandbox") return { ok: true, mode, resendInSec: 60 };
   if (mode === "unavailable") return { ok: false, error: "unavailable" };
@@ -117,6 +140,13 @@ export async function requestOtp(phone: string): Promise<RequestOtpResult> {
     }
   }
 
+  const paced = consumeOtpSendRate(phone, ip, now);
+  if (!paced.ok) return { ok: false, error: "too_many", retryAfterSec: paced.retryAfterSec };
+
+  if (smsProvider() === "finnotech") {
+    return sendFinnotechOtp(db, phone, sentCount, windowStart, now);
+  }
+
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   const { error } = await db.from("auth_otp_codes").upsert({
     phone,
@@ -126,6 +156,8 @@ export async function requestOtp(phone: string): Promise<RequestOtpResult> {
     sent_count: sentCount,
     window_started_at: windowStart,
     last_sent_at: new Date(now).toISOString(),
+    provider: "local",
+    provider_ref: null,
   });
   if (error) {
     console.error("otp_store", error.message);
@@ -140,6 +172,68 @@ export async function requestOtp(phone: string): Promise<RequestOtpResult> {
     return { ok: false, error: "send_failed" };
   }
   return { ok: true, mode, resendInSec: RESEND_COOLDOWN_MS / 1000 };
+}
+
+type OtpDb = ReturnType<typeof createServiceClient>;
+
+async function sendFinnotechOtp(
+  db: OtpDb,
+  phone: string,
+  sentCount: number,
+  windowStart: string,
+  now: number
+): Promise<RequestOtpResult> {
+  const channel = finnotechOtpChannel();
+  if (channel === "messaging") {
+    try {
+      const initiated = await initiateMessagingOtp(phone);
+      const { error } = await db.from("auth_otp_codes").upsert({
+        phone,
+        code_hash: "external",
+        expires_at: new Date(now + initiated.expiresIn * 1000).toISOString(),
+        attempts: 0,
+        sent_count: sentCount,
+        window_started_at: windowStart,
+        last_sent_at: new Date(now).toISOString(),
+        provider: "finnotech_messaging",
+        provider_ref: initiated.traceId,
+      });
+      if (error) {
+        console.error("otp_store", error.message);
+        return { ok: false, error: "send_failed" };
+      }
+      return { ok: true, mode: "sms", resendInSec: RESEND_COOLDOWN_MS / 1000 };
+    } catch (err) {
+      safeFinnotechLog("otp_finnotech", err);
+      if (!messagingScopeMissing(err) || !finnotechSmsSender()) {
+        return { ok: false, error: "send_failed" };
+      }
+    }
+  }
+
+  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  const { error } = await db.from("auth_otp_codes").upsert({
+    phone,
+    code_hash: hashCode(phone, code),
+    expires_at: new Date(now + CODE_TTL_MS).toISOString(),
+    attempts: 0,
+    sent_count: sentCount,
+    window_started_at: windowStart,
+    last_sent_at: new Date(now).toISOString(),
+    provider: "finnotech_finnotext",
+    provider_ref: null,
+  });
+  if (error) {
+    console.error("otp_store", error.message);
+    return { ok: false, error: "send_failed" };
+  }
+  try {
+    await sendFinnotextOtp(phone, code);
+  } catch (err) {
+    safeFinnotechLog("otp_finnotext", err);
+    return { ok: false, error: "send_failed" };
+  }
+  return { ok: true, mode: "sms", resendInSec: RESEND_COOLDOWN_MS / 1000 };
 }
 
 export type VerifyOtpResult =
@@ -157,7 +251,7 @@ export async function verifyOtp(phone: string, code: string): Promise<VerifyOtpR
   const db = createServiceClient();
   const { data: row } = await db
     .from("auth_otp_codes")
-    .select("code_hash, expires_at, attempts")
+    .select("code_hash, expires_at, attempts, provider, provider_ref")
     .eq("phone", phone)
     .maybeSingle();
   if (!row) return { ok: false, error: "invalid_otp" };
@@ -166,6 +260,34 @@ export async function verifyOtp(phone: string, code: string): Promise<VerifyOtpR
   }
   if (Number(row.attempts) >= MAX_ATTEMPTS) {
     return { ok: false, error: "too_many_attempts" };
+  }
+
+  if (row.provider === "finnotech_messaging") {
+    const traceId = String(row.provider_ref ?? "");
+    if (!traceId) return { ok: false, error: "invalid_otp" };
+    let matched = false;
+    try {
+      matched = await verifyMessagingOtp(traceId, code);
+    } catch (err) {
+      safeFinnotechLog("otp_verify", err);
+      return { ok: false, error: "unavailable" };
+    }
+    if (!matched) {
+      await db
+        .from("auth_otp_codes")
+        .update({ attempts: Number(row.attempts) + 1 })
+        .eq("phone", phone);
+      return { ok: false, error: "invalid_otp" };
+    }
+    await db
+      .from("auth_otp_codes")
+      .update({
+        expires_at: new Date(0).toISOString(),
+        attempts: MAX_ATTEMPTS,
+        provider_ref: null,
+      })
+      .eq("phone", phone);
+    return { ok: true };
   }
 
   const expected = Buffer.from(String(row.code_hash), "hex");
