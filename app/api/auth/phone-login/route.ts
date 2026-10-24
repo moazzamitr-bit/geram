@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authMethod } from "@/lib/auth/method";
-import { otpCodeLength, otpMode, verifyOtp } from "@/lib/auth/otp";
+import { otpMode, verifyOtp } from "@/lib/auth/otp";
 import { isIranMobile, normalizeIranMobile } from "@/lib/auth/phone";
 import { toEnglishDigits } from "@/lib/kyc/national-id";
 import { createOtpSession } from "@/lib/db/phone-auth";
@@ -18,8 +18,8 @@ export async function POST(request: Request) {
   const ipLimit = rateLimit(`login:ip:${clientIp(request)}`, 20, 10 * 60 * 1000);
   if (!ipLimit.ok) return tooManyRequests(ipLimit.retryAfterSec);
 
-  // Reject a bad number or a code of the wrong length before asking whether
-  // Supabase or the SMS provider is up. A short code is invalid_otp, not 503.
+  // Digits only. The exact length is the one Finnotech used (default 5), checked
+  // in verifyOtp. Do not reject a 5-digit code here.
   const body = (await request.json().catch(() => ({}))) as { phone?: string; otp?: string };
   const phone = normalizeIranMobile(body.phone ?? "");
   const otp = toEnglishDigits(body.otp ?? "").replace(/\D/g, "");
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   if (!isIranMobile(phone)) {
     return NextResponse.json({ ok: false, error: "invalid_phone" }, { status: 400 });
   }
-  if (otp.length !== otpCodeLength()) {
+  if (!/^\d{4,8}$/.test(otp)) {
     return NextResponse.json({ ok: false, error: "invalid_otp" }, { status: 401 });
   }
 

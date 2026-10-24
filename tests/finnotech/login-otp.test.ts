@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { finnotechOtpChannel, finnotechConfigured } from "@/lib/finnotech/config";
+import { finnotechOtpChannel, finnotechConfigured, finnotechOtpDigits } from "@/lib/finnotech/config";
 import { resetFinnotechAuthCache } from "@/lib/finnotech/client";
-import { initiateMessagingOtp, sendFinnotextOtp, verifyMessagingOtp } from "@/lib/finnotech/otp";
+import { codeLengthFromMessagingResult, initiateMessagingOtp, sendFinnotextOtp, verifyMessagingOtp } from "@/lib/finnotech/otp";
 import { consumeOtpSendRate, otpMode, smsProvider } from "@/lib/auth/otp";
 
 const SECRET = "otp-secret";
@@ -70,6 +70,7 @@ describe("finnotech login otp", () => {
     const initiated = await initiateMessagingOtp("09120000000");
     expect(initiated.traceId).toBe("trace-1");
     expect(initiated.expiresIn).toBe(90);
+    expect(initiated.codeLength).toBe(5);
     const initiate = calls.find((call) => call.url.includes("/otp/initiate"));
     expect(initiate?.url).toContain("/messaging/v2/clients/geram/otp/initiate");
     expect(initiate?.url).toContain("trackId=");
@@ -85,6 +86,18 @@ describe("finnotech login otp", () => {
     const verify = calls.find((call) => call.url.includes("/otp/verify"));
     expect(verify?.body).toEqual({ traceId: "trace-1", otp: "554321" });
     expect(calls.some((call) => JSON.stringify(call.body).includes(SECRET))).toBe(false);
+  });
+
+  it("uses 5 digits unless the initiate result or env says otherwise", () => {
+    expect(finnotechOtpDigits()).toBe(5);
+    expect(codeLengthFromMessagingResult({ traceId: "t", status: "pending", expiresIn: 120 })).toBe(5);
+    expect(codeLengthFromMessagingResult({ otpLength: 5 })).toBe(5);
+    expect(codeLengthFromMessagingResult({ codeLength: 7 })).toBe(7);
+    vi.stubEnv("FINNOTECH_OTP_LENGTH", "6");
+    expect(finnotechOtpDigits()).toBe(6);
+    expect(codeLengthFromMessagingResult({ status: "pending" })).toBe(6);
+    vi.stubEnv("FINNOTECH_OTP_LENGTH", "nope");
+    expect(finnotechOtpDigits()).toBe(5);
   });
 
   it("sends finnotext from FINNOTECH_SMS_SENDER", async () => {

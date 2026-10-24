@@ -1,12 +1,12 @@
 "use client";
 
+import { OtpCodeFields } from "@/components/auth/OtpCodeFields";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { formatMaskedPhone, useAuth } from "@/lib/auth/auth-context";
 import { isIranMobile, normalizeIranMobile } from "@/lib/auth/phone";
-import { toEnglishDigits } from "@/lib/kyc/national-id";
 import { cn } from "@/lib/utils";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Method = "password" | "otp";
 type OtpStep = "phone" | "otp";
@@ -59,7 +59,7 @@ export function UserLoginForm({
 }) {
   const { isAuthenticated, hydrated, user } = useAuth();
   const [method, setMethod] = useState<Method>(initialMethod);
-  const [codeLength, setCodeLength] = useState(6);
+  const [codeLength, setCodeLength] = useState(5);
   const [queryError, setQueryError] = useState(messageFor(initialError || null));
 
   useEffect(() => {
@@ -380,6 +380,26 @@ function OtpLogin({ codeLength }: { codeLength: number }) {
   const [loading, setLoading] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [length, setLength] = useState(codeLength);
+  const submitting = useRef(false);
+
+  const submitCode = async (code: string) => {
+    if (submitting.current) return;
+    setError("");
+    if (code.length !== length) {
+      setError(`کد ${length.toLocaleString("fa-IR")} رقمی را کامل وارد کنید.`);
+      return;
+    }
+    submitting.current = true;
+    setLoading(true);
+    const result = await login(normalizedPhone, code);
+    setLoading(false);
+    submitting.current = false;
+    if (!result.ok) {
+      setError(result.error === "invalid_otp" ? "کد تأیید نادرست است." : messageFor(result.error ?? ""));
+      return;
+    }
+    window.location.assign("/auth/onboarding");
+  };
 
   useEffect(() => {
     if (!hydrated || !isAuthenticated) return;
@@ -477,21 +497,9 @@ function OtpLogin({ codeLength }: { codeLength: number }) {
   ) : (
     <form
       className="space-y-5"
-      onSubmit={async (event) => {
+      onSubmit={(event) => {
         event.preventDefault();
-        setError("");
-        if (otp.length !== length) {
-          setError(`کد ${length.toLocaleString("fa-IR")} رقمی را کامل وارد کنید.`);
-          return;
-        }
-        setLoading(true);
-        const result = await login(normalizedPhone, otp);
-        setLoading(false);
-        if (!result.ok) {
-          setError(result.error === "invalid_otp" ? "کد تأیید نادرست است." : messageFor(result.error ?? ""));
-          return;
-        }
-        window.location.assign("/auth/onboarding");
+        void submitCode(otp);
       }}
     >
       <div>
@@ -500,22 +508,19 @@ function OtpLogin({ codeLength }: { codeLength: number }) {
           کد تأیید به شماره {formatMaskedPhone(normalizedPhone)} ارسال شد.
         </p>
       </div>
-      <label className="block">
+      <div>
         <span className="mb-2 block text-[13px] text-text-secondary">
           کد {length.toLocaleString("fa-IR")} رقمی
         </span>
-        <input
-          dir="ltr"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={length}
-          value={otp}
-          onChange={(event) =>
-            setOtp(toEnglishDigits(event.target.value).replace(/\D/g, "").slice(0, length))
-          }
-          className="h-12 w-full rounded-xl border border-black/10 bg-[#F6F4F1] px-4 text-center text-[22px] tracking-[0.4em] text-text outline-none transition focus:border-[#FFB800] focus:bg-white"
+        <OtpCodeFields
+          length={length}
+          disabled={loading}
+          onChange={setOtp}
+          onComplete={(code) => {
+            void submitCode(code);
+          }}
         />
-      </label>
+      </div>
       {error && (
         <p className="text-[13px] text-negative" role="alert">
           {error}

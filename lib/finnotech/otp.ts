@@ -1,5 +1,5 @@
 import { finnotechCall, FinnotechError } from "@/lib/finnotech/client";
-import { finnotechClientId, finnotechSmsSender } from "@/lib/finnotech/config";
+import { finnotechClientId, finnotechOtpDigits, finnotechSmsSender } from "@/lib/finnotech/config";
 
 function clientPath(prefix: string) {
   return `/${prefix}/v2/clients/${encodeURIComponent(finnotechClientId())}`;
@@ -9,11 +9,41 @@ export type MessagingOtp = {
   traceId: string;
   expiresIn: number;
   trackId: string;
+  /** Digits Finnotech will send. From the initiate result when present, else env/default 5. */
+  codeLength: number;
 };
+
+type MessagingInitiateResult = {
+  traceId?: string;
+  expiresIn?: number;
+  status?: string;
+  otpLength?: number;
+  codeLength?: number;
+  length?: number;
+  digits?: number;
+};
+
+const LENGTH_FIELDS = ["otpLength", "codeLength", "length", "digits"] as const;
+
+/**
+ * Official initiate schema (docs.finnotech.ir messagingOtpInitiatePost) returns
+ * traceId, status, and expiresIn only. The published verify sample is 6 digits,
+ * but the SMS Finnotech actually sends is 5. If a length field is present, use
+ * it; otherwise FINNOTECH_OTP_LENGTH, default 5.
+ */
+export function codeLengthFromMessagingResult(result: MessagingInitiateResult | null | undefined) {
+  if (result) {
+    for (const key of LENGTH_FIELDS) {
+      const parsed = Number(result[key]);
+      if (Number.isInteger(parsed) && parsed >= 4 && parsed <= 8) return parsed;
+    }
+  }
+  return finnotechOtpDigits();
+}
 
 /** messaging:otp-initiate:post — Finnotech generates the code. We keep only traceId. */
 export async function initiateMessagingOtp(phone: string): Promise<MessagingOtp> {
-  const sent = await finnotechCall<{ traceId?: string; expiresIn?: number; status?: string }>({
+  const sent = await finnotechCall<MessagingInitiateResult>({
     method: "POST",
     path: `${clientPath("messaging")}/otp/initiate`,
     body: { identifier: phone, method: "sms", purpose: "login", ttl: 120 },
@@ -26,6 +56,7 @@ export async function initiateMessagingOtp(phone: string): Promise<MessagingOtp>
     traceId,
     expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 120,
     trackId: sent.trackId,
+    codeLength: codeLengthFromMessagingResult(sent.result),
   };
 }
 

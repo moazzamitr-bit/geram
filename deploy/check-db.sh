@@ -13,6 +13,22 @@ psql_q() { docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres -At -v ON
 
 docker ps --format '{{.Names}}' | grep -qx "$DB_CONTAINER" || { echo "Container $DB_CONTAINER not found"; exit 1; }
 
+# Postgres resolves relation names at parse time, so a CASE cannot protect a
+# SELECT from a missing table. Create the ledger before any count when applying.
+ensure_ledger() {
+  psql_q <<'SQL'
+create table if not exists public.geram_schema_migrations (
+  filename text primary key,
+  applied_at timestamptz not null default now()
+);
+SQL
+}
+
+if [ "${1:-}" = "--apply" ]; then
+  echo "== Migration ledger"
+  ensure_ledger
+fi
+
 echo "== Geram database check ($DB_CONTAINER)"
 psql_q <<'SQL'
 select 'auth users:           ' || count(*) from auth.users;
@@ -32,8 +48,6 @@ select 'migration 1021 otp:         ' || (to_regclass('public.auth_otp_codes') i
 select 'migration 1024 finnotech kyc:' || exists(select 1 from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='kyc_verified_at');
 select 'migration 1024 legacy drop: ' || (to_regclass('public.wallets') is null and to_regclass('public.transactions') is null);
 select 'migration 1024 kyc level:   ' || exists(select 1 from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='kyc_level');
-select 'tracked migrations:         ' || case when to_regclass('public.geram_schema_migrations') is null then 'NOT TRACKED'
-  else (select count(*)::text from public.geram_schema_migrations) end;
 select 'wallets:                    ' || case when to_regclass('public.wallets') is null then 'DROPPED' else 'STILL PRESENT' end;
 select 'transactions:               ' || case when to_regclass('public.transactions') is null then 'DROPPED' else 'STILL PRESENT' end;
 select 'core_sandbox_deposits:      ' || case when to_regclass('public.core_sandbox_deposits') is null then 'DROPPED' else 'STILL PRESENT' end;
@@ -44,18 +58,20 @@ select 'market_prices kept:         ' || (to_regclass('public.market_prices') is
 select 'wallets_update_own policy:  ' || exists(select 1 from pg_policies where tablename='wallets' and policyname='wallets_update_own') || '  (must be false)';
 SQL
 
+ledger=$(psql_q -c "select to_regclass('public.geram_schema_migrations')")
+if [ -n "$ledger" ]; then
+  echo "tracked migrations:         $(psql_q -c "select count(*) from public.geram_schema_migrations")"
+else
+  echo "tracked migrations:         NOT TRACKED"
+fi
+
 if [ "${1:-}" = "--apply" ]; then
   [ -d "$APP_DIR/supabase/migrations" ] || { echo "No migrations at $APP_DIR"; exit 1; }
   # Files at or after this timestamp are NOT assumed to be applied on an
   # existing database. Older files were re-run by the previous script.
   BASELINE_BEFORE=20261024210000
   echo "== Migration ledger"
-  psql_q <<'SQL'
-create table if not exists public.geram_schema_migrations (
-  filename text primary key,
-  applied_at timestamptz not null default now()
-);
-SQL
+  ensure_ledger
   tracked=$(psql_q -c "select count(*) from public.geram_schema_migrations")
   profiles=$(psql_q -c "select to_regclass('public.profiles') is not null")
   if [ "$tracked" = "0" ] && [ "$profiles" = "t" ]; then

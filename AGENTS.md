@@ -86,7 +86,7 @@ and never leave production broken.
   signup return `method_disabled`. Admin `/admin/login` is still email and password.
   The session is opened with `generateLink` magiclink plus `verifyOtp` and does not read or
   write the password, so an old password account can sign in by OTP on the same phone.
-  Resend waits 2 minutes. The code is 6 digits unless `FINNOTECH_OTP_LENGTH` says otherwise.
+  Resend waits 2 minutes. The code is 5 digits (what Finnotech SMS sends) unless `FINNOTECH_OTP_LENGTH` says otherwise.
   Do not change `AUTH_METHOD` without the owner's OK.
 - Shahkar KYC is server-side (`/app/profile/kyc`), then an optional card/IBAN ownership match.
   Levels: 0 mobile, 1 identity (trade), 2 bank (higher caps and withdrawals). Buy/sell require

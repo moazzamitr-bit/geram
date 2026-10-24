@@ -3,7 +3,8 @@
  * client was not granted instead of failing the token. See docs/DEPLOY.md.
  *
  * Login OTP: messaging initiate/verify, or facility finnotext when a sender
- * line is set. The published verify sample is a 6-digit code (`554321`).
+ * line is set. The live SMS line sends 5 digits. The verify sample `554321`
+ * is not the length to enforce.
  * Identity: Shahkar SMS plus civil-registry identification.
  * Withdrawals: card and IBAN ownership against the same national id.
  */
@@ -48,12 +49,14 @@ export function finnotechTimeoutMs() {
 }
 
 /**
- * Digits in the login code. Finnotech's verify sample is 6 (`554321`).
- * Set FINNOTECH_OTP_LENGTH only when the granted SMS line uses another length.
+ * Digits in the login code. Finnotech's otp-initiate response is
+ * `{ traceId, status, expiresIn }` and does not include a length. Their
+ * verify example is 6 digits (`554321`), but the SMS line in production
+ * sends 5. `FINNOTECH_OTP_LENGTH` overrides that (4–8).
  */
 export function finnotechOtpDigits() {
-  const parsed = Number(process.env.FINNOTECH_OTP_LENGTH ?? 6);
-  if (!Number.isInteger(parsed) || parsed < 4 || parsed > 8) return 6;
+  const parsed = Number(process.env.FINNOTECH_OTP_LENGTH ?? 5);
+  if (!Number.isInteger(parsed) || parsed < 4 || parsed > 8) return 5;
   return parsed;
 }
 

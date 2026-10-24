@@ -32,6 +32,26 @@ export function newLoginCode() {
   return String(randomInt(0, 10 ** digits)).padStart(digits, "0");
 }
 
+/** Length Finnotech reported for this challenge, stored beside the external hash. */
+export function messagingStoredLength(codeHash: string): number | null {
+  const match = /^external:(\d+)$/.exec(codeHash);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  if (!Number.isInteger(parsed) || parsed < 4 || parsed > 8) return null;
+  return parsed;
+}
+
+function externalCodeHash(length: number) {
+  return `external:${length}`;
+}
+
+/** Sandbox demo code. An explicit DEMO_OTP wins; otherwise it matches the configured length. */
+export function sandboxDemoCode() {
+  const explicit = process.env.DEMO_OTP?.trim() || process.env.NEXT_PUBLIC_DEMO_OTP?.trim();
+  if (explicit) return explicit;
+  return "123456789".slice(0, otpCodeLength());
+}
+
 export type OtpMode = "sms" | "sandbox" | "unavailable";
 
 export type SmsProvider = "finnotech" | "smsir" | "kavenegar";
@@ -205,7 +225,7 @@ async function sendFinnotechOtp(
       const initiated = await initiateMessagingOtp(phone);
       const { error } = await db.from("auth_otp_codes").upsert({
         phone,
-        code_hash: "external",
+        code_hash: externalCodeHash(initiated.codeLength),
         expires_at: new Date(now + initiated.expiresIn * 1000).toISOString(),
         attempts: 0,
         sent_count: sentCount,
@@ -218,7 +238,7 @@ async function sendFinnotechOtp(
         console.error("otp_store", error.message);
         return { ok: false, error: "send_failed" };
       }
-      return { ok: true, mode: "sms", resendInSec: OTP_RESEND_SEC, codeLength: otpCodeLength() };
+      return { ok: true, mode: "sms", resendInSec: OTP_RESEND_SEC, codeLength: initiated.codeLength };
     } catch (err) {
       safeFinnotechLog("otp_finnotech", err);
       if (!messagingScopeMissing(err) || !finnotechSmsSender()) {
@@ -259,8 +279,7 @@ export type VerifyOtpResult =
 export async function verifyOtp(phone: string, code: string): Promise<VerifyOtpResult> {
   const mode = otpMode();
   if (mode === "sandbox") {
-    const demo = process.env.DEMO_OTP || process.env.NEXT_PUBLIC_DEMO_OTP || "123456";
-    return code === demo ? { ok: true } : { ok: false, error: "invalid_otp" };
+    return code === sandboxDemoCode() ? { ok: true } : { ok: false, error: "invalid_otp" };
   }
   if (mode === "unavailable") return { ok: false, error: "unavailable" };
 
@@ -281,6 +300,10 @@ export async function verifyOtp(phone: string, code: string): Promise<VerifyOtpR
   if (row.provider === "finnotech_messaging") {
     const traceId = String(row.provider_ref ?? "");
     if (!traceId) return { ok: false, error: "invalid_otp" };
+    // Exact length Finnotech used for this send (initiate result, else default 5).
+    // Do not require 6 digits: that check rejected the 5-digit SMS.
+    const expected = messagingStoredLength(String(row.code_hash)) ?? otpCodeLength();
+    if (code.length !== expected) return { ok: false, error: "invalid_otp" };
     let matched = false;
     try {
       matched = await verifyMessagingOtp(traceId, code);
