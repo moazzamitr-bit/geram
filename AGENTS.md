@@ -19,7 +19,7 @@ and never leave production broken.
 | Code on the server | `/opt/geram`, a clean checkout of branch **`fix/p0-security`** |
 | Settings / secrets | `/opt/geram/.env.production` on the server only (root-only). Never in git. |
 | Execution mode | `SANDBOX` (simulated deposits; no real payment rails yet) |
-| Login | `AUTH_METHOD=password` (mobile + password, number NOT verified). SMS OTP code exists but is off. |
+| Login | `AUTH_METHOD=password` until the server sets `otp`. With `otp`, users sign in by mobile SMS only (new numbers are created). Admin email/password stays. |
 
 ## 2. Hard rules
 
@@ -80,13 +80,20 @@ and never leave production broken.
 - **Closed-beta admin nav**: pages listed in `lib/admin/closed-beta.ts` stay in the repo
   but are hidden and rewritten to a “not active in beta” screen. Remove a path from that
   list to turn the page back on. Inventory registration stays on `/admin/approvals`.
-- **SMS OTP**: default login stays `AUTH_METHOD=password`. When `AUTH_METHOD=otp`, Finnotech
-  (otherwise sms.ir / Kavenegar) checks the code, then the server opens a GoTrue session with
-  admin `generateLink` magiclink plus `verifyOtp` (`token_hash`, type `email`). That path does not
-  read or write the password, so password login keeps working for the same account. sms.ir template
-  `123456` only reaches the panel owner's number. Do not change `AUTH_METHOD` without the owner's OK.
-- Shahkar KYC is server-side (`/app/profile/kyc`). Buy/sell require `kyc_status=VERIFIED` when
-  `REQUIRE_KYC_FOR_TRADE` is unset and mode is `PRODUCTION` (off in SANDBOX / CLOSED_BETA).
+- **SMS OTP**: default login stays `AUTH_METHOD=password` until the server sets `otp`.
+  With `otp`, `/auth/login` asks only for a mobile number, Finnotech (else sms.ir / Kavenegar)
+  sends the code, and a new number is created on success. User password login and password
+  signup return `method_disabled`. Admin `/admin/login` is still email and password.
+  The session is opened with `generateLink` magiclink plus `verifyOtp` and does not read or
+  write the password, so an old password account can sign in by OTP on the same phone.
+  Resend waits 2 minutes. The code is 6 digits unless `FINNOTECH_OTP_LENGTH` says otherwise.
+  Do not change `AUTH_METHOD` without the owner's OK.
+- Shahkar KYC is server-side (`/app/profile/kyc`), then an optional card/IBAN ownership match.
+  Levels: 0 mobile, 1 identity (trade), 2 bank (higher caps and withdrawals). Buy/sell require
+  level 1 when `REQUIRE_KYC_FOR_TRADE` is unset and mode is `PRODUCTION` (off in SANDBOX / CLOSED_BETA).
+  `check-db.sh --apply` records applied files in `geram_schema_migrations` and does not re-run them.
+  The first run on an existing database stamps every file older than `20261024210000` and applies
+  only that migration and anything newer.
 - Not built yet: payment gateway deposits, bank withdrawals (Paya/Satna), supplier/custody
   contracts, executable price source (TGJU is public data), eNamad/licence.
 - `lib/data.ts` → `contactInfo` still has placeholder phone/address; replace with real company data.

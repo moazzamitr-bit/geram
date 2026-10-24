@@ -15,6 +15,12 @@ export const KYC_MESSAGES = {
   unavailable: "سرویس احراز هویت موقتاً در دسترس نیست. کمی بعد دوباره تلاش کنید.",
   duplicate_national_code: "این کد ملی قبلاً برای حساب دیگری ثبت شده است.",
   provider: "سرویس احراز هویت پاسخ نداد. کمی بعد دوباره تلاش کنید.",
+  underage: "افتتاح حساب از ۱۸ سال تمام امکان‌پذیر است.",
+  identity_required: "اول کد ملی و تاریخ تولد را تأیید کنید، بعد حساب بانکی.",
+  invalid_card: "شماره کارت ۱۶ رقمی معتبر نیست.",
+  invalid_iban: "شماره شبا معتبر نیست. با IR و ۲۴ رقم وارد کنید.",
+  bank_required: "شماره کارت یا شبا را وارد کنید.",
+  bank_mismatch: "این کارت یا شبا به نام صاحب کد ملی حساب نیست.",
 } as const;
 
 export type KycErrorCode = keyof typeof KYC_MESSAGES;

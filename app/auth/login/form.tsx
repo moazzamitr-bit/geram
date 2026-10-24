@@ -3,6 +3,8 @@
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { formatMaskedPhone, useAuth } from "@/lib/auth/auth-context";
+import { isIranMobile, normalizeIranMobile } from "@/lib/auth/phone";
+import { toEnglishDigits } from "@/lib/kyc/national-id";
 import { cn } from "@/lib/utils";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
@@ -49,12 +51,15 @@ function messageFor(code: string | null) {
 export function UserLoginForm({
   initialError = "",
   initialTab = "login",
+  initialMethod = "password",
 }: {
   initialError?: string;
   initialTab?: "login" | "register";
+  initialMethod?: Method;
 }) {
   const { isAuthenticated, hydrated, user } = useAuth();
-  const [method, setMethod] = useState<Method>("password");
+  const [method, setMethod] = useState<Method>(initialMethod);
+  const [codeLength, setCodeLength] = useState(6);
   const [queryError, setQueryError] = useState(messageFor(initialError || null));
 
   useEffect(() => {
@@ -68,8 +73,11 @@ export function UserLoginForm({
     const timer = setTimeout(() => controller.abort(), 3_000);
     fetch("/api/auth/config", { cache: "no-store", signal: controller.signal })
       .then((res) => res.json())
-      .then((data: { method?: string }) => {
-        if (data.method === "otp") setMethod("otp");
+      .then((data: { method?: string; otpCodeLength?: number }) => {
+        if (data.method === "otp" || data.method === "password") setMethod(data.method);
+        if (data.otpCodeLength && data.otpCodeLength >= 4 && data.otpCodeLength <= 8) {
+          setCodeLength(data.otpCodeLength);
+        }
       })
       .catch(() => {
         /* password form is already on screen */
@@ -102,7 +110,7 @@ export function UserLoginForm({
                 {queryError}
               </p>
             )}
-            {method === "otp" ? <OtpLogin /> : <PasswordLogin initialTab={initialTab} />}
+            {method === "otp" ? <OtpLogin codeLength={codeLength} /> : <PasswordLogin initialTab={initialTab} />}
           </div>
         </div>
         <aside
@@ -356,7 +364,14 @@ function PasswordField({
   );
 }
 
-function OtpLogin() {
+function formatCountdown(total: number) {
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  const text = `${minutes}:${String(secs).padStart(2, "0")}`;
+  return text.replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
+}
+
+function OtpLogin({ codeLength }: { codeLength: number }) {
   const { login, isAuthenticated, hydrated, user } = useAuth();
   const [step, setStep] = useState<OtpStep>("phone");
   const [phone, setPhone] = useState("");
@@ -364,6 +379,7 @@ function OtpLogin() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  const [length, setLength] = useState(codeLength);
 
   useEffect(() => {
     if (!hydrated || !isAuthenticated) return;
@@ -371,12 +387,16 @@ function OtpLogin() {
   }, [hydrated, isAuthenticated, user]);
 
   useEffect(() => {
+    setLength(codeLength);
+  }, [codeLength]);
+
+  useEffect(() => {
     if (seconds <= 0) return;
     const timer = setTimeout(() => setSeconds((value) => value - 1), 1000);
     return () => clearTimeout(timer);
   }, [seconds]);
 
-  const normalizedPhone = useMemo(() => phone.replace(/\D/g, "").replace(/^98/, "0"), [phone]);
+  const normalizedPhone = useMemo(() => normalizeIranMobile(phone), [phone]);
 
   const sendCode = async () => {
     try {
@@ -391,16 +411,19 @@ function OtpLogin() {
         error?: string;
         resendInSec?: number;
         retryAfterSec?: number;
+        codeLength?: number;
       };
       if (!data.ok) {
         setError(
           data.error === "cooldown" || data.error === "too_many"
-            ? `برای ارسال دوباره ${(data.retryAfterSec ?? 60).toLocaleString("fa-IR")} ثانیه صبر کنید.`
+            ? `برای ارسال دوباره ${(data.retryAfterSec ?? 120).toLocaleString("fa-IR")} ثانیه صبر کنید.`
             : "ارسال پیامک ناموفق بود. دوباره تلاش کنید."
         );
+        if (data.retryAfterSec) setSeconds(data.retryAfterSec);
         return false;
       }
-      setSeconds(data.resendInSec ?? 60);
+      if (data.codeLength && data.codeLength >= 4 && data.codeLength <= 8) setLength(data.codeLength);
+      setSeconds(data.resendInSec ?? 120);
       return true;
     } catch {
       setError(messageFor("network"));
@@ -414,7 +437,7 @@ function OtpLogin() {
       onSubmit={async (event) => {
         event.preventDefault();
         setError("");
-        if (!/^09\d{9}$/.test(normalizedPhone)) {
+        if (!isIranMobile(normalizedPhone)) {
           setError(messageFor("invalid_phone"));
           return;
         }
@@ -425,9 +448,9 @@ function OtpLogin() {
       }}
     >
       <div>
-        <h1 className="text-[22px] font-extrabold text-text">ورود / ثبت‌نام</h1>
+        <h1 className="text-[22px] font-extrabold text-text">ورود یا ثبت‌نام</h1>
         <p className="mt-2 text-[14px] leading-7 text-muted-app">
-          شماره موبایل خود را وارد کنید تا کد تأیید برایتان ارسال شود.
+          شماره موبایل را وارد کنید. کد تأیید پیامک می‌شود. اگر حساب نداشته باشید، با همین کد ساخته می‌شود.
         </p>
       </div>
       <label className="block">
@@ -437,7 +460,7 @@ function OtpLogin() {
           inputMode="numeric"
           autoComplete="tel"
           value={phone}
-          onChange={(event) => setPhone(event.target.value)}
+          onChange={(event) => setPhone(normalizeIranMobile(event.target.value))}
           placeholder="09121234567"
           className={cn(fieldClass, "text-left")}
         />
@@ -457,8 +480,8 @@ function OtpLogin() {
       onSubmit={async (event) => {
         event.preventDefault();
         setError("");
-        if (otp.length !== 6) {
-          setError("کد ۶ رقمی را کامل وارد کنید.");
+        if (otp.length !== length) {
+          setError(`کد ${length.toLocaleString("fa-IR")} رقمی را کامل وارد کنید.`);
           return;
         }
         setLoading(true);
@@ -478,14 +501,18 @@ function OtpLogin() {
         </p>
       </div>
       <label className="block">
-        <span className="mb-2 block text-[13px] text-text-secondary">کد ۶ رقمی</span>
+        <span className="mb-2 block text-[13px] text-text-secondary">
+          کد {length.toLocaleString("fa-IR")} رقمی
+        </span>
         <input
           dir="ltr"
           inputMode="numeric"
           autoComplete="one-time-code"
-          maxLength={6}
+          maxLength={length}
           value={otp}
-          onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
+          onChange={(event) =>
+            setOtp(toEnglishDigits(event.target.value).replace(/\D/g, "").slice(0, length))
+          }
           className="h-12 w-full rounded-xl border border-black/10 bg-[#F6F4F1] px-4 text-center text-[22px] tracking-[0.4em] text-text outline-none transition focus:border-[#FFB800] focus:bg-white"
         />
       </label>
@@ -497,16 +524,32 @@ function OtpLogin() {
       <GoldButton type="submit" variant="black" className="w-full" disabled={loading}>
         {loading ? "در حال بررسی..." : "تأیید و ورود"}
       </GoldButton>
-      <button
-        type="button"
-        className="text-[13px] text-text-secondary hover:text-gold"
-        onClick={() => {
-          setStep("phone");
-          setError("");
-        }}
-      >
-        ویرایش شماره
-      </button>
+      <div className="flex items-center justify-between text-[13px]">
+        <button
+          type="button"
+          className="text-text-secondary hover:text-gold"
+          onClick={() => {
+            setStep("phone");
+            setOtp("");
+            setError("");
+          }}
+        >
+          ویرایش شماره
+        </button>
+        <button
+          type="button"
+          disabled={seconds > 0 || loading}
+          className="text-text-secondary hover:text-gold disabled:text-muted-app"
+          onClick={async () => {
+            setError("");
+            setLoading(true);
+            await sendCode();
+            setLoading(false);
+          }}
+        >
+          {seconds > 0 ? `ارسال دوباره تا ${formatCountdown(seconds)}` : "ارسال دوباره کد"}
+        </button>
+      </div>
     </form>
   );
 }

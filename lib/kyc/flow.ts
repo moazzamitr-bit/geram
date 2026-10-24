@@ -7,6 +7,7 @@ import {
   normalizeJalaliBirthDate,
   normalizeNationalCode,
 } from "@/lib/kyc/national-id";
+import { isAtLeast18Jalali } from "@/lib/kyc/age";
 import { rateLimit } from "@/lib/rate-limit";
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
@@ -170,6 +171,9 @@ export async function startShahkarKyc(
   }
   const birthDate = normalizeJalaliBirthDate(input.birthDate);
   if (!birthDate) throw new KycFlowError("invalid_birth_date", 400);
+  if (!isAtLeast18Jalali(birthDate)) {
+    throw new KycFlowError("underage", 422);
+  }
   if (deps.configured === false) throw new KycFlowError("not_configured", 503);
 
   const now = depsNow(deps);

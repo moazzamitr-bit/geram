@@ -117,6 +117,24 @@ describe("login routes", () => {
     await expect(res.json()).resolves.toEqual({ ok: false, error: "method_disabled" });
   });
 
+  it("rejects a short OTP before checking whether Supabase is configured", async () => {
+    vi.stubEnv("AUTH_METHOD", "otp");
+    vi.stubEnv("GERAM_EXECUTION_MODE", "SANDBOX");
+    const res = await phoneLogin(
+      jsonRequest("/api/auth/phone-login", { phone: "۰۹۱۲۰۰۰۰۰۰۰", otp: "۱۲۳۴۵" }, "203.0.113.24")
+    );
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toEqual({ ok: false, error: "invalid_otp" });
+  });
+
+  it("rejects a bad phone before checking whether Supabase is configured", async () => {
+    vi.stubEnv("AUTH_METHOD", "otp");
+    vi.stubEnv("GERAM_EXECUTION_MODE", "SANDBOX");
+    const res = await phoneLogin(jsonRequest("/api/auth/phone-login", { phone: "123", otp: "123456" }, "203.0.113.25"));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ ok: false, error: "invalid_phone" });
+  });
+
   it("returns invalid_credentials for a bad password login without a session call", async () => {
     const res = await passwordLogin(jsonRequest("/api/auth/password-login", { phone: "123", password: "nope" }, "203.0.113.22"));
     expect(res.status).toBe(400);

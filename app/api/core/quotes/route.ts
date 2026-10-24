@@ -4,6 +4,7 @@ import { serializeQuote } from "@/lib/core/adapters";
 import { isAssetCode, uiInstrumentToAsset } from "@/lib/core/assets";
 import { gramsToUg, irrToSafeTomanNumber, tomanToIrr } from "@/lib/core/money";
 import { assertWithinDailyLimit } from "@/lib/core/limits";
+import { effectiveTradeLimits } from "@/lib/kyc/levels";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { loadCommerceSettings } from "@/lib/commerce/settings-server";
 import { resolveUserFeeSnapshot } from "@/lib/core/user-fees";
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const userId = await requireCoreUserId();
-    await assertTradeKyc(userId);
+    const kyc = await assertTradeKyc(userId);
     // Each BUY quote reserves platform metal for its TTL; cap quote spam.
     const limited = rateLimit(`quote:${userId}`, 30, 60 * 1000);
     if (!limited.ok) return tooManyRequests(limited.retryAfterSec);
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
         userId,
         side,
         requestedToman: irrToSafeTomanNumber(requestedIrr),
-        limits: settings.limits,
+        limits: effectiveTradeLimits(settings.limits, kyc.level, kyc.required),
       });
     }
     const quote = await core.issueQuote({

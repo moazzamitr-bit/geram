@@ -147,6 +147,39 @@ describe("double spend / oversell", () => {
     });
     expect(silver.asset).toBe("SILVER");
   });
+
+  it("serializes a buy and an admin debit on the same user lock", async () => {
+    const { store, core } = makeCore();
+    const keys: string[] = [];
+    const original = store.withAdvisoryLock.bind(store);
+    store.withAdvisoryLock = (key, fn) => {
+      keys.push(key);
+      return original(key, fn);
+    };
+    const user = "lock-user";
+    await core.sandboxDeposit(user, tomanToIrr(1_000_000), "seed");
+    const quote = await core.issueQuote({
+      userId: user,
+      asset: "GOLD",
+      side: "BUY",
+      inputMode: "RIAL_AMOUNT",
+      requestedIrr: tomanToIrr(1_000_000),
+    });
+    keys.length = 0;
+    await core.executeTrade({ userId: user, quoteId: quote.id, idempotencyKey: "buy-lock" });
+    await expect(
+      core.debitApprovedUserIrr({
+        userId: user,
+        amountIrr: tomanToIrr(1_000_000),
+        reason: "برگشت همزمان با خرید",
+        refId: "debit-lock-1",
+      })
+    ).rejects.toMatchObject({ code: "insufficient_funds" });
+    const userLocks = keys.filter((key) => key === `user:${user}`);
+    expect(userLocks.length).toBeGreaterThanOrEqual(2);
+    const wallet = await core.wallet(user);
+    expect(wallet.rialAvailable).toBe(0n);
+  });
 });
 
 describe("quote expiry race", () => {

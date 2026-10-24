@@ -10,6 +10,7 @@ export type AdminRole =
 
 export type AdminPermission =
   | "user.view"
+  | "user.plan"
   | "kyc.view"
   | "kyc.review"
   | "kyc.approve_verified"
@@ -43,6 +44,7 @@ export const NEVER_ISSUED_PERMISSIONS = ["wallet.edit", "balance.edit"] as const
 
 const ALL: AdminPermission[] = [
   "user.view",
+  "user.plan",
   "kyc.view",
   "kyc.review",
   "kyc.approve_verified",

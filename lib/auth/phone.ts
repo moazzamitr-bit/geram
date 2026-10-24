@@ -1,7 +1,9 @@
+import { toEnglishDigits } from "@/lib/kyc/national-id";
+
 /** Iranian mobile helpers shared by OTP and password login. */
 
 export function normalizeIranMobile(input: string) {
-  let digits = input.replace(/\D/g, "");
+  let digits = toEnglishDigits(input).replace(/\D/g, "");
   if (digits.startsWith("0098")) digits = digits.slice(4);
   if (digits.startsWith("98") && digits.length >= 12) digits = `0${digits.slice(2)}`;
   if (digits.startsWith("9") && digits.length === 10) digits = `0${digits}`;

@@ -35,6 +35,10 @@ export default async function AdminKycDetailPage({
     kyc_checked_at?: string | null;
     kyc_provider?: string | null;
     kyc_track_id?: string | null;
+    kyc_level?: number | null;
+    kyc_bank_verified_at?: string | null;
+    kyc_bank_track_id?: string | null;
+    kyc_bank_mask?: string | null;
   };
   const configured = finnotechConfigured();
 
@@ -58,6 +62,10 @@ export default async function AdminKycDetailPage({
         <p>تماس: <span dir="ltr">{maskPhone(profile.phone)} · {maskEmail(profile.email)}</span></p>
         <p>کد ملی: <span dir="ltr">{row.national_code ? maskNationalCode(row.national_code) : "—"}</span></p>
         <p>تاریخ تولد استعلام: <span dir="ltr">{row.kyc_birth_date || "—"}</span></p>
+        <p>سطح: {row.kyc_level ?? (profile.kyc_status === "VERIFIED" ? 1 : 0)} — ۰ موبایل، ۱ هویت، ۲ حساب بانکی</p>
+        <p>حساب بانکی: {row.kyc_bank_mask || "—"}</p>
+        <p>پیگیری حساب: <span dir="ltr">{row.kyc_bank_track_id || "—"}</span></p>
+        <p>زمان تطبیق حساب: {when(row.kyc_bank_verified_at)}</p>
         <p>سرویس: {row.kyc_provider || "—"}</p>
         <p>شناسه پیگیری: <span dir="ltr">{row.kyc_track_id || "—"}</span></p>
         <p>زمان تأیید: {when(row.kyc_verified_at)}</p>

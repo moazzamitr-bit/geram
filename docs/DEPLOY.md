@@ -55,11 +55,29 @@ docker run -d --restart unless-stopped --env-file .env.production -p 3000:3000 g
 - کرون روزانه: `curl -H "Authorization: Bearer $CRON_SECRET" https://YOUR_DOMAIN/api/cron/revenue`
 - محدودیت نرخ درخواست در حافظه همان سرور است؛ با یک کانتینر دقیق کار می‌کند.
 
-## ۵٫۱ ورود (رمز عبور، نه پیامک)
+## ۵٫۱ ورود
 
-پیش‌فرض `AUTH_METHOD=password` است. صفحه `/auth/login` همان اول فرم شماره و رمز عبور را نشان می‌دهد و `/api/auth/phone-login` پاسخ `method_disabled` می‌دهد. پیامک فقط با `AUTH_METHOD=otp` فعال می‌شود. اگر فینوتک تنظیم شده باشد پیامک از فینوتک می‌رود (messaging، یا finnotext اگر `FINNOTECH_OTP_CHANNEL=finnotext`)؛ وگرنه sms.ir یا کاوه‌نگار. بعد از تأیید کد، نشست بدون خواندن یا عوض کردن رمز عبور ساخته می‌شود، پس ورود با رمز و ورود با پیامک برای یک کاربر هر دو کار می‌کنند. `AUTH_METHOD` را بدون تأیید صاحب محصول عوض نکنید. ثبت‌نام به `SUPABASE_SERVICE_ROLE_KEY` نیاز دارد.
+پیش‌فرض هنوز `AUTH_METHOD=password` است. وقتی روی سرور `AUTH_METHOD=otp` بگذارید، صفحه `/auth/login` فقط شماره موبایل می‌خواهد، کد پیامکی می‌آید، و اگر شماره تازه باشد حساب ساخته می‌شود. ورود و ثبت‌نام با رمز برای کاربر پاسخ `method_disabled` می‌دهد. ورود ادمین در `/admin/login` با ایمیل و رمز همان‌طور که هست می‌ماند. نشست OTP رمز عبور را نمی‌خواند و عوض نمی‌کند، پس حساب قدیمی با همان شماره و کد پیامکی وارد می‌شود.
 
-احراز هویت کاربر در `/app/profile/kyc` با شاهکار و استعلام ثبت احوال فینوتک است. این خط‌ها را در `/opt/geram/.env.production` بگذارید (مقادیر واقعی، نه در گیت):
+ارسال دوباره کد ۲ دقیقه طول می‌کشد. طول کد ۶ رقم است (نمونه صحت‌سنجی فینوتک `554321`) مگر `FINNOTECH_OTP_LENGTH` چیز دیگری بگوید. پیامک اگر فینوتک تنظیم شده باشد از فینوتک می‌رود (messaging، یا finnotext اگر `FINNOTECH_OTP_CHANNEL=finnotext` و `FINNOTECH_SMS_SENDER` پر باشد)؛ وگرنه sms.ir یا کاوه‌نگار.
+
+احراز هویت در `/app/profile/kyc` سه سطح دارد، مثل وال‌گلد و گرمی: موبایل، بعد کد ملی و تاریخ تولد (شاهکار و ثبت احوال)، بعد کارت یا شبای به نام همان شخص برای برداشت. خرید و فروش در `PRODUCTION` بدون سطح هویت رد می‌شود. برای خاموش کردن موقت: `REQUIRE_KYC_FOR_TRADE=false`. سقف روزانه هر سطح در پنل کاربر دیده می‌شود.
+
+اسکوپ‌هایی که توکن فینوتک درخواست می‌کند (اگر به کلاینت داده نشده باشد، فینوتک همان یکی را حذف می‌کند و بقیه توکن را نگه می‌دارد):
+
+```
+kyc:sms-shahkar-send:get
+kyc:sms-shahkar-verification:get
+facility:sms-shahkar-send:get
+kyc:identification-inquiry:get
+kyc:card-owner-verification:post
+kyc:iban-owner-verification:get
+messaging:otp-initiate:post
+messaging:otp-verify:post
+facility:finnotext-otp:post
+```
+
+این خط‌ها را در `/opt/geram/.env.production` بگذارید (مقادیر واقعی، نه در گیت):
 
 ```
 FINNOTECH_BASE_URL=https://api.finnotech.ir
@@ -69,7 +87,9 @@ FINNOTECH_NID=
 FINNOTECH_SMS_SENDER=
 ```
 
-`FINNOTECH_NID` کد ملی کسی است که در کنسول فینوتک به کلاینت دسترسی دارد. `FINNOTECH_SMS_SENDER` فقط برای ارسال OTP با فینوتکست لازم است. خرید و فروش در حالت `PRODUCTION` بدون احراز هویت رد می‌شود؛ برای خاموش کردن موقت: `REQUIRE_KYC_FOR_TRADE=false`. بعد از گرفتن کد، مایگریشن `20261024120000_finnotech_kyc.sql` را با `check-db.sh --apply` اجرا کنید. ورود ادمین با ایمیل حسابی است که `profiles.role = admin` دارد؛ `admin@geram.ir` روی سرور خودمیزبان فعلی این نقش را ندارد.
+`FINNOTECH_NID` کد ملی کسی است که در کنسول فینوتک به کلاینت دسترسی دارد. `FINNOTECH_SMS_SENDER` فقط برای ارسال OTP با فینوتکست لازم است. `AUTH_METHOD=otp` را بعد از دیپلوی روی سرور بگذارید. ورود ادمین با ایمیل حسابی است که `profiles.role = admin` دارد؛ `admin@geram.ir` روی سرور خودمیزبان فعلی این نقش را ندارد.
+
+مایگریشن تازه `20261024210000_kyc_levels_bank.sql` است. `check-db.sh --apply` دیگر همه فایل‌ها را از نو اجرا نمی‌کند. جدول `geram_schema_migrations` اسم فایل‌های اعمال‌شده را نگه می‌دارد. بار اول روی پایگاه فعلی، فایل‌های قدیمی‌تر از `20261024210000` فقط ثبت می‌شوند و خود این مایگریشن (و هر فایل جدیدتر) اجرا می‌شود. پایگاه خالی همه فایل‌ها را به ترتیب اجرا می‌کند.
 
 پروکسی `/sb` اگر همین الان GoTrue را جواب می‌دهد، برای این اصلاح لازم نیست عوض شود. فقط `Set-Cookie` را حذف نکنید و `NEXT_PUBLIC_SUPABASE_URL` همان آدرسی بماند که مرورگر می‌بیند (`https://geram.co/sb`). متغیر `GERAM_EXECUTION_MODE` را برای این تغییر عوض نکنید.
 

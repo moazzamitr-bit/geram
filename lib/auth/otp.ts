@@ -1,6 +1,11 @@
 import { createHash, randomInt, timingSafeEqual } from "crypto";
 import { getExecutionMode } from "@/lib/core/mode";
-import { finnotechConfigured, finnotechOtpChannel, finnotechSmsSender } from "@/lib/finnotech/config";
+import {
+  finnotechConfigured,
+  finnotechOtpChannel,
+  finnotechOtpDigits,
+  finnotechSmsSender,
+} from "@/lib/finnotech/config";
 import { safeFinnotechLog } from "@/lib/finnotech/client";
 import {
   initiateMessagingOtp,
@@ -11,10 +16,21 @@ import {
 import { rateLimit } from "@/lib/rate-limit";
 import { createServiceClient } from "@/lib/supabase/admin";
 
-const CODE_TTL_MS = 2 * 60 * 1000;
-const RESEND_COOLDOWN_MS = 60 * 1000;
+/** Login code stays valid for two minutes, and resend waits the same two minutes. */
+export const OTP_TTL_MS = 2 * 60 * 1000;
+export const OTP_RESEND_SEC = 120;
+const RESEND_COOLDOWN_MS = OTP_RESEND_SEC * 1000;
 const MAX_ATTEMPTS = 5;
 const MAX_SENDS_PER_HOUR = 5;
+
+export function otpCodeLength() {
+  return finnotechOtpDigits();
+}
+
+export function newLoginCode() {
+  const digits = otpCodeLength();
+  return String(randomInt(0, 10 ** digits)).padStart(digits, "0");
+}
 
 export type OtpMode = "sms" | "sandbox" | "unavailable";
 
@@ -103,12 +119,12 @@ async function sendKavenegar(phone: string, code: string) {
 }
 
 export type RequestOtpResult =
-  | { ok: true; mode: OtpMode; resendInSec: number }
+  | { ok: true; mode: OtpMode; resendInSec: number; codeLength: number }
   | { ok: false; error: "cooldown" | "too_many" | "unavailable" | "send_failed"; retryAfterSec?: number };
 
 export async function requestOtp(phone: string, ip = "unknown"): Promise<RequestOtpResult> {
   const mode = otpMode();
-  if (mode === "sandbox") return { ok: true, mode, resendInSec: 60 };
+  if (mode === "sandbox") return { ok: true, mode, resendInSec: OTP_RESEND_SEC, codeLength: otpCodeLength() };
   if (mode === "unavailable") return { ok: false, error: "unavailable" };
 
   const db = createServiceClient();
@@ -147,11 +163,11 @@ export async function requestOtp(phone: string, ip = "unknown"): Promise<Request
     return sendFinnotechOtp(db, phone, sentCount, windowStart, now);
   }
 
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  const code = newLoginCode();
   const { error } = await db.from("auth_otp_codes").upsert({
     phone,
     code_hash: hashCode(phone, code),
-    expires_at: new Date(now + CODE_TTL_MS).toISOString(),
+    expires_at: new Date(now + OTP_TTL_MS).toISOString(),
     attempts: 0,
     sent_count: sentCount,
     window_started_at: windowStart,
@@ -171,7 +187,7 @@ export async function requestOtp(phone: string, ip = "unknown"): Promise<Request
     console.error("otp_send", err instanceof Error ? err.message : err);
     return { ok: false, error: "send_failed" };
   }
-  return { ok: true, mode, resendInSec: RESEND_COOLDOWN_MS / 1000 };
+  return { ok: true, mode, resendInSec: OTP_RESEND_SEC, codeLength: otpCodeLength() };
 }
 
 type OtpDb = ReturnType<typeof createServiceClient>;
@@ -202,7 +218,7 @@ async function sendFinnotechOtp(
         console.error("otp_store", error.message);
         return { ok: false, error: "send_failed" };
       }
-      return { ok: true, mode: "sms", resendInSec: RESEND_COOLDOWN_MS / 1000 };
+      return { ok: true, mode: "sms", resendInSec: OTP_RESEND_SEC, codeLength: otpCodeLength() };
     } catch (err) {
       safeFinnotechLog("otp_finnotech", err);
       if (!messagingScopeMissing(err) || !finnotechSmsSender()) {
@@ -211,11 +227,11 @@ async function sendFinnotechOtp(
     }
   }
 
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  const code = newLoginCode();
   const { error } = await db.from("auth_otp_codes").upsert({
     phone,
     code_hash: hashCode(phone, code),
-    expires_at: new Date(now + CODE_TTL_MS).toISOString(),
+    expires_at: new Date(now + OTP_TTL_MS).toISOString(),
     attempts: 0,
     sent_count: sentCount,
     window_started_at: windowStart,
@@ -233,7 +249,7 @@ async function sendFinnotechOtp(
     safeFinnotechLog("otp_finnotext", err);
     return { ok: false, error: "send_failed" };
   }
-  return { ok: true, mode: "sms", resendInSec: RESEND_COOLDOWN_MS / 1000 };
+  return { ok: true, mode: "sms", resendInSec: OTP_RESEND_SEC, codeLength: otpCodeLength() };
 }
 
 export type VerifyOtpResult =
