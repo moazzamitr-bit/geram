@@ -270,11 +270,35 @@ export class PostgresCoreStore implements CoreStore {
   }
 
   async findJournalIdByRef(refType: string, refId: string): Promise<string | null> {
-    const { rows } = await this.sql().query(
-      `select id from core_journals where ref_type=$1 and ref_id=$2 order by created_at asc limit 1`,
+    return (await this.findJournalByRef(refType, refId))?.id ?? null;
+  }
+
+  async findJournalByRef(refType: string, refId: string): Promise<JournalEntry | null> {
+    const { rows: headers } = await this.sql().query(
+      `select * from core_journals where ref_type=$1 and ref_id=$2 order by created_at asc limit 1`,
       [refType, refId]
     );
-    return rows[0] ? str(rows[0].id) : null;
+    const header = headers[0];
+    if (!header) return null;
+    const id = str(header.id);
+    const { rows: lines } = await this.sql().query(
+      `select * from core_journal_lines where journal_id=$1 order by id asc`,
+      [id]
+    );
+    return {
+      id,
+      createdAt: new Date(str(header.created_at)).toISOString(),
+      reason: str(header.reason),
+      refType: str(header.ref_type),
+      refId: str(header.ref_id),
+      lines: lines.map((row) => ({
+        accountCode: str(row.account_code) as AccountCode,
+        holderId: str(row.holder_id),
+        asset: str(row.asset) as LedgerAsset,
+        debit: big(row.debit),
+        credit: big(row.credit),
+      })),
+    };
   }
 
   async insertJournal(entry: JournalEntry) {

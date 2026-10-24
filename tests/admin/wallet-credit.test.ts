@@ -1,5 +1,12 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { normalizeIranMobile, resolveCreditTarget, walletCreditRefId } from "@/lib/admin/wallet-credit";
+import {
+  normalizeIranMobile,
+  planImmediateWalletCredit,
+  resolveCreditTarget,
+  walletCreditRefId,
+} from "@/lib/admin/wallet-credit";
 import { SANDBOX_FLAGS } from "@/lib/core/mode";
 import { tomanToIrr } from "@/lib/core/money";
 import { PLATFORM_HOLDER } from "@/lib/core/types";
@@ -52,6 +59,37 @@ describe("admin wallet credit", () => {
     );
   });
 
+  it("rejects the same ref when the amount or user differs", async () => {
+    const { core } = makeMemoryCore({ seed: false });
+    const user = "11111111-1111-4111-8111-111111111111";
+    const other = "22222222-2222-4222-8222-222222222222";
+    const refId = walletCreditRefId("credit-key-2");
+    await core.creditApprovedUserIrr({
+      userId: user,
+      amountIrr: tomanToIrr(10_000),
+      reason: "closed beta invite credit",
+      refId,
+    });
+    await expect(
+      core.creditApprovedUserIrr({
+        userId: user,
+        amountIrr: tomanToIrr(20_000),
+        reason: "closed beta invite credit",
+        refId,
+      })
+    ).rejects.toMatchObject({ code: "idempotency_conflict" });
+    await expect(
+      core.creditApprovedUserIrr({
+        userId: other,
+        amountIrr: tomanToIrr(10_000),
+        reason: "closed beta invite credit",
+        refId,
+      })
+    ).rejects.toMatchObject({ code: "idempotency_conflict" });
+    expect((await core.wallet(user)).rialAvailable).toBe(tomanToIrr(10_000));
+    expect((await core.wallet(other)).rialAvailable).toBe(0n);
+  });
+
   it("rejects a credit aimed at the platform holder", async () => {
     const { core } = makeMemoryCore({ seed: false });
     await expect(
@@ -90,6 +128,94 @@ describe("credit target", () => {
       lookupByPhones: async () => [],
     });
     expect(missing).toMatchObject({ ok: false, error: "user_not_found", status: 404 });
+  });
+});
+
+describe("immediate wallet credit plan", () => {
+  const payload = {
+    userId: "user-1",
+    amount: "250000",
+    asset: "IRR",
+    direction: "CREDIT",
+    idempotencyKey: "credit-key-9",
+  };
+
+  it("posts a new credit without a second admin", () => {
+    const plan = planImmediateWalletCredit({
+      userId: "user-1",
+      amountToman: 250_000,
+      idempotencyKey: "credit-key-9",
+      prior: null,
+    });
+    expect(plan).toMatchObject({
+      ok: true,
+      record: "insert",
+      priorId: null,
+      refId: walletCreditRefId("credit-key-9"),
+    });
+  });
+
+  it("replays an executed credit and finishes a queued one", () => {
+    expect(
+      planImmediateWalletCredit({
+        userId: "user-1",
+        amountToman: 250_000,
+        idempotencyKey: "credit-key-9",
+        prior: { id: "row-1", status: "EXECUTED", payload },
+      })
+    ).toMatchObject({ ok: true, record: "already_recorded", priorId: "row-1" });
+    expect(
+      planImmediateWalletCredit({
+        userId: "user-1",
+        amountToman: 250_000,
+        idempotencyKey: "credit-key-9",
+        prior: { id: "row-2", status: "PENDING_APPROVAL", payload },
+      })
+    ).toMatchObject({ ok: true, record: "mark_executed", priorId: "row-2" });
+  });
+
+  it("does not revive a rejected key or a different amount", () => {
+    expect(
+      planImmediateWalletCredit({
+        userId: "user-1",
+        amountToman: 250_000,
+        idempotencyKey: "credit-key-9",
+        prior: { id: "row-3", status: "REJECTED", payload },
+      })
+    ).toMatchObject({ ok: false, error: "credit_rejected", status: 409 });
+    expect(
+      planImmediateWalletCredit({
+        userId: "user-1",
+        amountToman: 100,
+        idempotencyKey: "credit-key-9",
+        prior: { id: "row-4", status: "EXECUTED", payload },
+      })
+    ).toMatchObject({ ok: false, error: "idempotency_conflict", status: 409 });
+  });
+});
+
+describe("wallet credit copy", () => {
+  const root = process.cwd();
+  const walletSurfaces = [
+    "components/admin/WalletCreditForm.tsx",
+    "app/admin/(dashboard)/deposits/page.tsx",
+    "app/admin/(dashboard)/users/[id]/page.tsx",
+    "app/admin/(dashboard)/approvals/page.tsx",
+  ];
+
+  it("does not tell the admin to wait for a second approval", () => {
+    for (const file of walletSurfaces) {
+      const text = readFileSync(path.join(root, file), "utf8");
+      expect(text).not.toMatch(/ادمین دوم|maker-checker/);
+    }
+    const form = readFileSync(path.join(root, walletSurfaces[0]), "utf8");
+    expect(form).toContain("ثبت شارژ");
+    expect(form).toContain("USER_AVAILABLE");
+  });
+
+  it("still requires a second admin for treasury inventory", () => {
+    const text = readFileSync(path.join(root, "components/admin/InventoryRequestForm.tsx"), "utf8");
+    expect(text).toContain("نیازمند تأیید ادمین دوم");
   });
 });
 

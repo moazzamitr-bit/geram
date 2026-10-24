@@ -39,10 +39,10 @@ export default async function AdminUser360Page({
     <div>
       <AdminPageHeader
         title={name}
-        description="نمای ۳۶۰ مشتری. شارژ فقط از ژورنال تأییدشده است، نه ویرایش wallets."
+        description="نمای ۳۶۰ مشتری. شارژ با ژورنال دفترکل است، نه ویرایش wallets."
         action={<AdminBadge tone={profile.role === "admin" ? "gold" : "neutral"}>{profile.role}</AdminBadge>}
       />
-      <AdminNotice title="شارژ دفترکل">دکمه Edit Balance وجود ندارد. شارژ زیر درخواست maker-checker می‌سازد و بعد از Execute به USER_AVAILABLE پست می‌شود.</AdminNotice>
+      <AdminNotice title="شارژ دفترکل">دکمه Edit Balance وجود ندارد. ثبت شارژ زیر همین حالا USER_AVAILABLE را در دفترکل زیاد می‌کند.</AdminNotice>
       <div className="mb-6 max-w-lg">
         <WalletCreditForm userId={id} lockUserId />
       </div>

@@ -63,6 +63,8 @@ export interface CoreStore {
   listJournals(): Promise<JournalEntry[]>;
   /** First journal id for this ref, if one was already posted. */
   findJournalIdByRef(refType: string, refId: string): Promise<string | null>;
+  /** First journal for this ref, including lines. */
+  findJournalByRef(refType: string, refId: string): Promise<JournalEntry | null>;
   insertJournal(entry: JournalEntry): Promise<void>;
   applyBalanceDeltas(deltas: { accountId: string; delta: bigint }[]): Promise<void>;
   insertQuote(quote: Quote): Promise<void>;
@@ -307,7 +309,13 @@ export class MemoryCoreStore implements CoreStore {
   }
 
   async findJournalIdByRef(refType: string, refId: string): Promise<string | null> {
-    return this.journals.find((j) => j.refType === refType && j.refId === refId)?.id ?? null;
+    return (await this.findJournalByRef(refType, refId))?.id ?? null;
+  }
+
+  async findJournalByRef(refType: string, refId: string): Promise<JournalEntry | null> {
+    const found = this.journals.find((j) => j.refType === refType && j.refId === refId);
+    if (!found) return null;
+    return { ...found, lines: found.lines.map((l) => ({ ...l })) };
   }
 
   async insertJournal(entry: JournalEntry): Promise<void> {
