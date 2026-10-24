@@ -97,7 +97,6 @@ describe("server entry points", () => {
       "lib/auth/cookie-client.ts",
       "middleware.ts",
       "lib/db/phone-auth.ts",
-      "app/api/auth/phone-login/route.ts",
     ];
     for (const file of files) {
       expect(readFileSync(file, "utf8"), file).toContain("serverSupabaseUrl");

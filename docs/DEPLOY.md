@@ -57,7 +57,7 @@ docker run -d --restart unless-stopped --env-file .env.production -p 3000:3000 g
 
 ## ۵٫۱ ورود (رمز عبور، نه پیامک)
 
-پیش‌فرض `AUTH_METHOD=password` است. صفحه `/auth/login` همان اول فرم شماره و رمز عبور را نشان می‌دهد و `/api/auth/phone-login` پاسخ `method_disabled` می‌دهد. پیامک فقط با `AUTH_METHOD=otp` فعال می‌شود. اگر فینوتک تنظیم شده باشد پیامک از فینوتک می‌رود (messaging، یا finnotext اگر `FINNOTECH_OTP_CHANNEL=finnotext`)؛ وگرنه sms.ir یا کاوه‌نگار. ورود با رمز عوض نمی‌شود. ثبت‌نام به `SUPABASE_SERVICE_ROLE_KEY` نیاز دارد.
+پیش‌فرض `AUTH_METHOD=password` است. صفحه `/auth/login` همان اول فرم شماره و رمز عبور را نشان می‌دهد و `/api/auth/phone-login` پاسخ `method_disabled` می‌دهد. پیامک فقط با `AUTH_METHOD=otp` فعال می‌شود. اگر فینوتک تنظیم شده باشد پیامک از فینوتک می‌رود (messaging، یا finnotext اگر `FINNOTECH_OTP_CHANNEL=finnotext`)؛ وگرنه sms.ir یا کاوه‌نگار. بعد از تأیید کد، نشست بدون خواندن یا عوض کردن رمز عبور ساخته می‌شود، پس ورود با رمز و ورود با پیامک برای یک کاربر هر دو کار می‌کنند. `AUTH_METHOD` را بدون تأیید صاحب محصول عوض نکنید. ثبت‌نام به `SUPABASE_SERVICE_ROLE_KEY` نیاز دارد.
 
 احراز هویت کاربر در `/app/profile/kyc` با شاهکار و استعلام ثبت احوال فینوتک است. این خط‌ها را در `/opt/geram/.env.production` بگذارید (مقادیر واقعی، نه در گیت):
 

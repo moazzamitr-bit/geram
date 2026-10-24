@@ -80,11 +80,11 @@ and never leave production broken.
 - **Closed-beta admin nav**: pages listed in `lib/admin/closed-beta.ts` stay in the repo
   but are hidden and rewritten to a “not active in beta” screen. Remove a path from that
   list to turn the page back on. Inventory registration stays on `/admin/approvals`.
-- **SMS OTP**: default login stays `AUTH_METHOD=password`. Finnotech messaging OTP is used when
-  `AUTH_METHOD=otp` and Finnotech env is set; otherwise sms.ir / Kavenegar. sms.ir template `123456`
-  only reaches the panel owner's number. The OTP service-role path still rotates the user's password
-  on every OTP login — do not turn `AUTH_METHOD=otp` on for people who sign in with a password until
-  that rotation is replaced, or those passwords stop working.
+- **SMS OTP**: default login stays `AUTH_METHOD=password`. When `AUTH_METHOD=otp`, Finnotech
+  (otherwise sms.ir / Kavenegar) checks the code, then the server opens a GoTrue session with
+  admin `generateLink` magiclink plus `verifyOtp` (`token_hash`, type `email`). That path does not
+  read or write the password, so password login keeps working for the same account. sms.ir template
+  `123456` only reaches the panel owner's number. Do not change `AUTH_METHOD` without the owner's OK.
 - Shahkar KYC is server-side (`/app/profile/kyc`). Buy/sell require `kyc_status=VERIFIED` when
   `REQUIRE_KYC_FOR_TRADE` is unset and mode is `PRODUCTION` (off in SANDBOX / CLOSED_BETA).
 - Not built yet: payment gateway deposits, bank withdrawals (Paya/Satna), supplier/custody
