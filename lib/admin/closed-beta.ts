@@ -5,7 +5,6 @@
  */
 export const CLOSED_BETA_INACTIVE_ADMIN_ROUTES = [
   "/admin/incidents",
-  "/admin/kyc",
   "/admin/bank-accounts",
   "/admin/sessions",
   "/admin/security",

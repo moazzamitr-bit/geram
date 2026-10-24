@@ -129,10 +129,9 @@ API: `POST /api/auth/phone-login` `{ phone, otp }`
 
 وضعیت‌ها: `UNVERIFIED | PENDING | VERIFIED | REJECTED | NEEDS_UPDATE`
 
-- UI کاربر: `/app/profile/kyc` — سندباکس (کد ملی + تاریخ تولد → PENDING؛ دکمه شبیه‌سازی VERIFIED)
-- گیت فعلی: فقط **فروش به بانک، برداشت، تحویل** (`isKycVerified`)
-- خرید/فروش به کیف‌پول بدون KYC مجاز است
-- ادمین `/admin/kyc`: فقط مشاهده، بدون تأیید/رد
+- UI کاربر: `/app/profile/kyc` — کد ملی (رقم کنترل) و تاریخ تولد شمسی. سرور شاهکار و استعلام ثبت احوال فینوتک را صدا می‌زند و در صورت تطبیق `kyc_status=VERIFIED` می‌شود. توکن خام ذخیره نمی‌شود.
+- خرید/فروش: در `PRODUCTION` (یا با `REQUIRE_KYC_FOR_TRADE=true`) بدون KYC رد می‌شود. در سندباکس پیش‌فرض خاموش است.
+- ادمین `/admin/kyc`: در بتای بسته روشن است و نتیجه واقعی پرونده را نشان می‌دهد.
 
 ---
 

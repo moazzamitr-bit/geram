@@ -23,7 +23,16 @@ function messageFor(code: string | null) {
     case "invalid_input":
       return "لطفاً همه فیلدها را درست پر کنید.";
     case "rate_limited":
+    case "too_many":
+    case "too_many_attempts":
       return "تعداد تلاش‌ها زیاد است. چند دقیقه بعد دوباره تلاش کنید.";
+    case "invalid_otp":
+      return "کد تأیید نادرست است.";
+    case "expired":
+      return "مهلت کد تمام شده. دوباره درخواست دهید.";
+    case "otp_provider_not_configured":
+    case "method_disabled":
+      return "ورود با پیامک الان فعال نیست. با رمز عبور وارد شوید.";
     case "timeout":
       return "ورود بیش از حد طول کشید. اتصال را بررسی کنید و دوباره تلاش کنید.";
     case "network":

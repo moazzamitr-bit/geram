@@ -30,6 +30,7 @@ select 'migration 0814 admin ops:   ' || (to_regclass('public.admin_role_assignm
 select 'migration 1021 RLS lockdown:' || exists(select 1 from pg_trigger where tgname='profiles_guard_privileged_columns');
 select 'migration 1021 fees:        ' || coalesce((select (value->>'buyFeeMinTomanFree') = '0' from public.platform_settings where key='fees'), false);
 select 'migration 1021 otp:         ' || (to_regclass('public.auth_otp_codes') is not null);
+select 'migration 1024 finnotech kyc:' || exists(select 1 from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='kyc_verified_at');
 select 'wallets_update_own policy:  ' || exists(select 1 from pg_policies where tablename='wallets' and policyname='wallets_update_own') || '  (must be false)';
 SQL
 

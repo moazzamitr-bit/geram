@@ -4,6 +4,7 @@ import { serializeTrade } from "@/lib/core/adapters";
 import { assertWithinDailyLimit } from "@/lib/core/limits";
 import { irrToSafeTomanNumber } from "@/lib/core/money";
 import { CoreError } from "@/lib/core/types";
+import { assertTradeKyc } from "@/lib/kyc/trade-gate";
 import { loadCommerceSettings } from "@/lib/commerce/settings-server";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const userId = await requireCoreUserId();
+    await assertTradeKyc(userId);
     const body = (await request.json()) as { quoteId?: string; idempotencyKey?: string };
     if (!body.quoteId) throw new CoreError("invalid_quote", "quoteId required");
     const key = readIdempotencyKey(request, body.idempotencyKey);

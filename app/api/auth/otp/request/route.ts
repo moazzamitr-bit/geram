@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_phone" }, { status: 400 });
   }
 
-  const result = await requestOtp(phone);
+  const result = await requestOtp(phone, clientIp(request));
   if (!result.ok) {
     const status =
       result.error === "cooldown" || result.error === "too_many"
