@@ -289,6 +289,83 @@ export class FinancialCore {
     });
   }
 
+  /**
+   * One admin posts physical metal (PLATFORM_AVAILABLE) or operating cash
+   * (PLATFORM_CASH_CONTROL) from PLATFORM_OPENING. Same refId posts once.
+   * Does not write the legacy wallets table.
+   */
+  async postApprovedPlatformOpening(input: {
+    accountCode: "PLATFORM_AVAILABLE" | "PLATFORM_CASH_CONTROL";
+    asset: AssetCode | "IRR";
+    amount: bigint;
+    reason: string;
+    refId: string;
+  }): Promise<{ journalId: string; replayed: boolean }> {
+    const reason = input.reason.trim();
+    const refId = input.refId.trim();
+    if (input.amount <= 0n) {
+      throw new CoreError("invalid_amount", "Opening amount must be positive", 400);
+    }
+    if (reason.length < 8) {
+      throw new CoreError("invalid_reason", "Reason must be at least 8 characters", 400);
+    }
+    if (!refId) {
+      throw new CoreError("invalid_request", "Idempotency ref is required", 400);
+    }
+    if (input.accountCode === "PLATFORM_CASH_CONTROL" && input.asset !== "IRR") {
+      throw new CoreError("invalid_request", "Operating cash must be IRR", 400);
+    }
+    if (input.accountCode === "PLATFORM_AVAILABLE" && input.asset === "IRR") {
+      throw new CoreError("invalid_request", "Metal inventory cannot be IRR", 400);
+    }
+    await this.bootstrap();
+    return this.deps.store.withLock(`admin-opening:${refId}`, async () => {
+      const existing = await this.deps.store.findJournalByRef(
+        "APPROVED_OPENING_BALANCE",
+        refId
+      );
+      if (existing) {
+        const opening = existing.lines.find(
+          (l) =>
+            l.accountCode === "PLATFORM_OPENING" &&
+            l.holderId === PLATFORM_HOLDER &&
+            l.asset === input.asset
+        );
+        const dest = existing.lines.find(
+          (l) =>
+            l.accountCode === input.accountCode &&
+            l.holderId === PLATFORM_HOLDER &&
+            l.asset === input.asset
+        );
+        const matches =
+          existing.lines.length === 2 &&
+          opening &&
+          dest &&
+          opening.debit === input.amount &&
+          opening.credit === 0n &&
+          dest.credit === input.amount &&
+          dest.debit === 0n;
+        if (!matches) {
+          throw new CoreError(
+            "idempotency_conflict",
+            "Idempotency key reused with a different opening",
+            409
+          );
+        }
+        return { journalId: existing.id, replayed: true };
+      }
+      const journalId = await this.postOpening({
+        accountCode: input.accountCode,
+        asset: input.asset,
+        amount: input.amount,
+        refType: "APPROVED_OPENING_BALANCE",
+        reason,
+        refId,
+      });
+      return { journalId, replayed: false };
+    });
+  }
+
   async sandboxDeposit(userId: string, amountIrr: Irr, idempotencyKey: string) {
     if (amountIrr <= 0n) throw new CoreError("invalid_amount", "deposit must be > 0");
     if (!sandboxDepositAllowed(this.mode(), this.flags())) {

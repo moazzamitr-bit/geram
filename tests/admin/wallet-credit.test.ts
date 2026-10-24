@@ -206,16 +206,11 @@ describe("wallet credit copy", () => {
   it("does not tell the admin to wait for a second approval", () => {
     for (const file of walletSurfaces) {
       const text = readFileSync(path.join(root, file), "utf8");
-      expect(text).not.toMatch(/ادمین دوم|maker-checker/);
+      expect(text).not.toMatch(/ادمین دوم|maker-checker|تأیید دو مرحله|سازنده نمی‌تواند/);
     }
     const form = readFileSync(path.join(root, walletSurfaces[0]), "utf8");
     expect(form).toContain("ثبت شارژ");
     expect(form).toContain("USER_AVAILABLE");
-  });
-
-  it("still requires a second admin for treasury inventory", () => {
-    const text = readFileSync(path.join(root, "components/admin/InventoryRequestForm.tsx"), "utf8");
-    expect(text).toContain("نیازمند تأیید ادمین دوم");
   });
 });
 

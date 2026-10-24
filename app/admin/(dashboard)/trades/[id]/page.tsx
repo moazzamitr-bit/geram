@@ -4,6 +4,7 @@ import {
   AdminPageHeader,
 } from "@/components/admin/AdminUI";
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
+import { isClosedBetaInactiveAdminPath } from "@/lib/admin/closed-beta";
 import { getTransaction } from "@/lib/admin/queries";
 import { probeTable } from "@/lib/admin/probe";
 import { formatToman } from "@/lib/utils";
@@ -78,9 +79,11 @@ export default async function AdminTradeDetailPage({
           extra={{ kind: "PAYMENT_MISMATCH", correlationId: id }}
           submitLabel="باز کردن حادثه"
         />
-        <p className="text-[13px] text-white/50">
-          مشاهده تطبیق: <Link className="text-gold" href="/admin/reconciliation">مرکز تطبیق</Link>
-        </p>
+        {!isClosedBetaInactiveAdminPath("/admin/reconciliation") ? (
+          <p className="text-[13px] text-white/50">
+            مشاهده تطبیق: <Link className="text-gold" href="/admin/reconciliation">مرکز تطبیق</Link>
+          </p>
+        ) : null}
       </div>
     </div>
   );

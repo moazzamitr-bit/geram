@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         error:
-          "تأیید دستی IBAN بدون maker-checker ممنوع است. مجوز bank.mark_verified صادر نشده.",
+          "تأیید دستی IBAN در این فاز فعال نیست. مجوز bank.mark_verified صادر نشده.",
       },
       { status: 403 }
     );

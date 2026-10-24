@@ -11,9 +11,13 @@ const OPTIONS = [
   { value: "IRR", label: "نقدینگی عملیاتی (تومان)" },
 ] as const;
 
+function newKey() {
+  return crypto.randomUUID();
+}
+
 /**
- * Maker step for an opening balance: the metal/cash the platform really holds.
- * A different admin approves, then "Execute journal" posts it to the ledger.
+ * One admin posts opening metal (PLATFORM_AVAILABLE) or operating cash
+ * (PLATFORM_CASH_CONTROL). The same idempotency key posts once.
  */
 export function InventoryRequestForm() {
   const router = useRouter();
@@ -21,6 +25,7 @@ export function InventoryRequestForm() {
   const [amount, setAmount] = useState("");
   const [evidence, setEvidence] = useState("");
   const [reason, setReason] = useState("");
+  const [idempotencyKey, setIdempotencyKey] = useState(newKey);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,18 +46,21 @@ export function InventoryRequestForm() {
           amount,
           direction: "IN",
           evidence,
+          idempotencyKey,
           reason,
         }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string; message?: string };
       if (!res.ok || data.ok === false) {
         setErr(data.error || "ناموفق");
+        if (res.status === 409) setIdempotencyKey(newKey());
         return;
       }
       setMsg(data.message || "ثبت شد.");
       setAmount("");
       setEvidence("");
       setReason("");
+      setIdempotencyKey(newKey());
       router.refresh();
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : "خطا");
@@ -64,8 +72,10 @@ export function InventoryRequestForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-white/10 bg-[#070B12] p-4">
       <p className="text-[13px] font-bold">ثبت موجودی اولیه خزانه</p>
-      <p className="text-[12px] text-white/45">
-        فقط فلز یا نقدینگی‌ای که واقعاً در اختیار شرکت است. بدون این مرحله خرید مشتری با «موجودی کافی نیست» رد می‌شود.
+      <p className="text-[12px] leading-6 text-white/45">
+        فقط فلز یا نقدینگی‌ای که واقعاً در اختیار شرکت است. با ثبت، ژورنال APPROVED_OPENING_BALANCE
+        همین حالا به موجودی قابل فروش (PLATFORM_AVAILABLE) یا نقد عملیاتی (PLATFORM_CASH_CONTROL) می‌نشیند.
+        جدول wallets عوض نمی‌شود. تکرار همان درخواست موجودی را دوباره زیاد نمی‌کند.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <select
@@ -100,11 +110,11 @@ export function InventoryRequestForm() {
         minLength={8}
         value={reason}
         onChange={(e) => setReason(e.target.value)}
-        placeholder="دلیل (الزامی)"
+        placeholder="دلیل (الزامی، حداقل ۸ نویسه)"
         className="h-16 w-full rounded-xl border border-white/10 bg-[#0B1220] p-3 text-[13px] outline-none focus:border-gold"
       />
       <GoldButton type="submit" size="sm" disabled={loading}>
-        {loading ? "…" : "ثبت درخواست (نیازمند تأیید ادمین دوم)"}
+        {loading ? "…" : "ثبت در دفترکل"}
       </GoldButton>
       {msg && <p className="text-[12px] text-positive">{msg}</p>}
       {err && <p className="text-[12px] text-negative">{err}</p>}

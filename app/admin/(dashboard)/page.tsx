@@ -5,6 +5,7 @@ import {
   AdminStatCard,
   OpsBadge,
 } from "@/components/admin/AdminUI";
+import { isClosedBetaInactiveAdminPath } from "@/lib/admin/closed-beta";
 import { loadDashboardOps, metricText } from "@/lib/admin/ops";
 import { formatToman } from "@/lib/utils";
 import {
@@ -137,7 +138,9 @@ export default async function AdminDashboardPage() {
       <div className="mt-8 flex flex-wrap gap-3 text-[13px]">
         <Link className="text-gold" href="/admin/readiness">آمادگی انتشار</Link>
         <Link className="text-gold" href="/admin/health">سلامت عملیات</Link>
-        <Link className="text-gold" href="/admin/kyc">صف KYC</Link>
+        {!isClosedBetaInactiveAdminPath("/admin/kyc") ? (
+          <Link className="text-gold" href="/admin/kyc">صف KYC</Link>
+        ) : null}
         <Link className="text-gold" href="/admin/trades">معاملات</Link>
       </div>
     </div>

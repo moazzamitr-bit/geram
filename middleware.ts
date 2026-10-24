@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { closedBetaAdminRewrite } from "@/lib/admin/closed-beta";
 import { fetchWithTimeout } from "@/lib/supabase/fetch";
 
 export async function middleware(request: NextRequest) {
@@ -9,6 +10,14 @@ export async function middleware(request: NextRequest) {
 
   if (!isAdmin && !isApp) {
     return NextResponse.next();
+  }
+
+  const inactive = closedBetaAdminRewrite(pathname);
+  if (inactive) {
+    const url = request.nextUrl.clone();
+    url.pathname = inactive;
+    url.search = "";
+    return NextResponse.rewrite(url);
   }
 
   // Login page is public

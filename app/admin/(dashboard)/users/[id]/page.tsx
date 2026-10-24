@@ -6,6 +6,7 @@ import {
 } from "@/components/admin/AdminUI";
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
 import { WalletCreditForm } from "@/components/admin/WalletCreditForm";
+import { isClosedBetaInactiveAdminPath } from "@/lib/admin/closed-beta";
 import {
   getProfile,
   getUserBanks,
@@ -63,7 +64,9 @@ export default async function AdminUser360Page({
             وضعیت: <AdminBadge tone={profile.kyc_status === "VERIFIED" ? "positive" : "warning"}>{profile.kyc_status}</AdminBadge>
           </p>
           <p>هویت / مالکیت موبایل / مالکیت حساب: <span className="text-white/45">NOT READY (فروشنده KYC نیست)</span></p>
-          <Link className="text-gold" href={`/admin/kyc/${id}`}>صف بررسی KYC</Link>
+          {!isClosedBetaInactiveAdminPath(`/admin/kyc/${id}`) ? (
+            <Link className="text-gold" href={`/admin/kyc/${id}`}>صف بررسی KYC</Link>
+          ) : null}
         </div>
       </section>
 

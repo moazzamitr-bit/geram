@@ -5,7 +5,7 @@ export default async function AdminInventoryPage() {
   const lots = await probeTable("inventory_lots", "*", { order: "created_at", limit: 100 });
   return (
     <div>
-      <AdminPageHeader title="لات موجودی" description="Edit Lot آزادانه وجود ندارد. تعدیل فقط maker-checker." />
+      <AdminPageHeader title="لات موجودی" description="Edit Lot آزادانه وجود ندارد. تعدیل آزاد موجودی از این صفحه انجام نمی‌شود." />
       <OpsBadge state="NOT_READY" />
       <AdminNotice title="وضعیت‌های هدف">
         PENDING_RECEIPT, CONTROLLED, RESERVED, CONSUMED, BLOCKED. جدول inventory_lots در این محیط موجود نیست.

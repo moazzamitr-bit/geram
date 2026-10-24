@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         error:
-          "اصلاح مالی فقط از مسیر AdjustmentRequest + maker-checker مجاز است. Mark Paid / Credit Wallet ممنوع است.",
+          "اصلاح مالی مستقیم مجاز نیست. Mark Paid / Credit Wallet ممنوع است.",
       },
       { status: 403 }
     );

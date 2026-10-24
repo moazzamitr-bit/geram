@@ -18,7 +18,7 @@ export default async function AdminReconciliationPage() {
     <div>
       <AdminPageHeader
         title="مرکز تطبیق"
-        description="اصلاح مالی فقط maker-checker. Credit Wallet / Mark Paid وجود ندارد."
+        description="اصلاح مالی مستقیم وجود ندارد. Credit Wallet / Mark Paid وجود ندارد."
         action={<a className="text-[13px] text-gold" href="/api/admin/export?type=reconciliation">CSV</a>}
       />
       {!items.ready ? (

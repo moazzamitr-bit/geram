@@ -33,7 +33,7 @@ export default async function AdminSettingsPage() {
         title="کارمزد و سقف"
         description="هر ذخیره با دلیل در AuditLog ثبت می‌شود (old/new/actor/timestamp)."
       />
-      <AdminNotice title="محدودیت">تغییرات پرریسک باید از صف maker-checker هم عبور کنند. Edit Balance اینجا نیست.</AdminNotice>
+      <AdminNotice title="محدودیت">موجودی کیف پول از این صفحه عوض نمی‌شود. Edit Balance اینجا نیست.</AdminNotice>
 
       <div className="space-y-6">
         <CommerceSettingsForm initial={settings} />
