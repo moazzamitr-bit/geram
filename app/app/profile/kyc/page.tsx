@@ -4,11 +4,10 @@ import { AppCard } from "@/components/app/AppCard";
 import { PageHeader } from "@/components/app/PageHeader";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
+import { JalaliBirthDateField } from "@/components/kyc/JalaliBirthDateField";
 import { formatMaskedPhone, useAuth, type KycStatus } from "@/lib/auth/auth-context";
-import {
-  isValidIranianNationalCode,
-  normalizeJalaliBirthDate,
-} from "@/lib/kyc/national-id";
+import { isValidIranianNationalCode, normalizeJalaliBirthDate } from "@/lib/kyc/national-id";
+import { isAtLeast18Jalali } from "@/lib/kyc/age";
 import { KYC_LEVEL_CAPS, KYC_LEVEL_TITLES, type KycLevel } from "@/lib/kyc/levels";
 import { KYC_MESSAGES, type KycErrorCode } from "@/lib/kyc/messages";
 import { formatToman } from "@/lib/utils";
@@ -82,8 +81,13 @@ export default function KycPage() {
       setError(KYC_MESSAGES.invalid_national_code);
       return;
     }
-    if (!normalizeJalaliBirthDate(birthDate)) {
-      setError(KYC_MESSAGES.invalid_birth_date);
+    const birth = normalizeJalaliBirthDate(birthDate);
+    if (!birth) {
+      setError("تاریخ تولد را از فهرست روز، ماه و سال انتخاب کنید.");
+      return;
+    }
+    if (!isAtLeast18Jalali(birth)) {
+      setError(KYC_MESSAGES.underage);
       return;
     }
     setLoading(true);
@@ -91,7 +95,7 @@ export default function KycPage() {
       const res = await fetch("/api/kyc/shahkar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nationalCode, birthDate }),
+        body: JSON.stringify({ nationalCode, birthDate: birth }),
       });
       const data = (await res.json()) as {
         ok?: boolean;
@@ -197,16 +201,7 @@ export default function KycPage() {
                 placeholder="۱۰ رقم"
               />
             </label>
-            <label className="block">
-              <span className="mb-2 block text-[13px] text-text-secondary">تاریخ تولد شمسی</span>
-              <input
-                dir="ltr"
-                className={fieldClass}
-                value={birthDate}
-                onChange={(event) => setBirthDate(event.target.value)}
-                placeholder="۱۳۷۰/۰۶/۱۵"
-              />
-            </label>
+            <JalaliBirthDateField value={birthDate} onChange={setBirthDate} />
             {error && <p className="text-[13px] text-negative" role="alert">{error}</p>}
             {info && <p className="text-[13px] text-text-secondary">{info}</p>}
             <GoldButton type="submit" className="w-full" disabled={loading}>

@@ -1,3 +1,5 @@
+import { jalaliMonthLength } from "@/lib/kyc/jalali";
+
 const PERSIAN = "۰۱۲۳۴۵۶۷۸۹";
 const ARABIC = "٠١٢٣٤٥٦٧٨٩";
 
@@ -51,7 +53,7 @@ export function normalizeJalaliBirthDate(input: string): string | null {
   const day = Number(match[3]);
   if (year < 1300 || year > 1410) return null;
   if (month < 1 || month > 12) return null;
-  const maxDay = month <= 6 ? 31 : 30;
+  const maxDay = jalaliMonthLength(year, month);
   if (day < 1 || day > maxDay) return null;
   return `${year}/${String(month).padStart(2, "0")}/${String(day).padStart(2, "0")}`;
 }
