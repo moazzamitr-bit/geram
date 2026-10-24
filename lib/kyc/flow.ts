@@ -1,5 +1,6 @@
 import type { IdentityInquiry, ShahkarSend } from "@/lib/finnotech/kyc";
 import { FinnotechError } from "@/lib/finnotech/client";
+import { redactSecrets } from "@/lib/finnotech/redact";
 import { KYC_MESSAGES, type KycErrorCode } from "@/lib/kyc/messages";
 import {
   isValidIranianNationalCode,
@@ -17,9 +18,10 @@ const MAX_OTP_ATTEMPTS = 5;
 export class KycFlowError extends Error {
   constructor(
     public code: KycErrorCode,
-    public httpStatus = 400
+    public httpStatus = 400,
+    message?: string
   ) {
-    super(KYC_MESSAGES[code]);
+    super(message?.trim() ? message.trim() : KYC_MESSAGES[code]);
     this.name = "KycFlowError";
   }
 }
@@ -75,7 +77,12 @@ export type KycDeps = {
   store: KycStore;
   audit: (event: KycAudit) => Promise<void>;
   sendShahkar: (mobile: string, nationalCode: string) => Promise<ShahkarSend>;
-  verifyShahkar: (otp: string, inquiryTrackId: string) => Promise<{ matched: boolean; trackId: string }>;
+  verifyShahkar: (
+    otp: string,
+    inquiryTrackId: string,
+    mobile: string,
+    nationalCode: string
+  ) => Promise<{ matched: boolean; trackId: string }>;
   inquire: (nationalCode: string, birthDate: string) => Promise<IdentityInquiry>;
   limit?: (key: string, max: number, windowMs: number, now: number) => { ok: boolean; retryAfterSec: number };
   configured?: boolean;
@@ -89,10 +96,25 @@ function depsNow(deps: KycDeps) {
   return deps.now?.() ?? Date.now();
 }
 
-function providerError(err: unknown): KycFlowError {
+/** Persian provider text only. Drop the reason when it still carries an id or a secret. */
+export function safeShahkarReason(message: string): string | null {
+  const trimmed = message.replace(/\s+/g, " ").trim();
+  if (!trimmed || trimmed.length > 180) return null;
+  if (/\d{10,}/.test(trimmed)) return null;
+  if (/bearer|client_secret|access_token|authorization/i.test(trimmed)) return null;
+  const cleaned = redactSecrets(trimmed);
+  if (!/[\u0600-\u06FF]/.test(cleaned)) return null;
+  if (/\d{6,}/.test(cleaned)) return null;
+  return cleaned;
+}
+
+function providerError(err: unknown, clientError?: KycErrorCode): KycFlowError {
   if (err instanceof KycFlowError) return err;
   if (err instanceof FinnotechError && err.code === "not_configured") {
     return new KycFlowError("not_configured", 503);
+  }
+  if (clientError && err instanceof FinnotechError && err.httpStatus === 400) {
+    return new KycFlowError(clientError, 400, safeShahkarReason(err.providerMessage) ?? undefined);
   }
   return new KycFlowError("provider", 502);
 }
@@ -203,7 +225,7 @@ export async function startShahkarKyc(
       result: "error",
       meta: { nationalCodeMasked: maskNationalCode(nationalCode) },
     });
-    throw providerError(err);
+    throw providerError(err, "invalid_input");
   }
 
   if (sent.outcome === "mismatch") {
@@ -258,11 +280,15 @@ export async function confirmShahkarKyc(
 
   let trackId = challenge.inquiryTrackId;
   if (!challenge.shahkarMatched) {
+    const profile = await deps.store.getProfile(input.userId);
+    if (!profile) throw new KycFlowError("unavailable", 503);
+    const phone = (profile.phone ?? "").replace(/\D/g, "");
+    if (!/^09\d{9}$/.test(phone)) throw new KycFlowError("no_phone", 400);
     let verified: { matched: boolean; trackId: string };
     try {
-      verified = await deps.verifyShahkar(otp, challenge.inquiryTrackId);
+      verified = await deps.verifyShahkar(otp, challenge.inquiryTrackId, phone, challenge.nationalCode);
     } catch (err) {
-      throw providerError(err);
+      throw providerError(err, "invalid_otp");
     }
     if (!verified.matched) {
       await deps.store.saveChallenge(input.userId, {
@@ -278,7 +304,7 @@ export async function confirmShahkarKyc(
           trackId: verified.trackId,
         },
       });
-      throw new KycFlowError("invalid_otp", 401);
+      throw new KycFlowError("invalid_otp", 400);
     }
     trackId = verified.trackId;
     await deps.store.saveChallenge(input.userId, {
