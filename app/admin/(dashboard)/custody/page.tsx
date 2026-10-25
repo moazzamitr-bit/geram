@@ -43,7 +43,7 @@ export default async function AdminCustodyPage({
       <div className="grid gap-3 md:grid-cols-2">
         {fields.map((f) => (
           <div key={f} className="rounded-2xl border border-white/10 bg-[#0F1724] p-4 text-[13px]">
-            <p className="text-white/50">{f}</p>
+            <p className="text-white/65">{f}</p>
             <p className="mt-2 font-bold text-white/45">داده در دسترس نیست</p>
           </div>
         ))}

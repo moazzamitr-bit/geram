@@ -45,12 +45,12 @@ export default async function AdminSavingsPage() {
           ["نوبت ناموفق (۱۰۰ آخر)", failed.toLocaleString("fa-IR")],
         ].map(([k, v]) => (
           <div key={k} className="rounded-2xl border border-white/10 bg-[#0F1724] p-4">
-            <p className="text-[12px] text-white/50">{k}</p>
+            <p className="text-[12px] text-white/65">{k}</p>
             <p className="mt-1 text-[18px] font-bold">{v}</p>
           </div>
         ))}
       </div>
-      <p className="text-[12px] text-white/50">
+      <p className="text-[12px] text-white/65">
         سقف تعداد طرح فعال در <Link className="text-gold" href="/admin/settings">تنظیمات</Link> قابل تغییر است.
       </p>
       <h2 className="font-bold">طرح‌ها</h2>

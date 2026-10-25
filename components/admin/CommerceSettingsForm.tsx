@@ -192,7 +192,7 @@ export function CommerceSettingsForm({ initial }: Props) {
             />
           </Field>
         </div>
-        <p className="mt-4 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-3 text-[12px] text-white/50">
+        <p className="mt-4 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-3 text-[12px] text-white/65">
           پیش‌نمایش خرید ۱۰ میلیون تومانی: رایگان{" "}
           <span className="text-gold tabular-nums">
             {preview.freeFee.toLocaleString("fa-IR")}
@@ -250,7 +250,7 @@ export function CommerceSettingsForm({ initial }: Props) {
               onChange={(n) => setReferral((r) => ({ ...r, feeSharePercent: n }))}
             />
           </Field>
-          <div className="self-end pb-2 text-[12px] text-white/40">
+          <div className="self-end pb-2 text-[12px] text-white/60">
             پاداش فقط به دعوت‌کننده‌ای با احراز کامل (شاهکار + کارت) واریز می‌شود.
           </div>
         </div>

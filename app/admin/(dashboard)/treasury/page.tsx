@@ -64,9 +64,9 @@ export default async function AdminTreasuryPage({
       <div className="grid gap-3 md:grid-cols-2">
         {metrics.map((m) => (
           <div key={m.label} className="rounded-2xl border border-white/10 bg-[#0F1724] p-4 text-[13px]">
-            <p className="text-white/50">{m.label}</p>
+            <p className="text-white/65">{m.label}</p>
             <p className="mt-2 font-bold">{m.value != null ? (typeof m.value === "number" || !Number.isNaN(Number(m.value)) ? `${(Number(m.value) / 1000).toLocaleString("fa-IR", { maximumFractionDigits: 3 })} گرم` : m.value) : "داده در دسترس نیست"}</p>
-            <p className="mt-1 text-[12px] text-white/40">{m.hint}</p>
+            <p className="mt-1 text-[12px] text-white/60">{m.hint}</p>
           </div>
         ))}
       </div>

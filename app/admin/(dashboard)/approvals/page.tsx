@@ -41,13 +41,13 @@ export default async function AdminApprovalsPage() {
               <td className="px-4 py-3">
                 {String(r.kind)}
                 {r.kind === "INVENTORY_ADJUSTMENT" && (
-                  <span className="block text-[11px] text-white/50" dir="ltr">
+                  <span className="block text-[11px] text-white/65" dir="ltr">
                     {String((r.payload as { asset?: string })?.asset ?? "")}{" "}
                     {String((r.payload as { amount?: string })?.amount ?? "")}
                   </span>
                 )}
                 {r.kind === "FINANCIAL_ADJUSTMENT" && (
-                  <span className="block text-[11px] text-white/50" dir="ltr">
+                  <span className="block text-[11px] text-white/65" dir="ltr">
                     {String((r.payload as { userId?: string })?.userId ?? "").slice(0, 8)}{" "}
                     {String((r.payload as { amount?: string })?.amount ?? "")} IRR-toman
                   </span>

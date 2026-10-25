@@ -343,13 +343,13 @@ export function MobileTradeButton({
             >
               <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/10" />
               <div className="mb-2 flex items-center justify-between">
-                <h2 id={titleId} className="text-[16px] font-extrabold text-text">
+                <h2 id={titleId} className="text-[16px] font-extrabold text-[#1c1917]">
                   {item.label}
                 </h2>
                 <button
                   type="button"
                   onClick={close}
-                  className="min-h-10 rounded-xl px-3 text-[13px] text-muted-app"
+                  className="min-h-10 rounded-xl px-3 text-[13px] font-medium text-[#57534e]"
                 >
                   بستن
                 </button>
@@ -368,7 +368,7 @@ export function MobileTradeButton({
                         aria-current={current ? "page" : undefined}
                         className={cn(
                           "flex min-h-14 items-center gap-3 rounded-2xl px-3 py-2",
-                          current ? "bg-[#FFF4D6] font-semibold text-text" : "text-text hover:bg-black/[0.04]"
+                          current ? "bg-[#FFF4D6] font-semibold text-[#1c1917]" : "font-medium text-[#1c1917] hover:bg-black/[0.04]"
                         )}
                         style={
                           current
@@ -380,11 +380,11 @@ export function MobileTradeButton({
                         <MetalIcon slug={metal.slug} size={22} />
                         <span className="min-w-0 flex-1">
                           <span className="block text-[15px]">{metal.label}</span>
-                          <span className="block text-[12px] font-normal text-muted-app">
+                          <span className="block text-[12px] font-normal text-[#57534e]">
                             {metal.title}
                           </span>
                         </span>
-                        <ChevronLeft size={16} className="text-muted-app" aria-hidden />
+                        <ChevronLeft size={16} className="text-[#57534e]" aria-hidden />
                       </Link>
                     </li>
                   );

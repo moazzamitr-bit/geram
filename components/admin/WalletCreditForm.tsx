@@ -117,7 +117,7 @@ export function WalletCreditForm({
         value={amount}
         decimals={0}
         words
-        wordsClassName="text-[12px] text-white/50"
+        wordsClassName="text-[12px] text-white/65"
         onValueChange={setAmount}
         placeholder="مبلغ به تومان"
         className="h-11 w-full rounded-xl border border-white/10 bg-[#0B1220] px-3 text-left tabular-nums text-[13px] text-white outline-none focus:border-gold"

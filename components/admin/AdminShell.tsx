@@ -70,7 +70,7 @@ export function AdminShell({
             <X size={18} />
           </button>
         </div>
-        <p className="px-5 pb-3 text-[11px] text-white/40">کنسول عملیات گرم</p>
+        <p className="px-5 pb-3 text-[11px] text-white/60">کنسول عملیات گرم</p>
         <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
           {adminNavGroups.map((group) => (
             <div key={group.id}>
@@ -146,7 +146,7 @@ export function AdminShell({
           </form>
           <div className="rounded-full border border-white/10 px-3 py-1.5 text-[12px] text-white/70">
             {adminName || "ادمین"}
-            {roleLabel ? <span className="text-white/40"> · {roleLabel}</span> : null}
+            {roleLabel ? <span className="text-white/60"> · {roleLabel}</span> : null}
           </div>
         </header>
         <main className="mx-auto w-full max-w-[1400px] p-4 md:p-6 lg:p-8">{children}</main>

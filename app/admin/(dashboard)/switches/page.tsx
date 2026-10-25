@@ -41,9 +41,9 @@ export default async function AdminSwitchesPage() {
               <p className="mt-2 text-[13px] text-white/60">
                 env: {String(envVal)} · Postgres: {dbVal == null ? "داده در دسترس نیست" : String(dbVal)}
               </p>
-              {row?.reason ? <p className="text-[12px] text-white/40">دلیل قبلی: {row.reason}</p> : null}
+              {row?.reason ? <p className="text-[12px] text-white/60">دلیل قبلی: {row.reason}</p> : null}
               {row?.updated_at ? (
-                <p className="text-[12px] text-white/40">
+                <p className="text-[12px] text-white/60">
                   تغییر: {new Date(row.updated_at).toLocaleString("fa-IR")}
                 </p>
               ) : null}

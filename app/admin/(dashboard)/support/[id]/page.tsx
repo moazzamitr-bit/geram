@@ -44,7 +44,7 @@ export default async function AdminTicketDetailPage({
           .sort((a: { created_at: string }, b: { created_at: string }) => a.created_at.localeCompare(b.created_at))
           .map((m: { id: string; sender: string; body: string; created_at: string }) => (
             <div key={m.id} className="rounded-2xl border border-white/10 bg-[#0F1724] p-4 text-[13px]">
-              <p className="text-[11px] text-white/40">
+              <p className="text-[11px] text-white/60">
                 {m.sender} · {new Date(m.created_at).toLocaleString("fa-IR")}
               </p>
               <p className="mt-2 leading-7">{m.body}</p>
