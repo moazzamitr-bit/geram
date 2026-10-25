@@ -1,16 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
 import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
 import "./globals.css";
-
-// Bundled locally: next/font/google downloads at build time, and Google Fonts
-// is unreachable from Iranian servers, which broke the production build there.
-const vazirmatn = localFont({
-  src: "./fonts/Vazirmatn-Variable.woff2",
-  weight: "100 900",
-  variable: "--font-vazirmatn",
-  display: "swap",
-});
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://geram.co";
 
@@ -63,7 +53,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fa" dir="rtl" className={vazirmatn.variable}>
+    <html lang="fa" dir="rtl">
+      <head>
+        {/* Dana (Persian digits) from /public/fonts, defined once in globals.css. */}
+        <link rel="preload" href="/fonts/DanaFaNum-Regular.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+      </head>
       <body className="font-sans antialiased">
         <a
           href="#main"

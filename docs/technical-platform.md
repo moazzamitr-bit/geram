@@ -30,7 +30,7 @@
 |---|---|
 | فریم‌ورک | Next.js 15.4 (App Router) + React 19 + TypeScript strict |
 | استایل | Tailwind CSS v4، توکن‌ها در `app/globals.css` |
-| فونت | Vazirmatn (`next/font`)، `lang=fa` `dir=rtl` |
+| فونت | Dana (DanaFaNum، ارقام فارسی) از `public/fonts`، وزن ۴۰۰ و ۷۰۰، تعریف یک‌جا در `globals.css`، `lang=fa` `dir=rtl` |
 | موشن | GSAP (لندینگ)، `motion` (آماده) |
 | چارت | Recharts |
 | بک‌اند موقت | Route Handlerهای Next (`app/api/*`) |

@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Dana";
+  src: url("/fonts/DanaFaNum-Regular.woff2") format("woff2"), url("/fonts/DanaFaNum-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Dana";
+  src: url("/fonts/DanaFaNum-Bold.woff2") format("woff2"), url("/fonts/DanaFaNum-Bold.woff") format("woff");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --color-bg: #080b0d;
   --color-bg-secondary: #0d1114;
@@ -19,7 +35,7 @@
   --color-positive: #4caf75;
   --color-negative: #d56565;
   --color-warning: #d49b45;
-  --font-sans: var(--font-vazirmatn), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Dana", Tahoma, system-ui, sans-serif;
   --radius-btn: 12px;
   --radius-card: 18px;
   --radius-panel: 24px;
@@ -74,7 +90,7 @@ body {
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-vazirmatn), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -405,4 +421,14 @@ body {
 
 .geram-app button.bg-gold-gradient:hover {
   background-color: #000 !important;
+}
+
+/* Form controls do not inherit the page font by default. */
+input,
+textarea,
+select,
+button,
+svg text,
+.recharts-wrapper {
+  font-family: inherit;
 }

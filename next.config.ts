@@ -69,6 +69,7 @@ const nextConfig: NextConfig = {
       { source: "/brand/:path*", headers: staticAssetCache },
       { source: "/icons/:path*", headers: staticAssetCache },
       { source: "/splash/:path*", headers: staticAssetCache },
+      { source: "/fonts/:path*", headers: staticAssetCache },
       {
         source: "/sw.js",
         headers: [
