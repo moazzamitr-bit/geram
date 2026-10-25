@@ -18,12 +18,12 @@ export const metadata: Metadata = {
     // (skipped: 393×852 @3 and older 375×667 devices).
     startupImage: [
       {
-        url: "/splash/apple-splash-1170x2532.png",
+        url: "/splash/apple-splash-1170x2532.png?v=2",
         media:
           "(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
       },
       {
-        url: "/splash/apple-splash-1290x2796.png",
+        url: "/splash/apple-splash-1290x2796.png?v=2",
         media:
           "(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
       },
