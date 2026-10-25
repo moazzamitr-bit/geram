@@ -70,11 +70,11 @@ export default function GoalsPage() {
       )}
 
       <AppCard>
-        <h2 className="text-[15px] font-bold">خریدهای زمان‌بندی‌شده</h2>
+        <h2 className="text-[15px] font-bold">طرح پس‌انداز</h2>
         <p className="mt-2 text-[13px] text-muted-app">
-          مدیریت خریدهای دوره‌ای از موجودی کیف پول.
+          خرید خودکار روزانه، هفتگی یا ماهانه طلا، نقره و مس از موجودی کیف پول.
         </p>
-        <Link href="/app/scheduled-purchases" className="mt-4 inline-flex text-[13px] text-gold">
+        <Link href="/app/savings" className="mt-4 inline-flex text-[13px] text-gold">
           مشاهده و مدیریت
         </Link>
       </AppCard>

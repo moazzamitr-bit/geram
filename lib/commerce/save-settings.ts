@@ -17,8 +17,6 @@ const feeSchema = z.object({
   sellFeeMinTomanPlus: z.number().int().min(0).max(10_000_000),
   withdrawFeeTomanFree: z.number().int().min(0).max(10_000_000),
   withdrawFeeTomanPlus: z.number().int().min(0).max(10_000_000),
-  dcaFeeTomanFree: z.number().int().min(0).max(10_000_000),
-  dcaFeeTomanPlus: z.number().int().min(0).max(10_000_000),
 });
 
 const plusSchema = z.object({

@@ -110,17 +110,6 @@ export async function listNotifications(limit = 100) {
   return data ?? [];
 }
 
-export async function listDca(limit = 100) {
-  const sb = await adminDb();
-  if (!sb) return [];
-  const { data } = await sb
-    .from("scheduled_purchases")
-    .select("*, profiles(first_name,last_name,phone)")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return data ?? [];
-}
-
 export async function listAlerts(limit = 100) {
   const sb = await adminDb();
   if (!sb) return [];

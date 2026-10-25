@@ -191,20 +191,6 @@ export function CommerceSettingsForm({ initial }: Props) {
               words
             />
           </Field>
-          <Field label="کارمزد هر اجرای DCA — رایگان (تومان)">
-            <NumberInput
-              value={fees.dcaFeeTomanFree}
-              onChange={(n) => setFee("dcaFeeTomanFree", n)}
-              words
-            />
-          </Field>
-          <Field label="کارمزد هر اجرای DCA — پلاس (تومان)">
-            <NumberInput
-              value={fees.dcaFeeTomanPlus}
-              onChange={(n) => setFee("dcaFeeTomanPlus", n)}
-              words
-            />
-          </Field>
         </div>
         <p className="mt-4 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-3 text-[12px] text-white/50">
           پیش‌نمایش خرید ۱۰ میلیون تومانی: رایگان{" "}
@@ -229,13 +215,13 @@ export function CommerceSettingsForm({ initial }: Props) {
               words
             />
           </Field>
-          <Field label="حداکثر برنامه DCA — رایگان">
+          <Field label="حداکثر طرح پس‌انداز فعال — رایگان">
             <NumberInput
               value={plus.maxDcaFree}
               onChange={(n) => setPlus((p) => ({ ...p, maxDcaFree: n }))}
             />
           </Field>
-          <Field label="حداکثر برنامه DCA — پلاس">
+          <Field label="حداکثر طرح پس‌انداز فعال — پلاس">
             <NumberInput
               value={plus.maxDcaPlus}
               onChange={(n) => setPlus((p) => ({ ...p, maxDcaPlus: n }))}

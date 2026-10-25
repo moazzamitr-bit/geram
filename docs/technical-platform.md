@@ -226,8 +226,7 @@ API:
 | کارمزد خرید | ۰٫۷٪ (حداقل ۵۰هزار) | ۰٫۴٪ (حداقل ۲۵هزار) |
 | کارمزد فروش | ۰٫۵٪ (حداقل ۳۰هزار) | ۰٫۳٪ (حداقل ۱۵هزار) |
 | برداشت | ۱۵هزار | ۰ |
-| اجرای DCA | ۲۵هزار | ۱۰هزار |
-| سقف DCA فعال | ۱ | ۱۰ |
+| سقف طرح پس‌انداز فعال | ۱ | ۱۰ |
 | هشدار SMS | خیر | بله |
 | قیمت پلاس | — | ۹۹هزار / ماه (سندباکس) |
 
@@ -237,9 +236,9 @@ API:
 
 فعال‌سازی سندباکس: `POST /api/commerce/plus/activate-sandbox` — ۳۰ روز `plan_tier=plus`. بدون درگاه اشتراک.
 
-### DCA
+### طرح پس‌انداز
 
-`/app/scheduled-purchases` + کرون `runDcaCron`. **فقط طلا.** از کیف ریالی کسر می‌شود.
+`/app/savings` + کرون `runSavingsCron` (کرون سرور هر ۱۵ دقیقه `deploy/run-cron.sh`). طلا، نقره، مس؛ روزانه/هفتگی/ماهانه ساعت ۱۰ تهران. هر نوبت با کلید یکتای `savings:<plan>:<slot>` از مسیر عادی quote → trade و کارمزد خود کاربر خرید می‌شود. ۳ شکست پشت سر هم = توقف طرح.
 
 ### هشدار قیمت
 
@@ -271,7 +270,7 @@ API:
 | `transactions` | خرید/فروش/واریز/برداشت/تحویل/کارمزد؛ `gold_mg` = میلی‌گرم همان `instrument` |
 | `bank_accounts` | شبا |
 | `goals` | اهداف پس‌انداز ریالی |
-| `scheduled_purchases` | DCA |
+| `scheduled_purchases` / `scheduled_purchase_runs` | طرح پس‌انداز و نوبت‌ها |
 | `delivery_requests` | تحویل فیزیکی |
 | `support_tickets` / `support_messages` | پشتیبانی |
 | `notifications` | اعلان درون‌برنامه |
@@ -299,7 +298,7 @@ RLS: کاربر ردیف خودش را می‌بیند؛ ادمین همه را.
 | POST | `/api/commerce/plus/activate-sandbox` | فعال‌سازی پلاس |
 | POST | `/api/referral/apply` | اعمال کد دعوت |
 | GET/PUT | `/api/admin/commerce-settings` | تنظیمات درآمد |
-| GET/POST | `/api/cron/revenue` | DCA + auto-buy |
+| GET/POST | `/api/cron/revenue` | طرح پس‌انداز + auto-buy |
 
 معامله، واریز، برداشت، تحویل **API سروری ندارند**؛ از کلاینت به جداول می‌روند.
 
@@ -322,7 +321,7 @@ RLS: کاربر ردیف خودش را می‌بیند؛ ادمین همه را.
 | `/app/wallet` | واریز/برداشت |
 | `/app/transactions/[id]` | رسید |
 | `/app/goals` | اهداف |
-| `/app/scheduled-purchases` | DCA |
+| `/app/savings` | طرح پس‌انداز |
 | `/app/delivery` | تحویل طلا |
 | `/app/trust` | مرکز اعتماد نمایشی |
 | `/app/support` | تیکت |

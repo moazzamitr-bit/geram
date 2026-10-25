@@ -2,7 +2,6 @@ export type ExecutionMode = "SANDBOX" | "CLOSED_BETA" | "PRODUCTION";
 
 export type FeatureFlags = {
   GOALS_ENABLED: boolean;
-  DCA_ENABLED: boolean;
   ALERT_AUTOBUY_ENABLED: boolean;
   REFERRAL_ENABLED: boolean;
   GERAM_PLUS_ENABLED: boolean;
@@ -47,7 +46,6 @@ export const DEFAULT_KILLS: KillSwitches = {
 
 export const SANDBOX_FLAGS: FeatureFlags = {
   GOALS_ENABLED: true,
-  DCA_ENABLED: false,
   ALERT_AUTOBUY_ENABLED: false,
   REFERRAL_ENABLED: true,
   GERAM_PLUS_ENABLED: true,
@@ -56,7 +54,6 @@ export const SANDBOX_FLAGS: FeatureFlags = {
 
 export const CONSERVATIVE_FLAGS: FeatureFlags = {
   GOALS_ENABLED: false,
-  DCA_ENABLED: false,
   ALERT_AUTOBUY_ENABLED: false,
   REFERRAL_ENABLED: false,
   GERAM_PLUS_ENABLED: false,
@@ -123,7 +120,6 @@ export function getFeatureFlags(
   const base = mode === "SANDBOX" ? SANDBOX_FLAGS : CONSERVATIVE_FLAGS;
   const flags: FeatureFlags = {
     GOALS_ENABLED: envBool(env, "GOALS_ENABLED", base.GOALS_ENABLED),
-    DCA_ENABLED: envBool(env, "DCA_ENABLED", base.DCA_ENABLED),
     ALERT_AUTOBUY_ENABLED: envBool(env, "ALERT_AUTOBUY_ENABLED", base.ALERT_AUTOBUY_ENABLED),
     REFERRAL_ENABLED: envBool(env, "REFERRAL_ENABLED", base.REFERRAL_ENABLED),
     GERAM_PLUS_ENABLED: envBool(env, "GERAM_PLUS_ENABLED", base.GERAM_PLUS_ENABLED),

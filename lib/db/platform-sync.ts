@@ -20,13 +20,6 @@ export type PlatformBundle = {
   goals: DemoGoal[];
   notifications: DemoNotification[];
   tickets: SupportTicket[];
-  scheduledPurchases: {
-    id: string;
-    amountRial: number;
-    cadence: string;
-    status: string;
-    nextRun: string;
-  }[];
   alerts: {
     id: string;
     direction: "above" | "below";
@@ -107,7 +100,6 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
     goals,
     notifications,
     tickets,
-    scheduled,
     alerts,
   ] = await Promise.all([
     loadLedgerBalances(),
@@ -126,7 +118,6 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
       .select("*, support_messages(*)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
-    supabase.from("scheduled_purchases").select("*").eq("user_id", user.id),
     supabase.from("price_alerts").select("*").eq("user_id", user.id),
   ]);
 
@@ -181,13 +172,7 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
           at: new Date(m.created_at).toLocaleString("fa-IR"),
         })),
     })),
-    scheduledPurchases: (scheduled.data ?? []).map((s) => ({
-      id: s.id,
-      amountRial: Number(s.amount_toman),
-      cadence: s.cadence,
-      status: s.status,
-      nextRun: s.next_run ?? "",
-    })),
+
     alerts: (alerts.data ?? []).map((a) => ({
       id: a.id,
       direction: a.direction as "above" | "below",
@@ -299,32 +284,6 @@ export async function persistBankAccount(input: {
     onConflict: "id",
   });
   if (error) console.error("persistBankAccount", error.message);
-}
-
-export async function persistScheduledPurchase(input: {
-  id: string;
-  amountRial: number;
-  cadence: string;
-  status: string;
-  nextRun: string;
-}) {
-  const auth = await authedClient();
-  if (!auth) return;
-  const nextRunAt = new Date();
-  nextRunAt.setDate(nextRunAt.getDate() + 1);
-  const row: Record<string, unknown> = {
-    user_id: auth.user.id,
-    amount_toman: input.amountRial,
-    cadence: input.cadence,
-    status: input.status,
-    next_run: input.nextRun,
-    next_run_at: nextRunAt.toISOString(),
-  };
-  if (isUuid(input.id)) row.id = input.id;
-  const { error } = await auth.supabase.from("scheduled_purchases").upsert(row, {
-    onConflict: "id",
-  });
-  if (error) console.error("persistScheduledPurchase", error.message);
 }
 
 export async function persistAlert(input: {

@@ -19,7 +19,7 @@ export default async function AdminPlusPage() {
       {settings ? (
         <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5 text-[13px] leading-7">
           <p>قیمت ماهانه تنظیمات: {formatToman(settings.plus.monthlyPriceToman)}</p>
-          <p>حداکثر DCA رایگان / پلاس: {settings.plus.maxDcaFree} / {settings.plus.maxDcaPlus}</p>
+          <p>حداکثر طرح پس‌انداز رایگان / پلاس: {settings.plus.maxDcaFree} / {settings.plus.maxDcaPlus}</p>
         </div>
       ) : (
         <p className="text-[13px] text-white/45">تنظیمات در دسترس نیست</p>
