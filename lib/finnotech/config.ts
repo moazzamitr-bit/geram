@@ -1,27 +1,18 @@
 /**
- * Scopes the client-credentials token requests. Finnotech drops a scope the
- * client was not granted instead of failing the token. See docs/DEPLOY.md.
- *
- * Login OTP: messaging initiate/verify, or facility finnotext when a sender
- * line is set. The live SMS line sends 5 digits. The verify sample `554321`
- * is not the length to enforce.
- * Identity: Shahkar SMS plus civil-registry identification.
- * Withdrawals: card and IBAN ownership against the same national id.
+ * Per-call scopes. Finnotech rejects the whole token request (400 "client has
+ * no access to this scope") if any requested scope is not granted to the
+ * client, so each call mints a token for only the scopes it needs. Every
+ * scope below is granted to the geram client.
  */
-export const FINNOTECH_SCOPES = [
-  "kyc:sms-shahkar-send:get",
-  "kyc:sms-shahkar-verification:get",
-  "kyc:sms-shahkar-verification:post",
-  "facility:sms-shahkar-send:get",
-  "facility:sms-shahkar-verification:get",
-  "facility:sms-shahkar-verification:post",
-  "kyc:identification-inquiry:get",
-  "kyc:card-owner-verification:post",
-  "kyc:iban-owner-verification:get",
-  "messaging:otp-initiate:post",
-  "messaging:otp-verify:post",
-  "facility:finnotext-otp:post",
-].join(",");
+export const FINNOTECH_SCOPE = {
+  shahkarSend: ["kyc:sms-shahkar-send:get"],
+  shahkarVerify: ["kyc:sms-shahkar-verification:get"],
+  identification: ["kyc:identification-inquiry:get"],
+  cardOwner: ["kyc:card-owner-verification:post"],
+  ibanOwner: ["kyc:iban-owner-verification:get"],
+  /** Login OTP: messaging initiate/verify, or finnotext delivery when a sender line is set. */
+  loginOtp: ["messaging:otp-initiate:post", "messaging:otp-verify:post", "facility:finnotext-otp:post"],
+} as const satisfies Record<string, readonly string[]>;
 
 export function finnotechBaseUrl() {
   const raw = process.env.FINNOTECH_BASE_URL?.trim() || "https://api.finnotech.ir";

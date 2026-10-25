@@ -8,6 +8,8 @@ import {
   jalaliAdultBirthMonths,
   jalaliAdultBirthYears,
   persianJalaliDate,
+  reconcileBirthParts,
+  type BirthParts,
 } from "@/lib/kyc/jalali";
 import { normalizeJalaliBirthDate } from "@/lib/kyc/national-id";
 import { useState } from "react";
@@ -15,7 +17,7 @@ import { useState } from "react";
 const selectClass =
   "h-12 w-full rounded-xl border border-black/10 bg-[#F6F4F1] px-2 text-center text-base text-text outline-none transition focus:border-[#FFB800] focus:bg-white";
 
-type Parts = { year: number; month: number; day: number };
+type Parts = BirthParts;
 
 function split(value: string): Parts {
   const normalized = normalizeJalaliBirthDate(value);
@@ -39,12 +41,12 @@ export function JalaliBirthDateField({
 
   const years = jalaliAdultBirthYears();
   const months = part.year ? jalaliAdultBirthMonths(part.year) : [];
-  const days = part.year && part.month ? jalaliAdultBirthDays(part.year, part.month) : [];
+  const days = part.year && part.month
+    ? jalaliAdultBirthDays(part.year, part.month)
+    : Array.from({ length: part.month ? (part.month <= 6 ? 31 : 30) : 31 }, (_, index) => index + 1);
 
   const commit = (next: Parts) => {
-    const month = jalaliAdultBirthMonths(next.year).includes(next.month) ? next.month : 0;
-    const day = month && jalaliAdultBirthDays(next.year, month).includes(next.day) ? next.day : 0;
-    const cleaned = { year: next.year, month, day };
+    const cleaned = reconcileBirthParts(next);
     setPart(cleaned);
     onChange(
       cleaned.year && cleaned.month && cleaned.day
@@ -64,7 +66,7 @@ export function JalaliBirthDateField({
           onChange={(event) => commit({ ...part, day: Number(event.target.value) || 0 })}
         >
           <option value="">روز</option>
-          {(days.length ? days : Array.from({ length: 31 }, (_, index) => index + 1)).map((day) => (
+          {days.map((day) => (
             <option key={day} value={day}>
               {toPersianDigits(String(day))}
             </option>

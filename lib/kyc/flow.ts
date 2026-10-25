@@ -133,6 +133,9 @@ function providerError(err: unknown, clientError?: KycErrorCode): KycFlowError {
   if (err instanceof FinnotechError && err.code === "not_configured") {
     return new KycFlowError("not_configured", 503);
   }
+  if (err instanceof FinnotechError && (err.code === "token_rejected" || err.code === "no_scope")) {
+    return new KycFlowError("provider_config", 503);
+  }
   if (clientError && err instanceof FinnotechError && err.httpStatus === 400) {
     return new KycFlowError(clientError, 400, safeShahkarReason(err.providerMessage) ?? undefined);
   }

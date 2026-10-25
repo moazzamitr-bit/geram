@@ -1,5 +1,5 @@
 import { finnotechCall, FinnotechError } from "@/lib/finnotech/client";
-import { finnotechClientId, finnotechOtpDigits, finnotechSmsSender } from "@/lib/finnotech/config";
+import { FINNOTECH_SCOPE, finnotechClientId, finnotechOtpDigits, finnotechSmsSender } from "@/lib/finnotech/config";
 
 function clientPath(prefix: string) {
   return `/${prefix}/v2/clients/${encodeURIComponent(finnotechClientId())}`;
@@ -46,6 +46,7 @@ export async function initiateMessagingOtp(phone: string): Promise<MessagingOtp>
   const sent = await finnotechCall<MessagingInitiateResult>({
     method: "POST",
     path: `${clientPath("messaging")}/otp/initiate`,
+    scopes: FINNOTECH_SCOPE.loginOtp,
     body: { identifier: phone, method: "sms", purpose: "login", ttl: 120 },
     idempotent: false,
   });
@@ -65,6 +66,7 @@ export async function verifyMessagingOtp(traceId: string, otp: string) {
   const checked = await finnotechCall<{ status?: string }>({
     method: "POST",
     path: `${clientPath("messaging")}/otp/verify`,
+    scopes: FINNOTECH_SCOPE.loginOtp,
     body: { traceId, otp },
     idempotent: false,
   });
@@ -81,6 +83,7 @@ export async function sendFinnotextOtp(phone: string, code: string) {
   await finnotechCall({
     method: "POST",
     path: `${clientPath("facility")}/finnotextOtp`,
+    scopes: FINNOTECH_SCOPE.loginOtp,
     body: {
       from,
       to: phone,

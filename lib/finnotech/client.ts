@@ -1,5 +1,5 @@
 import { Agent } from "undici";
-import { FINNOTECH_SCOPES, finnotechBaseUrl, finnotechClientId, finnotechConfigured, finnotechTimeoutMs } from "@/lib/finnotech/config";
+import { finnotechBaseUrl, finnotechClientId, finnotechConfigured, finnotechTimeoutMs } from "@/lib/finnotech/config";
 import { redactSecrets } from "@/lib/finnotech/redact";
 
 const REFRESH_SKEW_MS = 60_000;
@@ -56,12 +56,26 @@ type ErrorNode = {
   name?: unknown;
 };
 
-let cache: CachedToken | null = null;
-let inflight: Promise<string> | null = null;
+type TokenSlot = { cache: CachedToken | null; inflight: Promise<string> | null };
+
+/** One token per scope set: an ungranted scope would fail the whole token. */
+const slots = new Map<string, TokenSlot>();
+
+export function scopeKey(scopes: readonly string[]) {
+  return [...new Set(scopes.map((s) => s.trim()).filter(Boolean))].sort().join(",");
+}
+
+function slotFor(key: string): TokenSlot {
+  let slot = slots.get(key);
+  if (!slot) {
+    slot = { cache: null, inflight: null };
+    slots.set(key, slot);
+  }
+  return slot;
+}
 
 export function resetFinnotechAuthCache() {
-  cache = null;
-  inflight = null;
+  slots.clear();
 }
 
 export function newTrackId() {
@@ -193,7 +207,7 @@ async function readJson(res: Response): Promise<Envelope<Record<string, unknown>
   return data;
 }
 
-async function tokenRequest(body: Record<string, string>, path: string, now: number) {
+async function tokenRequest(slot: TokenSlot, body: Record<string, string>, path: string, now: number) {
   const res = await fetch(`${finnotechBaseUrl()}${path}`, {
     method: "POST",
     headers: {
@@ -211,6 +225,8 @@ async function tokenRequest(body: Record<string, string>, path: string, now: num
   } catch (err) {
     if (err instanceof FinnotechError && err.httpStatus >= 400 && err.httpStatus < 500) {
       logFinnotechFailure("POST", path, err);
+      // Token/scope rejection is our configuration, never the user's data.
+      throw new FinnotechError("token_rejected", err.httpStatus, err.providerMessage, err.providerBody);
     }
     throw err;
   }
@@ -221,7 +237,7 @@ async function tokenRequest(body: Record<string, string>, path: string, now: num
   if (!accessToken || !refreshToken || !Number.isFinite(lifeTimeMs) || lifeTimeMs <= 0) {
     throw new FinnotechError("token_incomplete", res.status);
   }
-  cache = { accessToken, refreshToken, lifeTimeMs, obtainedAt: now };
+  slot.cache = { accessToken, refreshToken, lifeTimeMs, obtainedAt: now };
   return accessToken;
 }
 
@@ -241,14 +257,16 @@ async function withTokenRetries(run: () => Promise<string>) {
   throw last;
 }
 
-async function mint(now: number) {
+async function mint(slot: TokenSlot, key: string, now: number) {
   if (!finnotechConfigured()) throw new FinnotechError("not_configured", 0);
+  if (!key) throw new FinnotechError("no_scope", 0);
   return withTokenRetries(() =>
     tokenRequest(
+      slot,
       {
         grant_type: "client_credentials",
         nid: process.env.FINNOTECH_NID!.trim(),
-        scopes: FINNOTECH_SCOPES,
+        scopes: key,
       },
       "/dev/v2/oauth2/token",
       now
@@ -256,12 +274,13 @@ async function mint(now: number) {
   );
 }
 
-async function refreshOrMint(now: number) {
-  const refreshToken = cache?.refreshToken;
-  if (!refreshToken) return mint(now);
+async function refreshOrMint(slot: TokenSlot, key: string, now: number) {
+  const refreshToken = slot.cache?.refreshToken;
+  if (!refreshToken) return mint(slot, key, now);
   try {
     return await withTokenRetries(() =>
       tokenRequest(
+        slot,
         {
           grant_type: "refresh_token",
           token_type: "CLIENT-CREDENTIAL",
@@ -272,26 +291,30 @@ async function refreshOrMint(now: number) {
       )
     );
   } catch (err) {
-    cache = null;
+    slot.cache = null;
     console.error("finnotech_refresh", err instanceof FinnotechError ? err.code : networkCauseCode(err));
-    return mint(now);
+    return mint(slot, key, now);
   }
 }
 
-export async function getFinnotechAccessToken(now = Date.now()) {
-  if (cache && !dueForRefresh(cache, now)) return cache.accessToken;
-  if (!inflight) {
-    const pending = (cache?.refreshToken ? refreshOrMint(now) : mint(now)).finally(() => {
-      inflight = null;
+export async function getFinnotechAccessToken(scopes: readonly string[], now = Date.now()) {
+  const key = scopeKey(scopes);
+  const slot = slotFor(key);
+  if (slot.cache && !dueForRefresh(slot.cache, now)) return slot.cache.accessToken;
+  if (!slot.inflight) {
+    const pending = (slot.cache?.refreshToken ? refreshOrMint(slot, key, now) : mint(slot, key, now)).finally(() => {
+      slot.inflight = null;
     });
-    inflight = pending;
+    slot.inflight = pending;
   }
-  return inflight;
+  return slot.inflight;
 }
 
 export type FinnotechCall = {
   method: "GET" | "POST";
   path: string;
+  /** Only the scopes this call needs (see FINNOTECH_SCOPE). */
+  scopes: readonly string[];
   query?: Record<string, string | number | undefined>;
   body?: unknown;
   /**
@@ -328,12 +351,12 @@ async function authorized<T>(
   now: number,
   refreshed: boolean
 ): Promise<{ trackId: string; result: T }> {
-  const token = await getFinnotechAccessToken(now);
+  const token = await getFinnotechAccessToken(input.scopes, now);
   try {
     return await once(input, trackId, token);
   } catch (err) {
     if (!refreshed && err instanceof FinnotechError && err.httpStatus === 401) {
-      cache = null;
+      slotFor(scopeKey(input.scopes)).cache = null;
       return authorized(input, trackId, Date.now(), true);
     }
     throw err;
