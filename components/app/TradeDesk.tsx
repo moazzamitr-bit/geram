@@ -7,7 +7,12 @@ import { DeferredPriceChart } from "@/components/ui/DeferredPriceChart";
 import type { ChartRange } from "@/components/ui/PriceChart";
 import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
 import { tradeFailureMessage } from "@/lib/app/trade-errors";
-import { feeRate, quotePreview, type AmountField as AmountKind } from "@/lib/app/trade-amount";
+import {
+  feeRate,
+  quotePreview,
+  receiptUnitPrice,
+  type AmountField as AmountKind,
+} from "@/lib/app/trade-amount";
 import { useAuth } from "@/lib/auth/auth-context";
 import { isKycVerified } from "@/lib/commerce/kyc";
 import type { UiQuote } from "@/lib/core-api";
@@ -276,7 +281,7 @@ export function TradeDesk({
         txId: res.txId,
         trackingCode: res.trackingCode || res.trade?.trackingCode || res.txId,
         goldMg: res.trade?.goldMg || quote.goldMg,
-        unitPrice: quote.pricePerGram || res.trade?.pricePerGram || 0,
+        unitPrice: receiptUnitPrice(res.trade?.pricePerGram, quote.pricePerGram),
         total: res.trade?.amountRial || (side === "buy" ? quote.gross : quote.net),
         fee: res.trade?.feeRial ?? quote.fee,
         createdAt: res.createdAt || new Date().toISOString(),

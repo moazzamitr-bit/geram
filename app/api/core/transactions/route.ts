@@ -26,7 +26,7 @@ export async function GET() {
 
     return Response.json({
       ok: true,
-      trades: trades.map(serializeTrade),
+      trades: trades.map((trade) => serializeTrade(trade)),
       journals: journals.map(serializeJournal),
       ui,
     });

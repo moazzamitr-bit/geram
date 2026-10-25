@@ -7,6 +7,13 @@ import {
 export type TradeSide = "buy" | "sell";
 export type AmountField = "toman" | "gram";
 
+/** Success receipt: executed toman/gram from the trade, then the locked quote. */
+export function receiptUnitPrice(tradePrice?: number | null, quotePrice?: number | null): number {
+  if (tradePrice != null && tradePrice > 0) return tradePrice;
+  if (quotePrice != null && quotePrice > 0) return quotePrice;
+  return 0;
+}
+
 export function parseAmount(raw: string) {
   const latin = raw
     .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
