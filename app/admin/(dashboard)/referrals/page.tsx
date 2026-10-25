@@ -1,95 +1,66 @@
-import {
-  AdminBadge,
-  AdminNotice,
-  AdminPageHeader,
-  AdminTable,
-  OpsBadge,
-} from "@/components/admin/AdminUI";
-import { listReferralEvents } from "@/lib/db/admin-queries";
-import { formatToman } from "@/lib/utils";
-import { getExecutionMode, getFeatureFlags } from "@/lib/core/mode";
+import { AdminPageHeader, AdminTable } from "@/components/admin/AdminUI";
+import { maskPhone } from "@/lib/admin/mask";
 import { loadCommerceSettings } from "@/lib/commerce/settings-server";
+import { adminReferralOverview } from "@/lib/referral/service";
+import Link from "next/link";
+
+export const dynamic = "force-dynamic";
+
+const toman = (irr: string | number | null) => `${(Number(BigInt(String(irr ?? 0)) / 10n)).toLocaleString("fa-IR")} تومان`;
 
 export default async function AdminReferralsPage() {
-  const [rows, settings] = await Promise.all([
-    listReferralEvents(100),
-    loadCommerceSettings(),
-  ]);
-  const share = settings.referral.feeSharePercent;
-  let enabled = false;
-  try {
-    enabled = getFeatureFlags(getExecutionMode()).REFERRAL_ENABLED;
-  } catch {
-    enabled = false;
-  }
-
+  const [{ totals, top, recent }, settings] = await Promise.all([adminReferralOverview(), loadCommerceSettings()]);
+  const pct = Math.round(settings.referral.feeSharePercent * 100);
   return (
-    <div>
+    <div className="space-y-6">
       <AdminPageHeader
-        title="دعوت دوستان"
-        description={`مدل سهم از کارمزد: ${Math.round(share * 100)}٪ کارمزد معاملات دعوت‌شده به دعوت‌کننده تعلق می‌گیرد. پرداخت هنوز به دفترکل متصل نیست.`}
+        title="معرفی دوستان"
+        description={`دعوت‌کننده‌ی احرازشده ${pct.toLocaleString("fa-IR")}٪ کارمزد هر معامله‌ی دوستش را همان لحظه از درآمد کارمزد (دفترکل) دریافت می‌کند.`}
       />
-      <OpsBadge state={enabled ? "SANDBOX" : "NOT_READY"} />
-      <AdminNotice title="REFERRAL_ENABLED">{String(enabled)}</AdminNotice>
-      <AdminTable
-        headers={[
-          "دعوت‌کننده",
-          "دعوت‌شده",
-          "پاداش دعوت‌کننده",
-          "پاداش دعوت‌شده",
-          "کارمزد معاملات دعوت‌شده",
-          "سهم دعوت‌کننده",
-          "وضعیت",
-          "تاریخ",
-        ]}
-        empty={rows.length === 0}
-      >
-        {rows.map((r) => {
-          const inviter = Array.isArray(r.inviter) ? r.inviter[0] : r.inviter;
-          const invitee = Array.isArray(r.invitee) ? r.invitee[0] : r.invitee;
-          return (
-            <tr key={r.id} className="border-t border-white/5">
-              <td className="px-4 py-3 text-[13px]">
-                {inviter?.first_name} {inviter?.last_name}
-                <span className="block font-mono text-[11px] text-white/45" dir="ltr">
-                  {inviter?.referral_code}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-[13px]">
-                {invitee?.first_name} {invitee?.last_name}
-                <span className="block text-[11px] text-white/45">{invitee?.phone}</span>
-              </td>
-              <td className="px-4 py-3 tabular-nums text-[13px]">
-                {formatToman(Number(r.inviter_bonus_toman))}
-              </td>
-              <td className="px-4 py-3 tabular-nums text-[13px]">
-                {formatToman(Number(r.invitee_bonus_toman))}
-              </td>
-              <td className="px-4 py-3 tabular-nums text-[13px]">
-                {formatToman(r.inviteeFeesToman)}
-              </td>
-              <td className="px-4 py-3 tabular-nums text-[13px] text-gold">
-                {formatToman(Math.floor(r.inviteeFeesToman * share))}
-              </td>
-              <td className="px-4 py-3">
-                <AdminBadge
-                  tone={
-                    r.status === "PAID"
-                      ? "positive"
-                      : r.status === "REJECTED"
-                        ? "negative"
-                        : "warning"
-                  }
-                >
-                  {r.status}
-                </AdminBadge>
-              </td>
-              <td className="px-4 py-3 text-[12px] text-white/50">
-                {new Date(r.created_at).toLocaleString("fa-IR")}
-              </td>
-            </tr>
-          );
-        })}
+      <div className="grid gap-3 sm:grid-cols-4">
+        {[
+          ["کاربران دعوت‌شده", totals.referred.toLocaleString("fa-IR")],
+          ["تعداد پاداش", totals.rewards.toLocaleString("fa-IR")],
+          ["کارمزد معاملات دعوت‌شده‌ها", toman(totals.fee_irr)],
+          ["پاداش پرداخت‌شده", toman(totals.reward_irr)],
+        ].map(([k, v]) => (
+          <div key={k} className="rounded-2xl border border-white/10 bg-[#0F1724] p-4">
+            <p className="text-[12px] text-white/50">{k}</p>
+            <p className="mt-1 text-[18px] font-bold">{v}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-[12px] text-white/50">
+        درصد سهم در <Link className="text-gold" href="/admin/settings">تنظیمات کارمزد</Link> قابل تغییر است.
+      </p>
+      <h2 className="font-bold">برترین دعوت‌کننده‌ها</h2>
+      <AdminTable headers={["کاربر", "کد", "دعوت‌شده", "پاداش"]} empty={top.length === 0}>
+        {top.map((r) => (
+          <tr key={String(r.id)} className="border-b border-white/5">
+            <td className="px-4 py-3">
+              <Link className="text-gold" href={`/admin/users/${r.id}`}>
+                {[r.first_name, r.last_name].filter(Boolean).join(" ") || maskPhone(String(r.phone ?? ""))}
+              </Link>
+            </td>
+            <td className="px-4 py-3 font-mono">{r.referral_code}</td>
+            <td className="px-4 py-3">{Number(r.invited).toLocaleString("fa-IR")}</td>
+            <td className="px-4 py-3">{toman(r.reward_irr)}</td>
+          </tr>
+        ))}
+      </AdminTable>
+      <h2 className="font-bold">آخرین پاداش‌ها</h2>
+      <AdminTable headers={["زمان", "دعوت‌کننده", "دعوت‌شده", "معامله", "کارمزد", "سهم", "پاداش"]} empty={recent.length === 0}>
+        {recent.map((r) => (
+          <tr key={String(r.trade_id)} className="border-b border-white/5">
+            <td className="px-4 py-3 text-[12px]">{new Date(String(r.created_at)).toLocaleString("fa-IR-u-ca-persian")}</td>
+            <td className="px-4 py-3">{maskPhone(String(r.referrer_phone ?? ""))}</td>
+            <td className="px-4 py-3">{maskPhone(String(r.referee_phone ?? ""))}</td>
+            <td className="px-4 py-3 text-[12px]">{r.side} {r.asset}</td>
+            <td className="px-4 py-3">{toman(r.fee_irr)}</td>
+            <td className="px-4 py-3">{(Number(r.share_bps) / 100).toLocaleString("fa-IR")}٪</td>
+            <td className="px-4 py-3">{toman(r.reward_irr)}</td>
+          </tr>
+        ))}
       </AdminTable>
     </div>
   );

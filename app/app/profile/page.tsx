@@ -12,6 +12,7 @@ import {
   FileText,
   Fingerprint,
   Gauge,
+  Gift,
   Lock,
   MonitorSmartphone,
   Package,
@@ -19,9 +20,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 const links = [
+  { href: "/app/referral", label: "معرفی دوستان", desc: "کد دعوت و سهم شما از کارمزد", icon: Gift },
   { href: "/app/delivery", label: "برداشت فیزیکی", desc: "تحویل حضوری سکه و شمش", icon: Package },
   { href: "/app/profile/kyc", label: "احراز هویت", desc: "سطح دسترسی و سقف‌ها", icon: Fingerprint },
   { href: "/app/profile/limits", label: "سقف تراکنش‌ها", desc: "خرید، فروش و برداشت امروز", icon: Gauge },
@@ -36,8 +37,6 @@ export default function ProfilePage() {
   const { user, logout } = useAuth();
   const store = useDemoStore();
   const router = useRouter();
-  const [referralInput, setReferralInput] = useState("");
-  const [refMsg, setRefMsg] = useState("");
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
@@ -74,50 +73,6 @@ export default function ProfilePage() {
             {store.plusActive ? "فعال" : "رایگان"}
           </span>
         </p>
-        {store.referralCode && (
-          <p className="mt-2 text-[13px] text-muted-app">
-            کد دعوت شما:{" "}
-            <span dir="ltr" className="font-mono text-gold">
-              {store.referralCode}
-            </span>
-          </p>
-        )}
-        {store.commerceSettings.referral.feeSharePercent > 0 && (
-          <p className="mt-2 text-[13px] text-muted-app">
-            با معرفی دوستان،{" "}
-            <span className="text-gold">
-              {Math.round(store.commerceSettings.referral.feeSharePercent * 100).toLocaleString("fa-IR")}٪
-            </span>{" "}
-            از کارمزد خرید و فروش آن‌ها سهم شما می‌شود.
-          </p>
-        )}
-        <label className="mt-5 block text-[13px]">
-          <span className="text-muted-app">کد دعوت دوست</span>
-          <input
-            dir="ltr"
-            value={referralInput}
-            onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
-            className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-[#0A0C0E] px-3 font-mono outline-none focus:border-gold"
-            placeholder="XXXXXXXX"
-          />
-        </label>
-        <GoldButton
-          type="button"
-          size="sm"
-          variant="secondary"
-          className="mt-3"
-          onClick={async () => {
-            const res = await store.applyReferralCode(referralInput);
-            setRefMsg(res.message ?? res.error ?? "");
-          }}
-        >
-          ثبت کد دعوت
-        </GoldButton>
-        {refMsg && (
-          <p className={`mt-2 text-[13px] ${refMsg.includes("خطا") || refMsg.includes("invalid") ? "text-negative" : "text-positive"}`}>
-            {refMsg}
-          </p>
-        )}
       </AppCard>
 
       <div className="space-y-2">

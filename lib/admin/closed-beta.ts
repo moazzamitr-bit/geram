@@ -18,7 +18,6 @@ export const CLOSED_BETA_INACTIVE_ADMIN_ROUTES = [
   "/admin/goals",
   "/admin/dca",
   "/admin/alerts",
-  "/admin/referrals",
   "/admin/plus",
   "/admin/notifications",
   "/admin/procurement",

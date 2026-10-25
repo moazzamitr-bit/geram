@@ -966,6 +966,7 @@ export class FinancialCore {
         } else {
           await this.postSell(quote, trade);
         }
+        await this.postReferralShare(trade);
 
         assertTradeTransition("RESERVED", "LEDGER_POSTED");
         await this.deps.store.updateTrade(trade.id, ["RESERVED"], { status: "LEDGER_POSTED" });
@@ -1082,6 +1083,63 @@ export class FinancialCore {
       ],
     });
     await this.reduceUserCost(quote.userId, quote.asset, quote.weightUg);
+  }
+
+  /**
+   * Referral fee share: moves part of this trade's fee from platform revenue to
+   * the inviter's wallet in the same transaction. Only fully verified inviters earn.
+   */
+  private referralReady: boolean | undefined;
+
+  private async postReferralShare(trade: Trade) {
+    const store = this.deps.store;
+    if (!store.rawQuery || trade.feeIrr <= 0n) return;
+    if (this.referralReady === undefined) {
+      // Bare ledger databases (tests, PGlite) have no profiles/referral tables.
+      const probe = await store.rawQuery(
+        "select to_regclass('public.referral_rewards') is not null and to_regclass('public.profiles') is not null as ok"
+      );
+      this.referralReady = Boolean((probe.rows[0] as { ok?: boolean } | undefined)?.ok);
+    }
+    if (!this.referralReady) return;
+    const { rows } = await store.rawQuery(
+      `select p.referred_by::text as referrer,
+              coalesce((s.value->>'feeSharePercent')::numeric, 0.15) as share
+         from public.profiles p
+         left join public.platform_settings s on s.key = 'referral'
+        where p.id = $1::uuid and p.referred_by is not null
+          and exists (select 1 from public.profiles r
+                       where r.id = p.referred_by and r.kyc_status = 'VERIFIED')
+          and exists (select 1 from public.user_bank_cards c
+                       where c.user_id = p.referred_by and c.status = 'VERIFIED')`,
+      [trade.userId]
+    );
+    const row = rows[0] as { referrer: string; share: string } | undefined;
+    if (!row) return;
+    const bps = BigInt(Math.round(Number(row.share) * 10_000));
+    if (bps <= 0n) return;
+    const reward = (trade.feeIrr * bps) / 10_000n;
+    if (reward <= 0n) return;
+    await ensureUserAccounts(store, row.referrer);
+    const journalId = newId("jnl");
+    await postJournal(store, {
+      id: journalId,
+      createdAt: trade.createdAt,
+      reason: "REFERRAL_SHARE",
+      refType: "referral_reward",
+      refId: trade.id,
+      lines: [
+        line("PLATFORM_FEE_REVENUE", PLATFORM_HOLDER, "IRR", reward, 0n),
+        line("USER_AVAILABLE", row.referrer, "IRR", 0n, reward),
+      ],
+    });
+    await store.rawQuery(
+      `insert into public.referral_rewards
+         (trade_id, referrer_id, referee_id, asset, side, fee_irr, reward_irr, share_bps, journal_id)
+       values ($1, $2::uuid, $3::uuid, $4, $5, $6, $7, $8, $9)`,
+      [trade.id, row.referrer, trade.userId, trade.asset, trade.side,
+       trade.feeIrr.toString(), reward.toString(), Number(bps), journalId]
+    );
   }
 
   /** Store for ledger-backed services (physical withdrawal, gift card, referral). */

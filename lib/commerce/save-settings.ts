@@ -29,9 +29,6 @@ const plusSchema = z.object({
 });
 
 const referralSchema = z.object({
-  inviterBonusToman: z.number().int().min(0).max(100_000_000),
-  inviteeBonusToman: z.number().int().min(0).max(100_000_000),
-  minKycForPayout: z.boolean(),
   feeSharePercent: z.number().min(0).max(0.5),
 });
 
