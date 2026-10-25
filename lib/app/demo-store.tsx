@@ -55,17 +55,6 @@ export type DemoGoal = {
   monthlyRial: number;
 };
 
-export type DemoDelivery = {
-  id: string;
-  productId: string;
-  productName: string;
-  weightGrams: number;
-  status: string;
-  method: string;
-  createdAt: string;
-  feeRial: number;
-};
-
 export type DemoAlert = {
   id: string;
   direction: "above" | "below";
@@ -129,7 +118,6 @@ type DemoState = {
   bankAccounts: { id: string; iban: string; bank: string; verified: boolean }[];
   transactions: DemoTransaction[];
   goals: DemoGoal[];
-  deliveries: DemoDelivery[];
   alerts: DemoAlert[];
   notifications: DemoNotification[];
   tickets: SupportTicket[];
@@ -187,13 +175,6 @@ type DemoState = {
   refreshFinancial: () => Promise<void>;
   addGoal: (goal: Omit<DemoGoal, "id" | "currentRial">) => string;
   contributeGoal: (goalId: string, rial: number) => { ok: boolean; error?: string };
-  requestDelivery: (input: {
-    productId: string;
-    productName: string;
-    weightGrams: number;
-    method: string;
-    feeRial: number;
-  }) => { ok: boolean; error?: string; id?: string };
   setPin: (pin: string) => void;
   addBankAccount: (iban: string, bank: string) => void;
   addAlert: (
@@ -280,7 +261,6 @@ const seed = {
   bankAccounts: [] as { id: string; iban: string; bank: string; verified: boolean }[],
   transactions: [] as DemoTransaction[],
   goals: [] as DemoGoal[],
-  deliveries: [] as DemoDelivery[],
   alerts: [] as DemoAlert[],
   notifications: [] as DemoNotification[],
   tickets: [] as SupportTicket[],
@@ -362,7 +342,6 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
                 bankAccounts: bundle.bankAccounts,
                 transactions: bundle.transactions,
                 goals: bundle.goals,
-                deliveries: bundle.deliveries,
                 notifications: bundle.notifications,
                 tickets: bundle.tickets,
                 scheduledPurchases: bundle.scheduledPurchases,
@@ -854,12 +833,6 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         return {
           ok: false,
           error: "واریز به هدف فعلاً به دفترکل متصل نیست.",
-        };
-      },
-      requestDelivery: () => {
-        return {
-          ok: false,
-          error: "تحویل فیزیکی در این نسخه فعال نیست.",
         };
       },
       setPin: (pin) => setState((s) => ({ ...s, pin })),

@@ -43,6 +43,8 @@ export class InsufficientBalanceError extends Error {
 
 export interface CoreStore {
   readonly persistence: "memory" | "postgres";
+  /** Postgres only: SQL on the current transaction (service tables beside the ledger). */
+  rawQuery?(sql: string, params?: unknown[]): Promise<{ rows: Record<string, unknown>[] }>;
   inTransaction(): boolean;
   withTransaction<T>(fn: () => Promise<T>): Promise<T>;
   withAdvisoryLock<T>(key: string, fn: () => Promise<T>): Promise<T>;

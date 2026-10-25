@@ -14,6 +14,7 @@ import {
   Gauge,
   Lock,
   MonitorSmartphone,
+  Package,
   Scale,
 } from "lucide-react";
 import Link from "next/link";
@@ -21,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const links = [
+  { href: "/app/delivery", label: "برداشت فیزیکی", desc: "تحویل حضوری سکه و شمش", icon: Package },
   { href: "/app/profile/kyc", label: "احراز هویت", desc: "سطح دسترسی و سقف‌ها", icon: Fingerprint },
   { href: "/app/profile/limits", label: "سقف تراکنش‌ها", desc: "خرید، فروش و برداشت امروز", icon: Gauge },
   { href: "/app/profile/security", label: "امنیت حساب", desc: "ورود و اعلان‌ها", icon: Lock },

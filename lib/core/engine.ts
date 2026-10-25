@@ -1084,6 +1084,31 @@ export class FinancialCore {
     await this.reduceUserCost(quote.userId, quote.asset, quote.weightUg);
   }
 
+  /** Store for ledger-backed services (physical withdrawal, gift card, referral). */
+  ledgerStore(): CoreStore {
+    return this.deps.store;
+  }
+
+  /** Metal leaving the user's free balance: drops cost basis pro rata, returns cost removed. */
+  async takeUserCost(userId: string, asset: AssetCode, qty: Microgram): Promise<Irr> {
+    const row = await this.deps.store.getCostBasis(userId, asset);
+    if (row.quantityUg <= 0n) return 0n;
+    const take = qty > row.quantityUg ? row.quantityUg : qty;
+    const cost = mulDivFloor(row.costIrr, take, row.quantityUg);
+    await this.deps.store.setCostBasis({
+      holderId: userId,
+      asset,
+      quantityUg: row.quantityUg - take,
+      costIrr: row.quantityUg - take <= 0n ? 0n : row.costIrr - cost,
+    });
+    return cost;
+  }
+
+  /** Metal entering the user's free balance at a known cost (release or redeem). */
+  async giveUserCost(userId: string, asset: AssetCode, qty: Microgram, costIrr: Irr) {
+    await this.addUserCost(userId, asset, qty, costIrr);
+  }
+
   private async addUserCost(userId: string, asset: AssetCode, qty: Microgram, costIrr: Irr) {
     const row = await this.deps.store.getCostBasis(userId, asset);
     await this.deps.store.setCostBasis({
