@@ -26,7 +26,6 @@ const HIDDEN = [
   "/admin/alerts",
   "/admin/referrals",
   "/admin/plus",
-  "/admin/delivery",
   "/admin/notifications",
   "/admin/procurement",
 ];
@@ -52,6 +51,7 @@ const VISIBLE = [
   "/admin/admins",
   "/admin/system",
   "/admin/support",
+  "/admin/delivery",
 ];
 
 describe("closed beta admin routes", () => {
