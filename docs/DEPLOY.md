@@ -68,7 +68,10 @@ docker run -d --restart unless-stopped --env-file .env.production -p 3000:3000 g
 ```
 kyc:sms-shahkar-send:get
 kyc:sms-shahkar-verification:get
+kyc:sms-shahkar-verification:post
 facility:sms-shahkar-send:get
+facility:sms-shahkar-verification:get
+facility:sms-shahkar-verification:post
 kyc:identification-inquiry:get
 kyc:card-owner-verification:post
 kyc:iban-owner-verification:get

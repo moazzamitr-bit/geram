@@ -73,8 +73,8 @@ describe("shahkar sms requests", () => {
     );
 
     const sent = await sendShahkarSms(MOBILE, NID);
-    expect(sent).toEqual({ outcome: "otp_required", trackId: "sms-send-track-id" });
-    const verified = await verifyShahkarSms("123456", sent.trackId, MOBILE, NID);
+    expect(sent).toEqual({ outcome: "otp_required", trackId: "sms-send-track-id", scope: "kyc" });
+    const verified = await verifyShahkarSms("123456", sent.trackId, MOBILE, NID, sent.scope);
     expect(verified).toEqual({ matched: true, trackId: "sms-verify-track-id" });
 
     const shahkar = urls.filter((href) => href.includes("/shahkar/"));
@@ -86,9 +86,86 @@ describe("shahkar sms requests", () => {
     expect(shahkar[1]).not.toContain(`trackId=${SEND_TRACK}`);
   });
 
-  it("falls back to facility smsSend version 2, then smsVerify, each with its own trackId", async () => {
+  it("pairs verify with the facility smsSend that succeeded and falls through a validation error", async () => {
     configure();
-    queueTrackIds([SEND_TRACK, FALLBACK_TRACK, VERIFY_TRACK, "44444444-4444-4444-8444-444444444444"]);
+    const postTrack = "44444444-4444-4444-8444-444444444444";
+    queueTrackIds([SEND_TRACK, FALLBACK_TRACK, VERIFY_TRACK, postTrack]);
+    const calls: { href: string; method: string; body: string | null }[] = [];
+    const logs: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string | URL, init?: RequestInit) => {
+        const href = String(url);
+        const method = init?.method ?? "GET";
+        const body = typeof init?.body === "string" ? init.body : null;
+        calls.push({ href, method, body });
+        if (href.includes("/oauth2/token")) return Response.json(tokenBody());
+        if (href.includes("/kyc/") && href.includes("/shahkar/smsSend")) {
+          return Response.json(
+            {
+              status: "FAILED",
+              responseCode: "FN-BRFH-50000040816",
+              error: { code: "VALIDATION_ERROR", message: "invalid request, Please check service url and http method" },
+            },
+            { status: 400 }
+          );
+        }
+        if (href.includes("/facility/") && href.includes("/shahkar/smsSend")) {
+          return Response.json({ status: "DONE", trackId: "facility-send-track", result: { smsSent: true } });
+        }
+        if (method === "GET" && href.includes("/facility/") && href.includes("/shahkar/smsVerification")) {
+          return Response.json(
+            {
+              status: "FAILED",
+              responseCode: "FN-BRFH-50000040816",
+              error: { code: "VALIDATION_ERROR", message: "invalid request, Please check service url and http method" },
+            },
+            { status: 400 }
+          );
+        }
+        if (method === "POST" && href.includes("/facility/") && href.includes("/shahkar/smsVerification")) {
+          return Response.json({ status: "DONE", trackId: "post-verify-track", result: { isValid: true } });
+        }
+        return Response.json({ status: "FAILED", error: { code: "NOT_FOUND", message: "missing" } }, { status: 404 });
+      })
+    );
+
+    const sent = await sendShahkarSms(MOBILE, NID);
+    expect(sent).toEqual({ outcome: "otp_required", trackId: "facility-send-track", scope: "facility" });
+    const verified = await verifyShahkarSms("998877", sent.trackId, MOBILE, NID, sent.scope);
+    expect(verified).toEqual({ matched: true, trackId: "post-verify-track" });
+
+    const shahkar = calls.filter((call) => call.href.includes("/shahkar/"));
+    expect(shahkar.map((call) => `${call.method} ${call.href}`)).toEqual([
+      `GET https://api.finnotech.ir/kyc/v2/clients/geram/shahkar/smsSend?trackId=${SEND_TRACK}&mobile=${MOBILE}&nationalCode=${NID}`,
+      `GET https://api.finnotech.ir/facility/v2/clients/geram/shahkar/smsSend?trackId=${FALLBACK_TRACK}&mobile=${MOBILE}&nationalCode=${NID}&version=2`,
+      `GET https://api.finnotech.ir/facility/v2/clients/geram/shahkar/smsVerification?trackId=${VERIFY_TRACK}&otp=998877&inquiryTrackId=facility-send-track&mobile=${MOBILE}&nationalCode=${NID}&version=2`,
+      `POST https://api.finnotech.ir/facility/v2/clients/geram/shahkar/smsVerification?trackId=${postTrack}&version=2`,
+    ]);
+    expect(JSON.parse(shahkar[3].body ?? "{}")).toEqual({
+      otp: "998877",
+      inquiryTrackId: "facility-send-track",
+      mobile: MOBILE,
+      nationalCode: NID,
+    });
+    const blob = logs.join("\n");
+    expect(blob).toContain("shahkar_sms GET /kyc/v2/clients/geram/shahkar/smsSend 400");
+    expect(blob).toContain("shahkar_sms GET /facility/v2/clients/geram/shahkar/smsSend 200");
+    expect(blob).toContain("shahkar_sms GET /facility/v2/clients/geram/shahkar/smsVerification 400");
+    expect(blob).toContain("FN-BRFH-50000040816");
+    expect(blob).toContain("shahkar_sms POST /facility/v2/clients/geram/shahkar/smsVerification 200");
+    expect(blob).not.toContain("998877");
+    expect(blob).not.toContain(MOBILE);
+    expect(blob).not.toContain(NID);
+    expect(blob).not.toContain("super-secret-value");
+  });
+
+  it("does not try another verify path after a real OTP rejection", async () => {
+    configure();
+    queueTrackIds([VERIFY_TRACK, "44444444-4444-4444-8444-444444444444"]);
     const urls: string[] = [];
     vi.stubGlobal(
       "fetch",
@@ -96,33 +173,18 @@ describe("shahkar sms requests", () => {
         const href = String(url);
         urls.push(href);
         if (href.includes("/oauth2/token")) return Response.json(tokenBody());
-        if (href.includes("/kyc/") && href.includes("/shahkar/smsSend")) {
-          return Response.json({ status: "FAILED", error: { code: "NOT_FOUND", message: "missing" } }, { status: 404 });
-        }
-        if (href.includes("/facility/") && href.includes("/shahkar/smsSend")) {
-          return Response.json({ status: "DONE", trackId: "facility-send-track", result: { smsSent: true } });
-        }
-        if (href.includes("/shahkar/smsVerification")) {
-          return Response.json({ status: "FAILED", error: { code: "NOT_FOUND", message: "missing" } }, { status: 404 });
-        }
-        if (href.includes("/shahkar/smsVerify")) {
-          return Response.json({ status: "DONE", trackId: "legacy-verify-track", result: { isValid: false } });
-        }
-        return Response.json({ status: "FAILED" }, { status: 500 });
+        return Response.json(
+          { status: "FAILED", error: { code: "OTP_MISMATCH", message: "otp mismatch" } },
+          { status: 400 }
+        );
       })
     );
-
-    const sent = await sendShahkarSms(MOBILE, NID);
-    expect(sent).toEqual({ outcome: "otp_required", trackId: "facility-send-track" });
-    const verified = await verifyShahkarSms("998877", "facility-send-track", MOBILE, NID);
-    expect(verified).toEqual({ matched: false, trackId: "legacy-verify-track" });
-
-    const shahkar = urls.filter((href) => href.includes("/shahkar/"));
-    expect(shahkar).toEqual([
-      `https://api.finnotech.ir/kyc/v2/clients/geram/shahkar/smsSend?trackId=${SEND_TRACK}&mobile=${MOBILE}&nationalCode=${NID}`,
-      `https://api.finnotech.ir/facility/v2/clients/geram/shahkar/smsSend?trackId=${FALLBACK_TRACK}&mobile=${MOBILE}&nationalCode=${NID}&version=2`,
-      `https://api.finnotech.ir/kyc/v2/clients/geram/shahkar/smsVerification?trackId=${VERIFY_TRACK}&otp=998877&inquiryTrackId=facility-send-track&mobile=${MOBILE}&nationalCode=${NID}`,
-      `https://api.finnotech.ir/kyc/v2/clients/geram/shahkar/smsVerify?trackId=44444444-4444-4444-8444-444444444444&otp=998877&inquiryTrackId=facility-send-track&mobile=${MOBILE}&nationalCode=${NID}`,
+    await expect(verifyShahkarSms("123456", "track-send", MOBILE, NID, "kyc")).rejects.toMatchObject({
+      code: "OTP_MISMATCH",
+      httpStatus: 400,
+    });
+    expect(urls.filter((href) => href.includes("/shahkar/"))).toEqual([
+      `https://api.finnotech.ir/kyc/v2/clients/geram/shahkar/smsVerification?trackId=${VERIFY_TRACK}&otp=123456&inquiryTrackId=track-send&mobile=${MOBILE}&nationalCode=${NID}`,
     ]);
   });
 });
