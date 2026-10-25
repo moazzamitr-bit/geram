@@ -1,6 +1,5 @@
 import { createClient, hasSupabaseEnv } from "@/lib/supabase/client";
 import type {
-  DemoDelivery,
   DemoGoal,
   DemoNotification,
   DemoTransaction,
@@ -19,7 +18,6 @@ export type PlatformBundle = {
   bankAccounts: { id: string; iban: string; bank: string; verified: boolean }[];
   transactions: DemoTransaction[];
   goals: DemoGoal[];
-  deliveries: DemoDelivery[];
   notifications: DemoNotification[];
   tickets: SupportTicket[];
   scheduledPurchases: {
@@ -107,7 +105,6 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
     ledger,
     banks,
     goals,
-    deliveries,
     notifications,
     tickets,
     scheduled,
@@ -118,11 +115,6 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
     supabase.from("goals").select("*").eq("user_id", user.id).order("created_at", {
       ascending: false,
     }),
-    supabase
-      .from("delivery_requests")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false }),
     supabase
       .from("notifications")
       .select("*")
@@ -161,16 +153,6 @@ export async function loadPlatformBundle(): Promise<PlatformBundle | null> {
       currentRial: Number(g.current_toman),
       targetDate: g.target_date ?? "",
       monthlyRial: Number(g.monthly_toman),
-    })),
-    deliveries: (deliveries.data ?? []).map((d) => ({
-      id: d.id,
-      productId: d.product_id,
-      productName: d.product_name,
-      weightGrams: Number(d.weight_grams),
-      status: d.status,
-      method: d.method,
-      createdAt: new Date(d.created_at).toLocaleString("fa-IR"),
-      feeRial: Number(d.fee_toman),
     })),
     notifications: (notifications.data ?? []).map((n) => ({
       id: n.id,
@@ -297,24 +279,6 @@ export async function persistTicketReply(
     .eq("id", ticketId);
 }
 
-export async function persistDelivery(delivery: DemoDelivery) {
-  const auth = await authedClient();
-  if (!auth) return;
-  const row: Record<string, unknown> = {
-    user_id: auth.user.id,
-    product_id: delivery.productId,
-    product_name: delivery.productName,
-    weight_grams: delivery.weightGrams,
-    method: delivery.method,
-    fee_toman: delivery.feeRial,
-    status: delivery.status,
-  };
-  if (isUuid(delivery.id)) row.id = delivery.id;
-  const { error } = await auth.supabase.from("delivery_requests").upsert(row, {
-    onConflict: "id",
-  });
-  if (error) console.error("persistDelivery", error.message);
-}
 
 export async function persistBankAccount(input: {
   id: string;

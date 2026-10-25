@@ -155,6 +155,10 @@ export class PostgresCoreStore implements CoreStore {
     return sqlAls.getStore() != null;
   }
 
+  rawQuery(sql: string, params: unknown[] = []) {
+    return this.sql().query(sql, params);
+  }
+
   static async applySchema(sql: SqlSession) {
     await sql.exec(CORE_SCHEMA_SQL);
   }

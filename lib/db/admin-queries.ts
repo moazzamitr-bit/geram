@@ -111,17 +111,6 @@ export async function listTickets(limit = 50) {
   return data ?? [];
 }
 
-export async function listDeliveries(limit = 50) {
-  if (!isSupabaseConfigured()) return [];
-  const supabase = await getDb();
-  const { data } = await supabase
-    .from("delivery_requests")
-    .select("*, profiles(first_name,last_name,phone)")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return data ?? [];
-}
-
 export async function listGoals(limit = 50) {
   if (!isSupabaseConfigured()) return [];
   const supabase = await getDb();
