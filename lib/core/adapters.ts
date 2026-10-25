@@ -1,5 +1,5 @@
 import { assetToUiInstrument, type AssetCode } from "@/lib/core/assets";
-import { irrToSafeTomanNumber, ugToSafeMgNumber } from "@/lib/core/money";
+import { irrToSafeTomanNumber, mulDivFloor, UG_PER_GRAM, ugToSafeMgNumber } from "@/lib/core/money";
 import type { JournalEntry, Quote, Trade } from "@/lib/core/types";
 import type { WalletView } from "@/lib/core/engine";
 import type { InstrumentId } from "@/lib/market/instruments";
@@ -34,7 +34,18 @@ export function quoteToUiPreview(quote: Quote) {
   };
 }
 
-export function tradeToDemoTx(trade: Trade, quote?: Quote): UiTransaction {
+/** Locked execution toman/gram, or the settled metal leg when the quote is absent. */
+export function executedTomanPerGram(trade: Trade, quote?: Quote | null): number {
+  if (quote && quote.id === trade.quoteId && quote.executionPriceIrrPerGram > 0n) {
+    return irrToSafeTomanNumber(quote.executionPriceIrrPerGram);
+  }
+  if (trade.weightUg <= 0n) return 0;
+  const metalIrr = trade.side === "BUY" ? trade.netIrr : trade.grossIrr;
+  if (metalIrr <= 0n) return 0;
+  return irrToSafeTomanNumber(mulDivFloor(metalIrr, UG_PER_GRAM, trade.weightUg));
+}
+
+export function tradeToDemoTx(trade: Trade, quote?: Quote | null): UiTransaction {
   const instrument = assetToUiInstrument(trade.asset) as InstrumentId;
   const type = trade.side === "BUY" ? "خرید" : "فروش";
   const settled = trade.status === "SETTLED";
@@ -46,9 +57,7 @@ export function tradeToDemoTx(trade: Trade, quote?: Quote): UiTransaction {
     goldMg: ugToSafeMgNumber(trade.weightUg),
     amountRial: irrToSafeTomanNumber(trade.side === "BUY" ? trade.grossIrr : trade.netIrr),
     feeRial: irrToSafeTomanNumber(trade.feeIrr),
-    pricePerGram: quote
-      ? irrToSafeTomanNumber(quote.executionPriceIrrPerGram)
-      : 0,
+    pricePerGram: executedTomanPerGram(trade, quote),
     status: settled ? "تکمیل‌شده" : trade.status === "FAILED" ? "ناموفق" : "در حال پردازش",
     createdAt: new Intl.DateTimeFormat("fa-IR", {
       dateStyle: "short",
@@ -86,6 +95,7 @@ export function journalToUi(entry: JournalEntry, userId: string): UiTransaction 
   else if (metal && metal.debit > metal.credit) type = "فروش";
   const amountIrr = irr ? (irr.credit > 0n ? irr.credit : irr.debit) : 0n;
   const weightUg = metal ? (metal.credit > 0n ? metal.credit : metal.debit) : 0n;
+  const feeIrr = fee?.credit ?? 0n;
   const asset = metal && metal.asset !== "IRR" ? (metal.asset as AssetCode) : "GOLD";
   const label =
     type === "واریز"
@@ -100,8 +110,8 @@ export function journalToUi(entry: JournalEntry, userId: string): UiTransaction 
     instrument: assetToUiInstrument(asset),
     goldMg: ugToSafeMgNumber(weightUg),
     amountRial: irrToSafeTomanNumber(amountIrr),
-    feeRial: fee ? irrToSafeTomanNumber(fee.credit) : 0,
-    pricePerGram: 0,
+    feeRial: irrToSafeTomanNumber(feeIrr),
+    pricePerGram: journalTomanPerGram(type, amountIrr, feeIrr, weightUg),
     status: "تکمیل‌شده",
     createdAt: faStamp(entry.createdAt),
     timeline: [
@@ -165,7 +175,7 @@ export function serializeQuote(quote: Quote) {
   };
 }
 
-export function serializeTrade(trade: Trade) {
+export function serializeTrade(trade: Trade, quote?: Quote | null) {
   return {
     id: trade.id,
     userId: trade.userId,
@@ -180,8 +190,20 @@ export function serializeTrade(trade: Trade) {
     idempotencyKey: trade.idempotencyKey,
     createdAt: trade.createdAt,
     trackingCode: trade.trackingCode,
-    ui: tradeToDemoTx(trade),
+    ui: tradeToDemoTx(trade, quote),
   };
+}
+
+function journalTomanPerGram(
+  type: UiTransaction["type"],
+  amountIrr: bigint,
+  feeIrr: bigint,
+  weightUg: bigint
+): number {
+  if ((type !== "خرید" && type !== "فروش") || weightUg <= 0n) return 0;
+  const metalIrr = type === "خرید" ? amountIrr - feeIrr : amountIrr + feeIrr;
+  if (metalIrr <= 0n) return 0;
+  return irrToSafeTomanNumber(mulDivFloor(metalIrr, UG_PER_GRAM, weightUg));
 }
 
 export function serializeWallet(wallet: WalletView) {

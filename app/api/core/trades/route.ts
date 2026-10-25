@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       quoteId: body.quoteId,
       idempotencyKey: key,
     });
-    return Response.json({ ok: true, trade: serializeTrade(trade) });
+    return Response.json({ ok: true, trade: serializeTrade(trade, quote) });
   } catch (err) {
     return jsonError(err);
   }

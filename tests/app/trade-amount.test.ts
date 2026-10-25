@@ -5,6 +5,7 @@ import {
   gramsForTargetSellNet,
   parseAmount,
   quotePreview,
+  receiptUnitPrice,
   tomanForTargetBuyGrams,
 } from "@/lib/app/trade-amount";
 
@@ -52,6 +53,13 @@ describe("trade amount linking", () => {
     expect(preview.fee).toBe(direct.fee);
     expect(preview.net).toBe(direct.net);
     expect(preview.toman).toBe(direct.net);
+  });
+
+  it("shows the executed toman per gram on the receipt", () => {
+    expect(receiptUnitPrice(26_063_300, 0)).toBe(26_063_300);
+    expect(receiptUnitPrice(26_063_300, 1)).toBe(26_063_300);
+    expect(receiptUnitPrice(0, 26_063_300)).toBe(26_063_300);
+    expect(receiptUnitPrice(0, 0)).toBe(0);
   });
 
   it("solves grams for a target sell net", () => {
