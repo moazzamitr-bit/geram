@@ -99,6 +99,7 @@ export const adminNavCatalog: AdminNavGroup[] = [
       { label: "هشدار قیمت", href: "/admin/alerts", icon: Bell },
       { label: "معرفی دوستان", href: "/admin/referrals", icon: Gift },
       { label: "گرم پلاس", href: "/admin/plus", icon: Flag },
+      { label: "کارت هدیه", href: "/admin/gifts", icon: Gift },
       { label: "برداشت فیزیکی", href: "/admin/delivery", icon: Package },
     ],
   },

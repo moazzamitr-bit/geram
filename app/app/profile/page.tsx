@@ -13,6 +13,7 @@ import {
   Fingerprint,
   Gauge,
   Gift,
+  PiggyBank,
   Lock,
   MonitorSmartphone,
   Package,
@@ -23,6 +24,8 @@ import { useRouter } from "next/navigation";
 
 const links = [
   { href: "/app/referral", label: "معرفی دوستان", desc: "کد دعوت و سهم شما از کارمزد", icon: Gift },
+  { href: "/app/savings", label: "طرح پس‌انداز", desc: "خرید خودکار روزانه، هفتگی یا ماهانه", icon: PiggyBank },
+  { href: "/app/gift", label: "کارت هدیه", desc: "هدیه دادن و دریافت طلا، نقره و مس", icon: Gift },
   { href: "/app/delivery", label: "برداشت فیزیکی", desc: "تحویل حضوری سکه و شمش", icon: Package },
   { href: "/app/profile/kyc", label: "احراز هویت", desc: "سطح دسترسی و سقف‌ها", icon: Fingerprint },
   { href: "/app/profile/limits", label: "سقف تراکنش‌ها", desc: "خرید، فروش و برداشت امروز", icon: Gauge },
