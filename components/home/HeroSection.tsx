@@ -127,7 +127,7 @@ export function HeroSection() {
             ref={(el) => {
               copyRefs.current[0] = el;
             }}
-            className="font-[family-name:var(--font-vazirmatn)] text-[56px] font-extrabold leading-none tracking-tight text-gold-gradient md:text-[72px] xl:text-[84px]"
+            className="font-sans text-[56px] font-extrabold leading-none tracking-tight text-gold-gradient md:text-[72px] xl:text-[84px]"
           >
             گرم
           </p>

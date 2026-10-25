@@ -139,7 +139,7 @@ export function PriceChart({
           <XAxis
             dataKey="label"
             hide={!showAxis}
-            tick={{ fontSize: 10, fill: axisFill }}
+            tick={{ fontSize: 10, fill: axisFill, fontFamily: "Dana" }}
             tickLine={false}
             axisLine={false}
             interval="preserveStartEnd"
@@ -148,7 +148,7 @@ export function PriceChart({
             hide={!showAxis}
             orientation="left"
             width={showAxis ? 52 : 0}
-            tick={{ fontSize: 10, fill: axisFill }}
+            tick={{ fontSize: 10, fill: axisFill, fontFamily: "Dana" }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(value) =>

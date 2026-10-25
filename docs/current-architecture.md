@@ -11,7 +11,7 @@
 
 The repository currently contains a **single Next.js 15 marketing website** (public landing page only). There is **no authenticated product**, **no API**, **no database**, **no auth**, and **no monorepo**.
 
-The landing page is production-quality visually (RTL, Vazirmatn, gold/dark design system, GSAP marketing motion). The product platform described in the master build prompt must be **built around** this homepage, reusing its design language without overwriting it.
+The landing page is production-quality visually (RTL, Dana, gold/dark design system, GSAP marketing motion). The product platform described in the master build prompt must be **built around** this homepage, reusing its design language without overwriting it.
 
 ---
 
@@ -28,7 +28,7 @@ The landing page is production-quality visually (RTL, Vazirmatn, gold/dark desig
 | Motion (marketing) | `gsap` + ScrollTrigger (dynamic import) | Hero + AppShowcase |
 | Motion (utility) | `motion` package present | Partially prepared; homepage uses GSAP more |
 | Utils | `clsx` + `tailwind-merge` | `cn()` helper |
-| Font | Vazirmatn (Google Fonts via `next/font`) | Weights 300–800, `lang="fa"` `dir="rtl"` |
+| Font | Dana (DanaFaNum, `public/fonts`, `@font-face` in globals.css) | Weights 400, 700, `lang="fa"` `dir="rtl"` |
 | Package manager | npm | `package-lock.json` present |
 | Backend | **None** | No NestJS / Prisma / Redis |
 | Auth | **None** | |
@@ -57,7 +57,7 @@ Missing (needed for platform): `test`, `test:e2e`, `db:*`, `api:dev`, `admin:dev
 Geram/
 ├── app/
 │   ├── globals.css          # Design tokens + global utilities
-│   ├── layout.tsx           # Root RTL layout + Vazirmatn + metadata
+│   ├── layout.tsx           # Root RTL layout + Dana preload + metadata
 │   └── page.tsx             # Marketing homepage composition
 ├── components/
 │   ├── home/                # Landing sections
@@ -212,7 +212,7 @@ Homepage tokens stay untouched; app shell can consume extended tokens.
 
 ### Typography
 
-- Font: **Vazirmatn**
+- Font: **Dana** (DanaFaNum)
 - Marketing hero: ~42–68px / weight 800 / line-height ~1.45
 - Section titles: ~36–50px
 - Body: 15–17px
