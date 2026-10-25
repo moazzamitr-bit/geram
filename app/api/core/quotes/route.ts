@@ -76,6 +76,9 @@ export async function POST(request: Request) {
     });
     return Response.json({ ok: true, quote: serializeQuote(quote) });
   } catch (err) {
+    if (err instanceof CoreError) {
+      console.error("core_quote", err.code, err.httpStatus);
+    }
     return jsonError(err);
   }
 }
