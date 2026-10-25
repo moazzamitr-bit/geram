@@ -16,7 +16,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
-const CARD_ORDER: InstrumentId[] = ["copper", "silver925", "gold18"];
+const CARD_ORDER: InstrumentId[] = ["gold18", "silver925", "copper"];
 
 const DOT: Record<InstrumentId, string> = {
   gold18: "#FFB800",
