@@ -6,11 +6,12 @@ import { DeferredPriceChart } from "@/components/ui/DeferredPriceChart";
 import type { ChartRange } from "@/components/ui/PriceChart";
 import { useDemoStore } from "@/lib/app/demo-store";
 import { unrealizedPnl } from "@/lib/app/pnl";
-import { INSTRUMENTS, type InstrumentId } from "@/lib/market/instruments";
+import { type InstrumentId } from "@/lib/market/instruments";
 import { tradePathForInstrument } from "@/lib/market/trade-routes";
 import { cn, formatFaNumber, formatToman } from "@/lib/utils";
 import { VerificationBanner } from "@/components/app/VerificationBanner";
 import { useVerificationGate } from "@/components/app/VerificationGate";
+import { ChevronLeft, CreditCard, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -40,7 +41,6 @@ export default function DashboardPage() {
   const gate = useVerificationGate();
   const router = useRouter();
   const [range, setRange] = useState<ChartRange>("1m");
-  const [chartMetal, setChartMetal] = useState<InstrumentId>("gold18");
 
   const rows = useMemo(() => {
     return CARD_ORDER.map((id) => {
@@ -57,53 +57,106 @@ export default function DashboardPage() {
 
   const metalValue = rows.reduce((sum, row) => sum + row.marketValue, 0);
   const total = metalValue + store.rialAvailable;
+  const costBasis = rows.reduce((sum, row) => sum + row.costBasis, 0);
+  const totalPnl = rows.reduce((sum, row) => sum + (row.marketPrice > 0 ? row.pnl : 0), 0);
+  const totalPnlPct = costBasis > 0 ? (totalPnl / costBasis) * 100 : 0;
+  const totalProfit = totalPnl >= 0;
   const trades = store.transactions.filter((tx) => tx.type === "خرید" || tx.type === "فروش");
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <h1 className="text-[22px] font-extrabold text-text">خانه</h1>
+      <h1 className="sr-only">خانه</h1>
+
+      <section className="rounded-3xl border border-border bg-white p-5 shadow-[0_10px_30px_rgba(28,25,23,0.05)] md:p-6">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] lg:items-center">
+          <div className="text-center lg:text-right">
+            <p className="text-[13px] text-text-secondary">ارزش کل دارایی‌ها</p>
+            <p className="mt-2 text-[32px] font-extrabold leading-tight tabular-nums text-[#1C1917] md:text-[38px]">
+              {formatFaNumber(total)}
+              <span className="mr-1.5 text-[14px] font-semibold text-muted-app">تومان</span>
+            </p>
+            {costBasis > 0 && (
+              <p
+                className={cn(
+                  "mt-2 inline-flex items-center gap-1 rounded-full px-3 py-1 text-[13px] font-bold tabular-nums",
+                  totalProfit ? "bg-[#E7F6EC] text-[#1B9E4B]" : "bg-[#FDECEC] text-[#E5484D]"
+                )}
+              >
+                {totalProfit ? "سود" : "زیان"} {totalProfit ? "+" : "−"}
+                {formatFaNumber(Math.abs(totalPnl))} تومان
+                <span dir="ltr">
+                  ({totalProfit ? "+" : "−"}
+                  {Math.abs(totalPnlPct).toLocaleString("fa-IR", { maximumFractionDigits: 2 })}٪)
+                </span>
+              </p>
+            )}
+            <div className="mt-4 flex items-center justify-center gap-2 text-[13px] text-text-secondary lg:justify-start">
+              <Wallet size={16} className="text-[#1F9D55]" />
+              موجودی تومانی
+              <span className="font-bold tabular-nums text-[#1C1917]">{formatToman(store.rialAvailable)}</span>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[13px] font-bold text-[#1C1917]">قیمت طلای ۱۸ عیار</p>
+              <ChartRangeTabs value={range} onChange={setRange} />
+            </div>
+            <DeferredPriceChart
+              variant="market"
+              appearance="light"
+              stroke={STROKE.gold18}
+              instrument="gold18"
+              range={range}
+              height={170}
+              showExtremes
+              className="mt-3"
+            />
+          </div>
+        </div>
+      </section>
 
       <VerificationBanner />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-2xl border border-border bg-white p-4 shadow-[0_10px_30px_rgba(28,25,23,0.04)]">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[13px] text-text-secondary">موجودی تومانی شما</p>
-            <span className="h-2.5 w-2.5 rounded-full bg-[#1F9D55]" />
-          </div>
-          <p className="mt-3 text-[22px] font-extrabold tabular-nums text-text">
-            {formatFaNumber(store.rialAvailable)}
-            <span className="mr-1 text-[13px] font-semibold text-muted-app">تومان</span>
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => gate.guard() && router.push("/app/wallet")}
-              className="flex h-10 items-center justify-center rounded-xl border border-black/10 text-[13px] font-bold text-text"
-            >
-              برداشت
-            </button>
-            <button
-              type="button"
-              onClick={() => gate.guard() && router.push("/app/wallet")}
-              className="flex h-10 items-center justify-center rounded-xl bg-[#161616] text-[13px] font-bold text-white"
-            >
-              واریز
-            </button>
-          </div>
-        </article>
+      <button
+        type="button"
+        onClick={() => gate.guard() && router.push("/app/wallet")}
+        className="flex w-full items-center gap-3 rounded-2xl border border-border bg-white p-4 text-right shadow-[0_10px_30px_rgba(28,25,23,0.04)]"
+      >
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#FFF4D6] text-[#8A6526]">
+          <CreditCard size={22} />
+        </span>
+        <span className="flex-1">
+          <span className="block text-[15px] font-extrabold text-[#1C1917]">واریز</span>
+          <span className="mt-0.5 block text-[12px] leading-6 text-text-secondary">
+            موجودی تومانی خود را افزایش دهید و آماده سرمایه‌گذاری شوید
+          </span>
+        </span>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/10 text-[#1C1917]">
+          <ChevronLeft size={18} />
+        </span>
+      </button>
 
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {rows.map((row) => {
           const change = store.marketQuotes[row.id]?.changePercent ?? null;
           const up = (change ?? 0) >= 0;
+          const price = store.getMarketPrice(row.id);
           return (
-            <article
+            <Link
               key={row.id}
-              className="rounded-2xl border border-border bg-white p-4 shadow-[0_10px_30px_rgba(28,25,23,0.04)]"
+              href={tradePathForInstrument(row.id)}
+              className={cn(
+                "overflow-hidden rounded-2xl border border-border bg-white shadow-[0_10px_30px_rgba(28,25,23,0.04)]",
+                row.id === "copper" && "col-span-2 lg:col-span-1"
+              )}
             >
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[13px] font-medium text-text">{CARD_TITLE[row.id]}</p>
-                <span className="flex items-center gap-1.5">
+              <div className="p-4 pb-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="flex items-center gap-2 text-[13px] font-medium text-[#1C1917]">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: DOT[row.id] }} />
+                    {CARD_TITLE[row.id]}
+                  </p>
                   {change != null && (
                     <span
                       dir="ltr"
@@ -116,133 +169,78 @@ export default function DashboardPage() {
                       {change.toLocaleString("fa-IR", { maximumFractionDigits: 2 })}٪
                     </span>
                   )}
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: DOT[row.id] }} />
-                </span>
+                </div>
+                <p className="mt-2 text-[18px] font-extrabold tabular-nums text-[#1C1917]">
+                  {price > 0 ? (
+                    <>
+                      {formatFaNumber(price)}
+                      <span className="mr-1 text-[11px] font-semibold text-muted-app">تومان</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-app">—</span>
+                  )}
+                </p>
               </div>
-              <p className="mt-3 text-[20px] font-extrabold tabular-nums text-text">
-                {store.getMarketPrice(row.id) > 0 ? (
-                  <>
-                    {formatFaNumber(store.getMarketPrice(row.id))}
-                    <span className="mr-1 text-[12px] font-semibold text-muted-app">تومان</span>
-                  </>
-                ) : (
-                  <span className="text-muted-app">—</span>
-                )}
-              </p>
-              <HoldingPnl
-                grams={row.grams}
-                marketPrice={row.marketPrice}
-                avgBuyPrice={row.avgBuyPrice}
-                pnl={row.pnl}
-                pnlPct={row.pnlPct}
+              <DeferredPriceChart
+                variant="market"
+                appearance="light"
+                stroke={STROKE[row.id]}
+                instrument={row.id}
+                range="7d"
+                height={56}
               />
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <Link
-                  href={tradePathForInstrument(row.id, "sell")}
-                  className="flex h-10 items-center justify-center rounded-xl border border-black/10 text-[13px] font-bold text-text"
-                >
-                  فروش
-                </Link>
-                <Link
-                  href={tradePathForInstrument(row.id)}
-                  className="flex h-10 items-center justify-center rounded-xl bg-[#161616] text-[13px] font-bold text-white"
-                >
-                  خرید
-                </Link>
-              </div>
-            </article>
+            </Link>
           );
         })}
       </div>
 
-      <div
-        dir="ltr"
-        className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,340px)]"
-      >
-        <section
-          dir="rtl"
-          className="order-1 rounded-2xl border border-border bg-white p-4 shadow-[0_10px_30px_rgba(28,25,23,0.04)] md:p-5 lg:order-2"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-[16px] font-bold text-text">دارایی‌های من</h2>
-              <p className="mt-1 text-[12px] text-muted-app">مجموع دارایی‌ها</p>
-            </div>
-            <p className="text-[13px] font-bold tabular-nums text-text">{formatToman(total)}</p>
+    <section className="rounded-2xl border border-border bg-white p-4 shadow-[0_10px_30px_rgba(28,25,23,0.04)] md:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-[16px] font-bold text-text">دارایی‌های من</h2>
+            <p className="mt-1 text-[12px] text-muted-app">مجموع دارایی‌ها</p>
           </div>
-          <AllocationBar
-            parts={[
-              { color: "#1F9D55", value: store.rialAvailable },
-              ...rows.map((row) => ({ color: DOT[row.id], value: row.marketValue })),
-            ]}
-          />
-          <ul className="mt-4 space-y-3">
-            {rows.map((row) => {
-              const pct = total > 0 ? (row.marketValue / total) * 100 : 0;
-              return (
-                <li key={row.id} className="flex items-center justify-between gap-3 text-[13px]">
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-2 font-medium text-text">
-                      <span className="h-2 w-2 rounded-full" style={{ background: DOT[row.id] }} />
-                      {CARD_TITLE[row.id]}
-                    </p>
-                    <p className="mt-1 text-[12px] tabular-nums text-muted-app">
-                      {formatFaNumber(row.grams, { maximumFractionDigits: 3 })} گرم
-                    </p>
-                    <HoldingPnl
-                      grams={row.grams}
-                      marketPrice={row.marketPrice}
-                      avgBuyPrice={row.avgBuyPrice}
-                      pnl={row.pnl}
-                      pnlPct={row.pnlPct}
-                    />
-                  </div>
-                  <div className="text-left">
-                    <p className="tabular-nums text-text">{formatToman(row.marketValue)}</p>
-                    <p className="mt-1 text-[12px] tabular-nums text-muted-app">
-                      {pct.toLocaleString("fa-IR", { maximumFractionDigits: 0 })}٪
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+          <p className="text-[13px] font-bold tabular-nums text-text">{formatToman(total)}</p>
+        </div>
+        <AllocationBar
+          parts={[
+            { color: "#1F9D55", value: store.rialAvailable },
+            ...rows.map((row) => ({ color: DOT[row.id], value: row.marketValue })),
+          ]}
+        />
+        <ul className="mt-4 space-y-3">
+          {rows.map((row) => {
+            const pct = total > 0 ? (row.marketValue / total) * 100 : 0;
+            return (
+              <li key={row.id} className="flex items-center justify-between gap-3 text-[13px]">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 font-medium text-text">
+                    <span className="h-2 w-2 rounded-full" style={{ background: DOT[row.id] }} />
+                    {CARD_TITLE[row.id]}
+                  </p>
+                  <p className="mt-1 text-[12px] tabular-nums text-muted-app">
+                    {formatFaNumber(row.grams, { maximumFractionDigits: 3 })} گرم
+                  </p>
+                  <HoldingPnl
+                    grams={row.grams}
+                    marketPrice={row.marketPrice}
+                    avgBuyPrice={row.avgBuyPrice}
+                    pnl={row.pnl}
+                    pnlPct={row.pnlPct}
+                  />
+                </div>
+                <div className="text-left">
+                  <p className="tabular-nums text-text">{formatToman(row.marketValue)}</p>
+                  <p className="mt-1 text-[12px] tabular-nums text-muted-app">
+                    {pct.toLocaleString("fa-IR", { maximumFractionDigits: 0 })}٪
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
-        <section
-          dir="rtl"
-          className="order-2 rounded-2xl border border-border bg-white p-4 shadow-[0_10px_30px_rgba(28,25,23,0.04)] md:p-5 lg:order-1"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <label className="text-[14px] font-bold text-text">
-              <span className="sr-only">فلز نمودار</span>
-              <select
-                value={chartMetal}
-                onChange={(event) => setChartMetal(event.target.value as InstrumentId)}
-                className="bg-transparent font-bold outline-none"
-              >
-                {(Object.keys(INSTRUMENTS) as InstrumentId[]).map((id) => (
-                  <option key={id} value={id}>
-                    نمودار {CARD_TITLE[id]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <ChartRangeTabs value={range} onChange={setRange} />
-          </div>
-          <div className="mt-3">
-            <DeferredPriceChart
-              variant="market"
-              appearance="light"
-              showAxis
-              stroke={STROKE[chartMetal]}
-              instrument={chartMetal}
-              range={range}
-              height={260}
-            />
-          </div>
-        </section>
-      </div>
 
       <section className="rounded-2xl border border-border bg-white shadow-[0_10px_30px_rgba(28,25,23,0.04)]">
         <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-4">
