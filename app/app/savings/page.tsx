@@ -30,6 +30,8 @@ type Run = {
   amountIrr: string | null;
   weightUg: string | null;
   error: string | null;
+  asset: Plan["asset"] | null;
+  cadence: Cadence | null;
 };
 type Overview = { plans: Plan[]; runs: Run[]; limits: { minToman: number; maxToman: number; maxActive: number } };
 
@@ -215,12 +217,11 @@ export default function SavingsPage() {
           <h3 className="text-[15px] font-bold text-text">سابقه خریدها</h3>
           <ul className="mt-3 divide-y divide-black/5">
             {data.runs.map((r) => {
-              const plan = data.plans.find((p) => p.id === r.planId);
               return (
                 <li key={r.id} className="flex items-center justify-between py-3 text-[13px]">
                   <div>
                     <p className="text-text">
-                      {plan ? `${METAL_LABEL[plan.asset]} ${CAD_LABEL[plan.cadence]}` : "طرح لغوشده"}
+                      {r.asset && r.cadence ? `${METAL_LABEL[r.asset]} ${CAD_LABEL[r.cadence]}` : "طرح پس‌انداز"}
                     </p>
                     <p className="text-[12px] text-muted-app">{faDate(r.runFor, true)}</p>
                   </div>
