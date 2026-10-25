@@ -12,6 +12,8 @@ import {
   Target,
   Wallet,
   type LucideIcon,
+  Gift,
+  PiggyBank,
 } from "lucide-react";
 
 type AppNavLink = {
@@ -66,6 +68,8 @@ export const desktopNavSections: AppNavSection[] = [
     items: [
       { label: "بازار", href: "/app/market", icon: LineChart },
       { label: "اهداف", href: "/app/goals", icon: Target },
+      { label: "طرح پس‌انداز", href: "/app/savings", icon: PiggyBank },
+      { label: "کارت هدیه", href: "/app/gift", icon: Gift },
       { label: "برداشت فیزیکی", href: "/app/delivery", icon: Package },
       { label: "پشتیبانی", href: "/app/support", icon: Headphones },
       {

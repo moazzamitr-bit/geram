@@ -1,12 +1,14 @@
 import { getFeatureFlags } from "@/lib/core/mode";
 import { buyFromLedger } from "@/lib/commerce/ledger-buy";
 import { runSavingsCron, type SavingsCronSummary } from "@/lib/savings/service";
+import { expireGiftCards } from "@/lib/gift/service";
 import { ledgerCoversToman, parseLedgerBalance } from "@/lib/ledger/display";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { getLiveGold18Price } from "@/lib/market/price-provider";
 
 export type CronRunSummary = {
   savings: SavingsCronSummary;
+  gifts: { due: number; expired: number };
   alerts: { checked: number; triggered: number; orders: number };
 };
 
@@ -172,6 +174,7 @@ export async function runAlertsCron(): Promise<
 
 export async function runRevenueCrons(): Promise<CronRunSummary> {
   const savings = await runSavingsCron();
+  const gifts = await expireGiftCards();
   const { alerts } = await runAlertsCron();
-  return { savings, alerts };
+  return { savings, gifts, alerts };
 }
