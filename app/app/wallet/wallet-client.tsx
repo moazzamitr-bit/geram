@@ -8,13 +8,14 @@ import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { AmountField } from "@/components/ui/AmountField";
 import { withdrawFee } from "@/lib/commerce/fees";
-import { isKycVerified, KYC_REQUIRED_MESSAGE } from "@/lib/commerce/kyc";
+import { useVerificationGate } from "@/components/app/VerificationGate";
 import { useDemoStore } from "@/lib/app/demo-store";
 import { formatToman } from "@/lib/utils";
 import { useState } from "react";
 
 export function WalletClient() {
   const store = useDemoStore();
+  const gate = useVerificationGate();
   const [withdrawAmount, setWithdrawAmount] = useState(0);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -55,6 +56,18 @@ export function WalletClient() {
           <p className="mt-3 text-[13px] leading-7 text-muted-app">
             واریز شخصی در این نسخه خاموش است. موجودی کیف پول را ادمین از دفترکل شارژ می‌کند. درگاه بانکی فعال نیست.
           </p>
+          <GoldButton
+            type="button"
+            variant="black"
+            className="mt-4 w-full"
+            onClick={() => {
+              if (!gate.guard()) return;
+              setErr("");
+              setMsg("درگاه واریز هنوز فعال نیست. موجودی را پشتیبانی شارژ می‌کند.");
+            }}
+          >
+            واریز
+          </GoldButton>
         </AppCard>
 
         <AppCard>
@@ -70,14 +83,12 @@ export function WalletClient() {
             کارمزد برداشت: {formatToman(wFee)}
             {store.plusActive ? " (گرم پلاس: رایگان)" : ""}
           </p>
-          {!isKycVerified(store.kycStatus) && (
-            <p className="mt-2 text-[12px] text-warning">{KYC_REQUIRED_MESSAGE}</p>
-          )}
           <GoldButton
             type="button"
             variant="secondary"
             className="mt-4 w-full"
             onClick={() => {
+              if (!gate.guard()) return;
               void (async () => {
                 const bankId = store.bankAccounts[0]?.id;
                 if (!bankId) {

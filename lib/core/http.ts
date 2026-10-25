@@ -38,7 +38,7 @@ export async function requireCoreUserId(): Promise<string> {
 export function jsonError(err: unknown) {
   if (err instanceof CoreError) {
     return Response.json(
-      { ok: false, error: err.code, message: err.message },
+      { ok: false, error: err.code, message: err.message, ...(err.details ?? {}) },
       { status: err.httpStatus }
     );
   }

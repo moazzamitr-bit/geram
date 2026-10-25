@@ -47,7 +47,7 @@ select 'migration 1021 fees:        ' || coalesce((select (value->>'buyFeeMinTom
 select 'migration 1021 otp:         ' || (to_regclass('public.auth_otp_codes') is not null);
 select 'migration 1024 finnotech kyc:' || exists(select 1 from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='kyc_verified_at');
 select 'migration 1024 legacy drop: ' || (to_regclass('public.wallets') is null and to_regclass('public.transactions') is null);
-select 'migration 1024 kyc level:   ' || exists(select 1 from information_schema.columns where table_schema='public' and table_name='profiles' and column_name='kyc_level');
+select 'migration 1025 bank cards:  ' || (to_regclass('public.user_bank_cards') is not null);
 select 'wallets:                    ' || case when to_regclass('public.wallets') is null then 'DROPPED' else 'STILL PRESENT' end;
 select 'transactions:               ' || case when to_regclass('public.transactions') is null then 'DROPPED' else 'STILL PRESENT' end;
 select 'core_sandbox_deposits:      ' || case when to_regclass('public.core_sandbox_deposits') is null then 'DROPPED' else 'STILL PRESENT' end;

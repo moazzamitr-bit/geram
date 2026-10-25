@@ -6,6 +6,8 @@ export function tradeFailureMessage(raw: string | undefined, fallback: string): 
   const text = (raw ?? "").trim();
   if (!text) return fallback;
   const lower = text.toLowerCase();
+  // Keep the code: TradeDesk opens the verification modal on it.
+  if (lower.startsWith("verification_required")) return text;
   if (lower.includes("insufficient_funds") || text.includes("موجودی کیف پول")) {
     return "موجودی کیف پول کافی نیست.";
   }

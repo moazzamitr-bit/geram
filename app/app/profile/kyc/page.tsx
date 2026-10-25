@@ -2,31 +2,22 @@
 
 import { AppCard } from "@/components/app/AppCard";
 import { PageHeader } from "@/components/app/PageHeader";
-import { StatusBadge } from "@/components/app/StatusBadge";
+import { useVerificationGate, VERIFICATION_STEPS } from "@/components/app/VerificationGate";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { JalaliBirthDateField } from "@/components/kyc/JalaliBirthDateField";
-import { formatMaskedPhone, useAuth, type KycStatus } from "@/lib/auth/auth-context";
+import { formatMaskedPhone, useAuth } from "@/lib/auth/auth-context";
+import { bankForCard, cardDigits, formatCardGroups, isLuhnValid } from "@/lib/kyc/card";
 import { isValidIranianNationalCode, normalizeJalaliBirthDate } from "@/lib/kyc/national-id";
 import { isAtLeast18Jalali } from "@/lib/kyc/age";
-import { KYC_LEVEL_CAPS, KYC_LEVEL_TITLES, type KycLevel } from "@/lib/kyc/levels";
 import { KYC_MESSAGES, kycOtpUiError, type KycErrorCode } from "@/lib/kyc/messages";
-import { formatToman } from "@/lib/utils";
-import { FormEvent, useEffect, useState } from "react";
+import { Check, CreditCard } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 
 const fieldClass =
   "h-12 w-full rounded-xl border border-black/10 bg-[#F6F4F1] px-4 text-[15px] text-text outline-none transition focus:border-[#FFB800] focus:bg-white";
 
-const steps: { level: KycLevel; desc: string }[] = [
-  { level: 0, desc: "شماره همین حساب با کد پیامکی تأیید شده است." },
-  {
-    level: 1,
-    desc: "کد ملی و تاریخ تولد با شاهکار و ثبت احوال تطبیق می‌شود. سقف معامله سطح هویت باز می‌شود.",
-  },
-  {
-    level: 2,
-    desc: "کارت یا شبای به نام خودتان برای برداشت لازم است. سقف بالاتر با این سطح باز می‌شود.",
-  },
-];
+type SavedCard = { id: string; panMasked: string; bankName: string };
 
 function messageFor(code: string | undefined, fallback?: string) {
   if (fallback) return fallback;
@@ -34,93 +25,99 @@ function messageFor(code: string | undefined, fallback?: string) {
   return "احراز هویت انجام نشد. دوباره تلاش کنید.";
 }
 
-export default function KycPage() {
+/** Only in-app paths, so ?return= cannot send the user off-site. */
+function safeReturn(raw: string | null) {
+  if (!raw || !raw.startsWith("/app/") || raw.startsWith("//")) return null;
+  return raw;
+}
+
+function Stepper({ active, done }: { active: number; done: boolean[] }) {
+  return (
+    <ol className="flex items-start justify-between gap-2" aria-label="مراحل احراز هویت">
+      {VERIFICATION_STEPS.map((step, index) => {
+        const finished = done[index];
+        const current = index === active;
+        return (
+          <li key={step.key} className="flex flex-1 flex-col items-center text-center">
+            <span
+              className={`flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-bold transition ${
+                finished
+                  ? "bg-[#1F9D55] text-white"
+                  : current
+                    ? "bg-[#161616] text-white ring-4 ring-[#FFB800]/30"
+                    : "border border-black/15 bg-white text-muted-app"
+              }`}
+              aria-current={current ? "step" : undefined}
+            >
+              {finished ? <Check size={18} /> : index + 1}
+            </span>
+            <span className={`mt-2 text-[12px] ${current ? "font-bold text-text" : "text-muted-app"}`}>{step.title}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function KycFlow() {
   const { user, applyKycResult } = useAuth();
-  const status = user?.kycStatus ?? "UNVERIFIED";
+  const gate = useVerificationGate();
+  const router = useRouter();
+  const returnTo = safeReturn(useSearchParams().get("return"));
+  const identity = gate.state?.identity ?? user?.kycStatus === "VERIFIED";
+  const hasCard = gate.state?.card ?? false;
+  const active = !identity ? 1 : !hasCard ? 2 : 3;
+
   const [nationalCode, setNationalCode] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [otp, setOtp] = useState("");
-  const [step, setStep] = useState<"form" | "otp">("form");
+  const [otpStep, setOtpStep] = useState(false);
   const [card, setCard] = useState("");
-  const [iban, setIban] = useState("");
+  const [cards, setCards] = useState<SavedCard[]>([]);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
-  const [level, setLevel] = useState<KycLevel>(status === "VERIFIED" ? 1 : 0);
 
   useEffect(() => {
-    if (status === "VERIFIED") {
-      setLevel((current) => (current < 1 ? 1 : current));
-    }
-  }, [status]);
-  const [bankMask, setBankMask] = useState<string | null>(null);
-
-  useEffect(() => {
-    void fetch("/api/kyc/status", { cache: "no-store" })
+    if (!identity) return;
+    void fetch("/api/kyc/bank", { cache: "no-store" })
       .then((res) => res.json())
-      .then((data: { ok?: boolean; level?: KycLevel; bankMask?: string | null; firstName?: string; lastName?: string; status?: KycStatus }) => {
-        if (!data.ok || data.level == null) return;
-        setLevel(data.level);
-        setBankMask(data.bankMask ?? null);
-        if (data.status === "VERIFIED") {
-          applyKycResult({
-            kycStatus: "VERIFIED",
-            firstName: data.firstName,
-            lastName: data.lastName,
-          });
-        }
-      })
+      .then((data: { ok?: boolean; cards?: SavedCard[] }) => data.ok && setCards(data.cards ?? []))
       .catch(() => undefined);
-  }, [applyKycResult]);
+  }, [identity, hasCard]);
+
+  // Finished: go back to where the gate stopped the user.
+  useEffect(() => {
+    if (active !== 3 || !returnTo) return;
+    const timer = setTimeout(() => router.replace(returnTo), 1200);
+    return () => clearTimeout(timer);
+  }, [active, returnTo, router]);
+
+  const post = async (url: string, body: unknown) => {
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = (await res.json().catch(() => ({}))) as Record<string, string | boolean | undefined> & { card?: SavedCard };
+    return { res, data };
+  };
 
   const onStart = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
     setInfo("");
-    if (!isValidIranianNationalCode(nationalCode)) {
-      setError(KYC_MESSAGES.invalid_national_code);
-      return;
-    }
+    if (!isValidIranianNationalCode(nationalCode)) return setError(KYC_MESSAGES.invalid_national_code);
     const birth = normalizeJalaliBirthDate(birthDate);
-    if (!birth) {
-      setError("تاریخ تولد را از فهرست روز، ماه و سال انتخاب کنید.");
-      return;
-    }
-    if (!isAtLeast18Jalali(birth)) {
-      setError(KYC_MESSAGES.underage);
-      return;
-    }
+    if (!birth) return setError("روز، ماه و سال تولد را انتخاب کنید.");
+    if (!isAtLeast18Jalali(birth)) return setError(KYC_MESSAGES.underage);
     setLoading(true);
     try {
-      const res = await fetch("/api/kyc/shahkar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nationalCode, birthDate: birth }),
-      });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        step?: string;
-        error?: string;
-        message?: string;
-        firstName?: string;
-        lastName?: string;
-      };
-      if (!res.ok || !data.ok) {
-        setError(messageFor(data.error, data.message));
-        return;
-      }
+      const { res, data } = await post("/api/kyc/shahkar", { nationalCode, birthDate: birth });
+      if (!res.ok || !data.ok) return setError(messageFor(data.error as string, data.message as string));
       if (data.step === "verified") {
-        applyKycResult({
-          kycStatus: "VERIFIED",
-          firstName: data.firstName,
-          lastName: data.lastName,
-        });
-        setInfo("هویت شما تأیید شد.");
-        setStep("form");
+        applyKycResult({ kycStatus: "VERIFIED", firstName: data.firstName as string, lastName: data.lastName as string });
+        await gate.refresh();
         return;
       }
-      setStep("otp");
-      setInfo("اگر کد ملی با شماره موبایل این حساب یکی باشد، رمز شاهکار پیامک می‌شود.");
+      setOtpStep(true);
+      setInfo("کد تأیید پیامک شد.");
     } catch {
       setError(KYC_MESSAGES.unavailable);
     } finally {
@@ -133,30 +130,13 @@ export default function KycPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("/api/kyc/shahkar/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ otp }),
-      });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        message?: string;
-        firstName?: string;
-        lastName?: string;
-      };
-      if (!res.ok || !data.ok) {
-        setError(kycOtpUiError(res.status, data));
-        return;
-      }
-      applyKycResult({
-        kycStatus: "VERIFIED",
-        firstName: data.firstName,
-        lastName: data.lastName,
-      });
-      setStep("form");
+      const { res, data } = await post("/api/kyc/shahkar/verify", { otp });
+      if (!res.ok || !data.ok) return setError(kycOtpUiError(res.status, data as { error?: string; message?: string }));
+      applyKycResult({ kycStatus: "VERIFIED", firstName: data.firstName as string, lastName: data.lastName as string });
       setOtp("");
-      setInfo("هویت شما تأیید شد.");
+      setOtpStep(false);
+      setInfo("");
+      await gate.refresh();
     } catch {
       setError(KYC_MESSAGES.unavailable);
     } finally {
@@ -164,37 +144,59 @@ export default function KycPage() {
     }
   };
 
+  const digits = cardDigits(card);
+  const bank = bankForCard(digits);
+  const cardComplete = digits.length === 16;
+  const cardValid = cardComplete && isLuhnValid(digits);
+
+  const onCard = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    if (!cardValid) return setError(KYC_MESSAGES.invalid_card);
+    setLoading(true);
+    try {
+      const { res, data } = await post("/api/kyc/bank", { card: digits });
+      if (!res.ok || !data.ok) return setError(messageFor(data.error as string, data.message as string));
+      setCard("");
+      setInfo(`${data.card?.bankName ?? "کارت"} به نام شما ثبت شد.`);
+      await gate.refresh();
+    } catch {
+      setError(KYC_MESSAGES.unavailable);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const errorLine = error ? (
+    <p className="rounded-xl bg-[#FDECEC] px-3 py-2 text-[13px] leading-6 text-negative" role="alert">
+      {error}
+    </p>
+  ) : null;
+
   return (
     <div className="mx-auto max-w-xl space-y-5">
-      <PageHeader
-        title="احراز هویت"
-        description="مثل وال‌گلد و گرمی: اول موبایل، بعد کد ملی و تاریخ تولد، و برای برداشت کارت یا شبای به نام خودتان."
-        backHref="/app/profile"
-      />
+      <PageHeader title="احراز هویت" backHref={returnTo ?? "/app/profile"} />
 
       <AppCard>
-        <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-bold">سطح فعلی: {KYC_LEVEL_TITLES[level]}</h2>
-          <StatusBadge status={status} />
-        </div>
-        <p className="mt-4 text-[13px] leading-7 text-muted-app">
-          {status === "VERIFIED"
-            ? `هویت تأیید شده است${user?.firstName ? `: ${user.firstName} ${user.lastName}` : ""}.`
-            : status === "REJECTED"
-              ? "این کد ملی تأیید نشد. اگر اطلاعات را اشتباه وارد کرده‌اید با پشتیبانی تماس بگیرید."
-              : `تطبیق با شماره ${user?.phone ? formatMaskedPhone(user.phone) : "همین حساب"} انجام می‌شود. سیم‌کارت باید به نام همین کد ملی باشد.`}
-        </p>
+        <Stepper active={Math.min(active, 2)} done={[true, identity, identity && hasCard]} />
       </AppCard>
 
-      {status !== "VERIFIED" && step === "form" && (
+      {active === 1 && !otpStep && (
         <AppCard>
           <form className="space-y-4" onSubmit={onStart}>
+            <div>
+              <h2 className="text-[16px] font-extrabold">اطلاعات هویتی</h2>
+              <p className="mt-1 text-[12px] leading-6 text-muted-app">
+                سیم‌کارت {user?.phone ? formatMaskedPhone(user.phone) : "این حساب"} باید به نام همین کد ملی باشد.
+              </p>
+            </div>
             <label className="block">
               <span className="mb-2 block text-[13px] text-text-secondary">کد ملی</span>
               <input
                 dir="ltr"
                 inputMode="numeric"
                 autoComplete="off"
+                maxLength={10}
                 className={fieldClass}
                 value={nationalCode}
                 onChange={(event) => setNationalCode(event.target.value)}
@@ -202,150 +204,128 @@ export default function KycPage() {
               />
             </label>
             <JalaliBirthDateField value={birthDate} onChange={setBirthDate} />
-            {error && <p className="text-[13px] text-negative" role="alert">{error}</p>}
-            {info && <p className="text-[13px] text-text-secondary">{info}</p>}
-            <GoldButton type="submit" className="w-full" disabled={loading}>
-              {loading ? "در حال استعلام…" : "تطبیق با شاهکار"}
+            {errorLine}
+            <GoldButton type="submit" variant="black" className="w-full" disabled={loading}>
+              {loading ? "در حال استعلام…" : "ادامه"}
             </GoldButton>
           </form>
         </AppCard>
       )}
 
-      {status !== "VERIFIED" && step === "otp" && (
+      {active === 1 && otpStep && (
         <AppCard>
           <form className="space-y-4" onSubmit={onVerify}>
-            <p className="text-[13px] leading-7 text-muted-app">
-              رمز پیامک‌شده برای {user?.phone ? formatMaskedPhone(user.phone) : "شماره حساب"} را وارد کنید.
-            </p>
+            <div>
+              <h2 className="text-[16px] font-extrabold">کد پیامک</h2>
+              <p className="mt-1 text-[12px] leading-6 text-muted-app">{info || "کد ارسال‌شده را وارد کنید."}</p>
+            </div>
             <input
               dir="ltr"
               inputMode="numeric"
               autoComplete="one-time-code"
-              className={fieldClass}
+              autoFocus
+              className={`${fieldClass} text-center tracking-[0.4em]`}
               value={otp}
               onChange={(event) => setOtp(event.target.value)}
-              placeholder="رمز پیامک"
+              placeholder="------"
             />
-            {error && <p className="text-[13px] text-negative" role="alert">{error}</p>}
-            {info && <p className="text-[13px] text-text-secondary">{info}</p>}
-            <GoldButton type="submit" className="w-full" disabled={loading}>
-              {loading ? "در حال بررسی…" : "تأیید رمز و استعلام نام"}
+            {errorLine}
+            <GoldButton type="submit" variant="black" className="w-full" disabled={loading || otp.length < 4}>
+              {loading ? "در حال بررسی…" : "تأیید"}
             </GoldButton>
-            <button
-              type="button"
-              className="w-full text-[13px] text-muted-app"
-              onClick={() => {
-                setStep("form");
-                setError("");
-              }}
-            >
+            <button type="button" className="w-full text-[13px] text-muted-app" onClick={() => { setOtpStep(false); setError(""); }}>
               اصلاح کد ملی یا تاریخ تولد
             </button>
           </form>
         </AppCard>
       )}
 
-      {status === "VERIFIED" && level < 2 && (
+      {active === 2 && (
         <AppCard>
-          <form
-            className="space-y-4"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              setError("");
-              setInfo("");
-              setLoading(true);
-              try {
-                const res = await fetch("/api/kyc/bank", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ card, iban }),
-                });
-                const data = (await res.json()) as { ok?: boolean; error?: string; message?: string; mask?: string };
-                if (!res.ok || !data.ok) {
-                  setError(messageFor(data.error, data.message));
-                  return;
-                }
-                setLevel(2);
-                setBankMask(data.mask ?? null);
-                setInfo("حساب بانکی با کد ملی شما یکی است. سقف برداشت این سطح باز شد.");
-              } catch {
-                setError(KYC_MESSAGES.unavailable);
-              } finally {
-                setLoading(false);
-              }
-            }}
-          >
-            <h2 className="text-[15px] font-bold">کارت یا شبا برای برداشت</h2>
-            <p className="text-[13px] leading-7 text-muted-app">
-              شماره کارت و کد ملی باید مال یک نفر باشند. شماره کامل کارت ذخیره نمی‌شود.
-            </p>
-            <label className="block">
-              <span className="mb-2 block text-[13px] text-text-secondary">شماره کارت</span>
-              <input
-                dir="ltr"
-                inputMode="numeric"
-                autoComplete="off"
-                className={fieldClass}
-                value={card}
-                onChange={(event) => setCard(event.target.value)}
-                placeholder="۱۶ رقم"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-[13px] text-text-secondary">یا شماره شبا</span>
-              <input
-                dir="ltr"
-                autoComplete="off"
-                className={fieldClass}
-                value={iban}
-                onChange={(event) => setIban(event.target.value)}
-                placeholder="IR..."
-              />
-            </label>
-            {error && <p className="text-[13px] text-negative" role="alert">{error}</p>}
-            {info && <p className="text-[13px] text-text-secondary">{info}</p>}
-            <GoldButton type="submit" className="w-full" disabled={loading}>
-              {loading ? "در حال تطبیق…" : "تطبیق مالکیت حساب"}
+          <form className="space-y-4" onSubmit={onCard}>
+            <div>
+              <h2 className="text-[16px] font-extrabold">کارت بانکی</h2>
+              <p className="mt-1 text-[12px] leading-6 text-muted-app">
+                کارتی به نام خودتان. واریز و برداشت فقط با همین کارت انجام می‌شود.
+              </p>
+            </div>
+            <div
+              className="relative overflow-hidden rounded-2xl p-4 text-white shadow-[0_12px_30px_rgba(28,25,23,0.18)]"
+              style={{ background: bank ? `linear-gradient(135deg, ${bank.color}, #161616)` : "linear-gradient(135deg, #3A3A3A, #161616)" }}
+              data-testid="card-preview"
+            >
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-[13px] font-bold">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-[12px]" aria-hidden>
+                    {bank ? bank.name.replace(/^(بانک|مؤسسه)\s*/, "").slice(0, 1) : <CreditCard size={16} />}
+                  </span>
+                  {bank?.name ?? "بانک"}
+                </span>
+                <CreditCard size={20} className="opacity-70" />
+              </div>
+              <p className="mt-6 text-center font-mono text-[19px] tracking-[0.12em]" dir="ltr">
+                {digits.padEnd(16, "•").replace(/(.{4})(?=.)/g, "$1 ")}
+              </p>
+            </div>
+            <input
+              dir="ltr"
+              inputMode="numeric"
+              autoComplete="cc-number"
+              aria-label="شماره کارت"
+              className={`${fieldClass} text-center font-mono tracking-[0.08em]`}
+              value={formatCardGroups(card)}
+              onChange={(event) => {
+                setError("");
+                setCard(cardDigits(event.target.value));
+              }}
+              placeholder="---- ---- ---- ----"
+            />
+            {cardComplete && !cardValid ? (
+              <p className="text-[12px] text-negative">{KYC_MESSAGES.invalid_card}</p>
+            ) : null}
+            {errorLine}
+            <GoldButton type="submit" variant="black" className="w-full" disabled={loading || !cardValid}>
+              {loading ? "در حال استعلام از بانک…" : "ثبت کارت"}
             </GoldButton>
           </form>
         </AppCard>
       )}
 
-      {level >= 2 && (
+      {active === 3 && (
         <AppCard>
-          <h2 className="text-[15px] font-bold">حساب بانکی تأیید شد</h2>
-          <p className="mt-3 text-[13px] leading-7 text-muted-app">{bankMask || "مالکیت کارت یا شبا ثبت شده است."}</p>
+          <div className="text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#E7F6EE] text-[#1F9D55]">
+              <Check size={28} />
+            </div>
+            <h2 className="mt-3 text-[17px] font-extrabold">احراز هویت کامل شد</h2>
+            <p className="mt-1 text-[13px] text-muted-app">
+              {returnTo ? "در حال بازگشت…" : "خرید، فروش، واریز و برداشت باز است."}
+            </p>
+          </div>
         </AppCard>
       )}
 
-      <AppCard>
-        <h2 className="text-[15px] font-bold">مراحل احراز</h2>
-        <ol className="mt-4 space-y-3">
-          {steps.map((stepItem, index) => {
-            const current = level === stepItem.level;
-            const finished = stepItem.level < level;
-            return (
-              <li
-                key={stepItem.level}
-                className={`rounded-xl border px-3 py-3 ${
-                  current ? "border-gold/35 bg-gold/5" : "border-black/[0.06]"
-                }`}
-              >
-                <p className="text-[13px] font-medium text-text">
-                  {index + 1}. {KYC_LEVEL_TITLES[stepItem.level]}
-                  {finished ? " — انجام شد" : current ? " — مرحله فعلی" : ""}
-                </p>
-                <p className="mt-1 text-[12px] leading-6 text-muted-app">{stepItem.desc}</p>
-                <p className="mt-2 text-[12px] text-text-secondary">
-                  خرید روزانه: {KYC_LEVEL_CAPS[stepItem.level].dailyBuyToman > 0 ? formatToman(KYC_LEVEL_CAPS[stepItem.level].dailyBuyToman) : "بعد از سطح هویت"}
-                  {" · "}
-                  برداشت: {KYC_LEVEL_CAPS[stepItem.level].dailyWithdrawToman > 0 ? formatToman(KYC_LEVEL_CAPS[stepItem.level].dailyWithdrawToman) : "بعد از تطبیق حساب"}
-                </p>
+      {cards.length > 0 && (
+        <AppCard>
+          <h2 className="text-[14px] font-bold">کارت‌های شما</h2>
+          <ul className="mt-3 space-y-2">
+            {cards.map((c) => (
+              <li key={c.id} className="flex items-center justify-between rounded-xl bg-[#F6F4F1] px-3 py-2 text-[13px]">
+                <span>{c.bankName}</span>
+                <span dir="ltr" className="font-mono">{c.panMasked}</span>
               </li>
-            );
-          })}
-        </ol>
-      </AppCard>
+            ))}
+          </ul>
+        </AppCard>
+      )}
     </div>
+  );
+}
+
+export default function KycPage() {
+  return (
+    <Suspense>
+      <KycFlow />
+    </Suspense>
   );
 }

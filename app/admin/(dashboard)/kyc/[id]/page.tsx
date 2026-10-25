@@ -4,7 +4,8 @@ import {
   AdminPageHeader,
 } from "@/components/admin/AdminUI";
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
-import { getProfile } from "@/lib/admin/queries";
+import { getProfile, getUserCards } from "@/lib/admin/queries";
+import { verificationState } from "@/lib/kyc/verification";
 import { maskEmail, maskPhone } from "@/lib/admin/mask";
 import { finnotechConfigured } from "@/lib/finnotech/config";
 import { maskNationalCode } from "@/lib/kyc/national-id";
@@ -35,11 +36,9 @@ export default async function AdminKycDetailPage({
     kyc_checked_at?: string | null;
     kyc_provider?: string | null;
     kyc_track_id?: string | null;
-    kyc_level?: number | null;
-    kyc_bank_verified_at?: string | null;
-    kyc_bank_track_id?: string | null;
-    kyc_bank_mask?: string | null;
   };
+  const cards = await getUserCards([id]);
+  const level = verificationState(profile.kyc_status, cards.filter((c) => c.status === "VERIFIED").length).level;
   const configured = finnotechConfigured();
 
   return (
@@ -62,10 +61,14 @@ export default async function AdminKycDetailPage({
         <p>تماس: <span dir="ltr">{maskPhone(profile.phone)} · {maskEmail(profile.email)}</span></p>
         <p>کد ملی: <span dir="ltr">{row.national_code ? maskNationalCode(row.national_code) : "—"}</span></p>
         <p>تاریخ تولد استعلام: <span dir="ltr">{row.kyc_birth_date || "—"}</span></p>
-        <p>سطح: {row.kyc_level ?? (profile.kyc_status === "VERIFIED" ? 1 : 0)} — ۰ موبایل، ۱ هویت، ۲ حساب بانکی</p>
-        <p>حساب بانکی: {row.kyc_bank_mask || "—"}</p>
-        <p>پیگیری حساب: <span dir="ltr">{row.kyc_bank_track_id || "—"}</span></p>
-        <p>زمان تطبیق حساب: {when(row.kyc_bank_verified_at)}</p>
+        <p>سطح: {level} — ۰ موبایل، ۱ هویت، ۲ کارت بانکی</p>
+        {cards.length === 0 ? <p>کارت بانکی: —</p> : null}
+        {cards.map((c) => (
+          <p key={c.pan_masked}>
+            کارت: <span dir="ltr">{c.pan_masked}</span> · {c.bank_name} · {c.status} · {when(c.verified_at)} · پیگیری{" "}
+            <span dir="ltr">{c.owner_track_id || "—"}</span>
+          </p>
+        ))}
         <p>سرویس: {row.kyc_provider || "—"}</p>
         <p>شناسه پیگیری: <span dir="ltr">{row.kyc_track_id || "—"}</span></p>
         <p>زمان تأیید: {when(row.kyc_verified_at)}</p>

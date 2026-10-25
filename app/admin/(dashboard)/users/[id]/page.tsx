@@ -11,10 +11,12 @@ import { isClosedBetaInactiveAdminPath } from "@/lib/admin/closed-beta";
 import {
   getProfile,
   getUserBanks,
+  getUserCards,
   getUserTickets,
   getUserTransactions,
 } from "@/lib/admin/queries";
 import { finnotechConfigured } from "@/lib/finnotech/config";
+import { verificationState } from "@/lib/kyc/verification";
 import { maskEmail, maskIban, maskPhone } from "@/lib/admin/mask";
 import { DISPLAY_METALS, formatUgAsGrams } from "@/lib/ledger/display";
 import { readHolderLedgerView } from "@/lib/ledger/read";
@@ -30,12 +32,14 @@ export default async function AdminUser360Page({
   const { id } = await params;
   const profile = await getProfile(id);
   if (!profile) notFound();
-  const [ledger, txs, banks, tickets] = await Promise.all([
+  const [ledger, txs, banks, tickets, cards] = await Promise.all([
     readHolderLedgerView(id),
     getUserTransactions(id, 30),
     getUserBanks(id),
     getUserTickets(id),
+    getUserCards([id]),
   ]);
+  const verification = verificationState(profile.kyc_status, cards.filter((c) => c.status === "VERIFIED").length);
 
   const name = [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "—";
 
@@ -59,7 +63,7 @@ export default async function AdminUser360Page({
           <p>ایمیل: <span dir="ltr">{maskEmail(profile.email)}</span></p>
           <p>عضویت: {new Date(profile.created_at).toLocaleString("fa-IR")}</p>
           <p>پلن: {profile.plan_tier ?? "free"}</p>
-          <p>سطح احراز: {profile.kyc_level ?? (profile.kyc_status === "VERIFIED" ? 1 : 0)}</p>
+          <p>سطح احراز: {verification.level} · کارت: <span dir="ltr">{cards.map((c) => c.pan_masked).join("، ") || "—"}</span></p>
           <div className="mt-3">
             <PlanTierForm userId={id} current={profile.plan_tier ?? "free"} />
           </div>

@@ -1,46 +1,26 @@
 import { finnotechCall, FinnotechError } from "@/lib/finnotech/client";
-import { FINNOTECH_SCOPE } from "@/lib/finnotech/config";
-import { finnotechClientId } from "@/lib/finnotech/config";
+import { FINNOTECH_SCOPE, finnotechClientId } from "@/lib/finnotech/config";
 
 /**
- * Card and IBAN ownership, both matched to the national id already stored
- * after Shahkar.
+ * Card ownership against the national code already verified by Shahkar and
+ * the civil registry (which used the same national code + birth date).
  *
- * Card (scope kyc:card-owner-verification:post):
  *   POST /kyc/v2/clients/{clientId}/cardOwnerVerification
- * IBAN (scope kyc:iban-owner-verification:get):
- *   GET /kyc/v2/clients/{clientId}/ibanOwnerVerification
+ *   scope kyc:card-owner-verification:post
+ *   body { card, nid } -> result { isValid }
  */
 
 export type OwnershipMatch = { matched: boolean; trackId: string };
 
-function clientPath() {
-  return `/kyc/v2/clients/${encodeURIComponent(finnotechClientId())}`;
-}
-
-function interpret(result: { isValid?: boolean; matched?: boolean }) {
-  if (result.isValid === true || result.matched === true) return true;
-  if (result.isValid === false || result.matched === false) return false;
-  throw new FinnotechError("bank_unrecognized", 200);
-}
-
 export async function verifyCardOwner(card: string, nationalCode: string): Promise<OwnershipMatch> {
-  const checked = await finnotechCall<{ isValid?: boolean; matched?: boolean }>({
+  const checked = await finnotechCall<{ isValid?: boolean }>({
     method: "POST",
-    path: `${clientPath()}/cardOwnerVerification`,
+    path: `/kyc/v2/clients/${encodeURIComponent(finnotechClientId())}/cardOwnerVerification`,
     scopes: FINNOTECH_SCOPE.cardOwner,
-    body: { card, nationalCode },
+    body: { card, nid: nationalCode },
     idempotent: false,
   });
-  return { matched: interpret(checked.result), trackId: checked.trackId };
-}
-
-export async function verifyIbanOwner(iban: string, nationalCode: string): Promise<OwnershipMatch> {
-  const checked = await finnotechCall<{ isValid?: boolean; matched?: boolean }>({
-    method: "GET",
-    path: `${clientPath()}/ibanOwnerVerification`,
-    scopes: FINNOTECH_SCOPE.ibanOwner,
-    query: { iban, nationalCode },
-  });
-  return { matched: interpret(checked.result), trackId: checked.trackId };
+  if (checked.result.isValid === true) return { matched: true, trackId: checked.trackId };
+  if (checked.result.isValid === false) return { matched: false, trackId: checked.trackId };
+  throw new FinnotechError("bank_unrecognized", 200);
 }

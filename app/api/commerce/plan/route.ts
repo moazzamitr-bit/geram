@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isPlusActive } from "@/lib/commerce/fees";
-import { kycRequiredForTrade } from "@/lib/kyc/trade-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +28,5 @@ export async function GET() {
     planExpiresAt: profile?.plan_expires_at ?? null,
     referralCode: profile?.referral_code ?? null,
     kycStatus: profile?.kyc_status ?? "UNVERIFIED",
-    kycRequiredForTrade: kycRequiredForTrade(),
   });
 }

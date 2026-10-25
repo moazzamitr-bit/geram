@@ -179,7 +179,9 @@ export class CoreError extends Error {
   constructor(
     public code: string,
     message: string,
-    public httpStatus = 400
+    public httpStatus = 400,
+    /** Extra JSON fields for the API response (e.g. nextStep). */
+    public details?: Record<string, unknown>
   ) {
     super(message);
     this.name = "CoreError";

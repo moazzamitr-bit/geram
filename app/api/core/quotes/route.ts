@@ -9,14 +9,14 @@ import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { loadCommerceSettings } from "@/lib/commerce/settings-server";
 import { resolveUserFeeSnapshot } from "@/lib/core/user-fees";
 import { CoreError, type InputMode, type QuoteSide } from "@/lib/core/types";
-import { assertTradeKyc } from "@/lib/kyc/trade-gate";
+import { assertVerified } from "@/lib/kyc/verification";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
     const userId = await requireCoreUserId();
-    const kyc = await assertTradeKyc(userId);
+    const kyc = await assertVerified(userId);
     // Each BUY quote reserves platform metal for its TTL; cap quote spam.
     const limited = rateLimit(`quote:${userId}`, 30, 60 * 1000);
     if (!limited.ok) return tooManyRequests(limited.retryAfterSec);
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
         userId,
         side,
         requestedToman: irrToSafeTomanNumber(requestedIrr),
-        limits: effectiveTradeLimits(settings.limits, kyc.level, kyc.required),
+        limits: effectiveTradeLimits(settings.limits, kyc.level),
       });
     }
     const quote = await core.issueQuote({

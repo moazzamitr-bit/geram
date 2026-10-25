@@ -18,11 +18,12 @@ export const KYC_MESSAGES = {
   duplicate_national_code: "این کد ملی قبلاً برای حساب دیگری ثبت شده است.",
   provider: "سرویس احراز هویت پاسخ نداد. کمی بعد دوباره تلاش کنید.",
   underage: "افتتاح حساب از ۱۸ سال تمام امکان‌پذیر است.",
-  identity_required: "اول کد ملی و تاریخ تولد را تأیید کنید، بعد حساب بانکی.",
-  invalid_card: "شماره کارت ۱۶ رقمی معتبر نیست.",
-  invalid_iban: "شماره شبا معتبر نیست. با IR و ۲۴ رقم وارد کنید.",
-  bank_required: "شماره کارت یا شبا را وارد کنید.",
-  bank_mismatch: "این کارت یا شبا به نام صاحب کد ملی حساب نیست.",
+  identity_required: "اول کد ملی و تاریخ تولد را تأیید کنید، بعد کارت بانکی.",
+  invalid_card: "شماره کارت درست نیست. ۱۶ رقم روی کارت را دوباره بررسی کنید.",
+  bank_required: "شماره کارت ۱۶ رقمی را وارد کنید.",
+  bank_mismatch: "این کارت به نام شما نیست. کارتی را وارد کنید که به نام صاحب همین کد ملی باشد.",
+  card_exists: "این کارت قبلاً در حساب شما ثبت شده است.",
+  card_provider: "بانک پاسخ نداد. چند دقیقه بعد دوباره تلاش کنید.",
 } as const;
 
 export type KycErrorCode = keyof typeof KYC_MESSAGES;
@@ -41,5 +42,8 @@ export function kycOtpUiError(status: number, data: { error?: string; message?: 
   return KYC_MESSAGES.unavailable;
 }
 
-export const TRADE_KYC_REQUIRED_MESSAGE =
-  "برای خرید و فروش باید احراز هویت شما تأیید شده باشد.";
+/** Gate copy by the first missing step. */
+export const VERIFICATION_REQUIRED_MESSAGE = {
+  identity: "برای خرید، فروش و واریز اول احراز هویت را کامل کنید: کد ملی و تاریخ تولد، بعد کارت بانکی.",
+  card: "هویت شما تأیید شده. فقط ثبت یک کارت بانکی به نام خودتان مانده است.",
+} as const;
