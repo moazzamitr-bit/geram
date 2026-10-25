@@ -93,7 +93,7 @@ export function VerificationGateProvider({ children }: { children: React.ReactNo
             <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#FFF4D6] text-[#8A6526]">
               <ShieldCheck size={28} />
             </div>
-            <h2 id="gate-title" className="text-center text-[19px] font-extrabold text-text">
+            <h2 id="gate-title" className="text-center text-[19px] font-extrabold text-[#1C1917]">
               اول احراز هویت را کامل کنید
             </h2>
             <p className="mt-2 text-center text-[13px] leading-6 text-muted-app">
@@ -112,7 +112,7 @@ export function VerificationGateProvider({ children }: { children: React.ReactNo
                     >
                       {done ? <Check size={14} /> : VERIFICATION_STEPS.indexOf(step) + 1}
                     </span>
-                    <span className={done ? "text-muted-app line-through" : "font-bold text-text"}>{step.title}</span>
+                    <span className={done ? "text-muted-app line-through" : "font-bold text-[#1C1917]"}>{step.title}</span>
                   </li>
                 );
               })}
