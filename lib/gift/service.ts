@@ -247,7 +247,7 @@ export async function listUserGifts(userId: string) {
     status: (g.status === "ACTIVE" && new Date(g.expires_at) <= new Date() ? "EXPIRED" : g.status) as GiftStatus,
     direction: g.sender_id === userId ? ("SENT" as const) : ("RECEIVED" as const),
     // Codes of received/settled cards are not needed client-side.
-    code: g.sender_id === userId ? g.code : g.code.slice(0, 4) + "-••••-••••",
+    code: g.sender_id === userId ? g.code : `GRM-••••-${g.code.slice(-4)}`,
   }));
 }
 
