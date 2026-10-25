@@ -6,7 +6,8 @@ import { redactSecrets } from "@/lib/finnotech/redact";
  * Shahkar SMS send + verification, then civil-registry identification.
  * Only the kyc product is used, each call with its own granted scope:
  *   GET /kyc/v2/clients/{clientId}/shahkar/smsSend           kyc:sms-shahkar-send:get
- *   GET /kyc/v2/clients/{clientId}/shahkar/smsVerification   kyc:sms-shahkar-verification:get
+ *   GET /kyc/v2/clients/{clientId}/smsShahkarVerification    kyc:sms-shahkar-verification:get
+ *       (sibling of /shahkar, not under it; query otp, inquiryTrackId, mobile, nationalCode)
  *   GET /kyc/v2/clients/{clientId}/identificationInquiry     kyc:identification-inquiry:get
  */
 
@@ -46,8 +47,16 @@ function mismatchError(err: unknown) {
 }
 
 /** Wrong URL/method or a missing route. A real OTP rejection uses another code. */
+/** Finnotech's answer for a wrong or expired SMS code (FN-KCFH-40004540927, ERR_BAD_REQUEST). */
+export function isShahkarOtpRejected(err: unknown): boolean {
+  if (!(err instanceof FinnotechError)) return false;
+  const blob = `${err.code}\n${err.providerMessage}\n${err.providerBody}`;
+  return /FN-KCFH-40004540927/.test(blob) || /کد\s*یک\s*‌?\s*بار\s*مصرف\s*نامعتبر/.test(blob);
+}
+
 export function isShahkarConfigError(err: unknown): boolean {
   if (!(err instanceof FinnotechError)) return false;
+  if (isShahkarOtpRejected(err)) return false;
   if (err.code === "token_rejected" || err.code === "no_scope") return true;
   if (err.httpStatus === 404) return true;
   if (err.httpStatus !== 400) return false;
@@ -110,7 +119,7 @@ export async function verifyShahkarSms(
   nationalCode: string
 ) {
   const secrets = [otp, inquiryTrackId, mobile, nationalCode];
-  const path = `${clientPath("kyc")}/shahkar/smsVerification`;
+  const path = `${clientPath("kyc")}/smsShahkarVerification`;
   try {
     const verified = await finnotechCall<{ isValid?: boolean }>({
       method: "GET",
@@ -118,7 +127,7 @@ export async function verifyShahkarSms(
       scopes: FINNOTECH_SCOPE.shahkarVerify,
       query: { otp, inquiryTrackId, mobile, nationalCode },
     });
-    logShahkar("GET", path, 200, JSON.stringify({ isValid: verified.result.isValid === true }), secrets);
+    logShahkar("GET", path, 200, JSON.stringify({ trackId: verified.trackId, result: verified.result }), secrets);
     return { matched: verified.result.isValid === true, trackId: verified.trackId };
   } catch (err) {
     const logged = errorDetail(err);
