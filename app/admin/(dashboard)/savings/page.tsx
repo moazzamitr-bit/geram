@@ -80,7 +80,7 @@ export default async function AdminSavingsPage() {
             <td className="px-4 py-3">{r.amount_irr ? `${(Number(r.amount_irr) / 10).toLocaleString("fa-IR")} تومان` : "—"}</td>
             <td className="px-4 py-3">{r.weight_ug ? (Number(r.weight_ug) / 1e6).toLocaleString("fa-IR", { maximumFractionDigits: 4 }) : "—"}</td>
             <td className="px-4 py-3">{r.fee_irr ? `${(Number(r.fee_irr) / 10).toLocaleString("fa-IR")} تومان` : "—"}</td>
-            <td className="px-4 py-3 font-mono text-[11px]">{String(r.trade_id ?? r.error ?? "")}</td>
+            <td className="px-4 py-3 text-[12px]">{r.trade_id ? <span className="font-mono text-[11px]">{String(r.trade_id)}</span> : String(r.error ?? "")}</td>
           </tr>
         ))}
       </AdminTable>

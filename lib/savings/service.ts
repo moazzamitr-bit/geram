@@ -44,6 +44,8 @@ export type SavingsRun = {
   weightUg: string | null;
   feeIrr: string | null;
   error: string | null;
+  asset: SavingsAsset | null;
+  cadence: Cadence | null;
 };
 
 type PlanRow = Record<string, unknown>;
@@ -74,6 +76,8 @@ function toRun(r: PlanRow): SavingsRun {
     weightUg: s(r.weight_ug),
     feeIrr: s(r.fee_irr),
     error: s(r.error),
+    asset: ((r.scheduled_purchases as PlanRow | null)?.asset as SavingsAsset) ?? null,
+    cadence: ((r.scheduled_purchases as PlanRow | null)?.cadence as Cadence) ?? null,
   };
 }
 
@@ -89,7 +93,7 @@ export async function savingsOverview(userId: string) {
   const db = createServiceClient();
   const [plans, runs, limit] = await Promise.all([
     db.from("scheduled_purchases").select("*").eq("user_id", userId).neq("status", "CANCELLED").order("created_at", { ascending: false }),
-    db.from("scheduled_purchase_runs").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(30),
+    db.from("scheduled_purchase_runs").select("*, scheduled_purchases(asset,cadence)").eq("user_id", userId).order("created_at", { ascending: false }).limit(30),
     maxActivePlans(userId),
   ]);
   if (plans.error) throw new Error(plans.error.message);
