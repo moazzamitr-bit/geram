@@ -42,13 +42,6 @@ export function withdrawFee(
   return plus ? fees.withdrawFeeTomanPlus : fees.withdrawFeeTomanFree;
 }
 
-export function dcaExecutionFee(
-  plus: boolean,
-  fees: FeeSettings = DEFAULT_COMMERCE_SETTINGS.fees
-): number {
-  return plus ? fees.dcaFeeTomanPlus : fees.dcaFeeTomanFree;
-}
-
 export function buyQuote(
   amountToman: number,
   pricePerGram: number,

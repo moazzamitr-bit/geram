@@ -37,10 +37,9 @@ describe("execution mode fail-closed", () => {
 describe("conservative feature flags", () => {
   it("defaults demo flags OFF in PRODUCTION even if env tries to enable them", () => {
     const flags = getFeatureFlags("PRODUCTION", {
-      DCA_ENABLED: "true",
+      GOALS_ENABLED: "true",
     });
-    expect(flags.DCA_ENABLED).toBe(true);
-    expect(getFeatureFlags("PRODUCTION", {}).DCA_ENABLED).toBe(false);
+    expect(flags.GOALS_ENABLED).toBe(true);
     expect(getFeatureFlags("PRODUCTION", {}).GOALS_ENABLED).toBe(false);
     expect(getFeatureFlags("CLOSED_BETA", {}).REFERRAL_ENABLED).toBe(false);
     expect(getFeatureFlags("CLOSED_BETA", {}).GERAM_PLUS_ENABLED).toBe(false);

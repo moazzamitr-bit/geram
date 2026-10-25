@@ -1,18 +1,12 @@
 import { getFeatureFlags } from "@/lib/core/mode";
-import { dcaExecutionFee, isPlusActive } from "@/lib/commerce/fees";
-import { buyGoldFromLedger } from "@/lib/commerce/ledger-buy";
-import { loadCommerceSettings } from "@/lib/commerce/settings-server";
+import { buyFromLedger } from "@/lib/commerce/ledger-buy";
+import { runSavingsCron, type SavingsCronSummary } from "@/lib/savings/service";
 import { ledgerCoversToman, parseLedgerBalance } from "@/lib/ledger/display";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { getLiveGold18Price } from "@/lib/market/price-provider";
 
-function cadenceDays(cadence: string): number {
-  if (/هفته|weekly/i.test(cadence)) return 7;
-  return 30;
-}
-
 export type CronRunSummary = {
-  dca: { processed: number; success: number; failed: number };
+  savings: SavingsCronSummary;
   alerts: { checked: number; triggered: number; orders: number };
 };
 
@@ -35,10 +29,6 @@ async function readUserAvailableIrr(
   }
 }
 
-function scheduleStamp(row: { id: string; next_run_at?: string | null }, now: Date) {
-  return `${row.id}:${row.next_run_at ?? now.toISOString()}`;
-}
-
 async function notifyUser(
   admin: ReturnType<typeof createServiceClient>,
   userId: string,
@@ -56,116 +46,6 @@ async function notifyUser(
   });
 }
 
-export async function runDcaCron(): Promise<CronRunSummary["dca"]> {
-  const summary = { processed: 0, success: 0, failed: 0 };
-  if (!getFeatureFlags().DCA_ENABLED) return summary;
-  const admin = createServiceClient();
-  const settings = await loadCommerceSettings();
-  const quote = await getLiveGold18Price();
-  const price = quote.priceToman;
-  if (!price || price < 100_000) return summary;
-
-  const now = new Date();
-  const { data: schedules } = await admin
-    .from("scheduled_purchases")
-    .select("*")
-    .eq("status", "ACTIVE");
-
-  for (const row of schedules ?? []) {
-    summary.processed += 1;
-    const nextRunAt = row.next_run_at
-      ? new Date(row.next_run_at)
-      : now;
-    if (nextRunAt > now) continue;
-
-    const userId = row.user_id as string;
-    const amount = Number(row.amount_toman);
-
-    const [funds, { data: profile }] = await Promise.all([
-      readUserAvailableIrr(admin, userId),
-      admin
-        .from("profiles")
-        .select("plan_tier, plan_expires_at")
-        .eq("id", userId)
-        .maybeSingle(),
-    ]);
-
-    const plus = isPlusActive(
-      (profile?.plan_tier as "free" | "plus") ?? "free",
-      profile?.plan_expires_at
-    );
-    const dcaFee = dcaExecutionFee(plus, settings.fees);
-    const totalDebit = amount + dcaFee;
-    const advance = async () => {
-      const next = new Date(now);
-      next.setDate(next.getDate() + cadenceDays(row.cadence));
-      await admin
-        .from("scheduled_purchases")
-        .update({
-          next_run_at: next.toISOString(),
-          next_run: next.toLocaleDateString("fa-IR"),
-        })
-        .eq("id", row.id);
-    };
-
-    if (!funds.ok || !ledgerCoversToman(funds.irr, totalDebit)) {
-      summary.failed += 1;
-      await notifyUser(
-        admin,
-        userId,
-        "خرید دوره‌ای انجام نشد",
-        funds.ok
-          ? `موجودی دفترکل برای خرید ${amount.toLocaleString("fa-IR")} تومان (به‌علاوه کارمزد) کافی نیست.`
-          : "موجودی دفترکل خوانده نشد.",
-        "/app/wallet"
-      );
-      if (funds.ok) await advance();
-      continue;
-    }
-
-    const bought = await buyGoldFromLedger({
-      userId,
-      amountToman: amount,
-      idempotencyKey: `dca:${scheduleStamp(row, now)}`,
-      plus,
-      settings,
-    });
-    if (!bought.ok) {
-      summary.failed += 1;
-      await notifyUser(
-        admin,
-        userId,
-        "خرید دوره‌ای انجام نشد",
-        "ثبت خرید در دفترکل ممکن نشد.",
-        "/app/wallet"
-      );
-      continue;
-    }
-
-    const next = new Date(now);
-    next.setDate(next.getDate() + cadenceDays(row.cadence));
-    await admin
-      .from("scheduled_purchases")
-      .update({
-        last_run_at: now.toISOString(),
-        next_run_at: next.toISOString(),
-        next_run: next.toLocaleDateString("fa-IR"),
-      })
-      .eq("id", row.id);
-
-    await notifyUser(
-      admin,
-      userId,
-      "خرید دوره‌ای انجام شد",
-      "خرید طلا در دفترکل ثبت شد.",
-      "/app/transactions"
-    );
-    summary.success += 1;
-  }
-
-  return summary;
-}
-
 export async function runAlertsCron(): Promise<
   Pick<CronRunSummary, "alerts">
 > {
@@ -174,7 +54,6 @@ export async function runAlertsCron(): Promise<
     return { alerts: summary };
   }
   const admin = createServiceClient();
-  const settings = await loadCommerceSettings();
   const quote = await getLiveGold18Price();
   const price = quote.priceToman;
 
@@ -226,18 +105,7 @@ export async function runAlertsCron(): Promise<
     }
 
     const buyAmount = Number(alert.auto_buy_toman);
-    const [funds, { data: profile }] = await Promise.all([
-      readUserAvailableIrr(admin, userId),
-      admin
-        .from("profiles")
-        .select("plan_tier, plan_expires_at")
-        .eq("id", userId)
-        .maybeSingle(),
-    ]);
-    const plus = isPlusActive(
-      (profile?.plan_tier as "free" | "plus") ?? "free",
-      profile?.plan_expires_at
-    );
+    const funds = await readUserAvailableIrr(admin, userId);
 
     if (!funds.ok || !ledgerCoversToman(funds.irr, buyAmount)) {
       await admin.from("price_alert_orders").insert({
@@ -257,12 +125,11 @@ export async function runAlertsCron(): Promise<
       continue;
     }
 
-    const bought = await buyGoldFromLedger({
+    const bought = await buyFromLedger({
       userId,
+      asset: "GOLD",
       amountToman: buyAmount,
       idempotencyKey: `alert:${alert.id}:${new Date().toISOString()}`,
-      plus,
-      settings,
     });
     if (!bought.ok) {
       await admin.from("price_alert_orders").insert({
@@ -304,7 +171,7 @@ export async function runAlertsCron(): Promise<
 }
 
 export async function runRevenueCrons(): Promise<CronRunSummary> {
-  const dca = await runDcaCron();
+  const savings = await runSavingsCron();
   const { alerts } = await runAlertsCron();
-  return { dca, alerts };
+  return { savings, alerts };
 }

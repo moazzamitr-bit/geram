@@ -9,8 +9,6 @@ export type FeeSettings = {
   sellFeeMinTomanPlus: number;
   withdrawFeeTomanFree: number;
   withdrawFeeTomanPlus: number;
-  dcaFeeTomanFree: number;
-  dcaFeeTomanPlus: number;
 };
 
 export type PlusSettings = {
@@ -54,8 +52,6 @@ export const DEFAULT_COMMERCE_SETTINGS: CommerceSettings = {
     // Competitors don't charge for withdrawals or scheduled buys beyond the trade fee.
     withdrawFeeTomanFree: 0,
     withdrawFeeTomanPlus: 0,
-    dcaFeeTomanFree: 0,
-    dcaFeeTomanPlus: 0,
   },
   plus: {
     monthlyPriceToman: 49_000,

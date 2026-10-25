@@ -65,7 +65,7 @@ export default function ProfilePage() {
       <AppCard>
         <h2 className="text-[15px] font-bold text-text">گرم پلاس</h2>
         <p className="mt-2 text-[13px] text-muted-app">
-          کارمزد کمتر، چند برنامه DCA، هشدار SMS و خرید خودکار پس از هشدار.
+          کارمزد کمتر، طرح‌های پس‌انداز بیشتر، هشدار SMS و خرید خودکار پس از هشدار.
         </p>
         <p className="mt-2 text-[13px]">
           وضعیت:{" "}

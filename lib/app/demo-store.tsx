@@ -121,13 +121,6 @@ type DemoState = {
   alerts: DemoAlert[];
   notifications: DemoNotification[];
   tickets: SupportTicket[];
-  scheduledPurchases: {
-    id: string;
-    amountRial: number;
-    cadence: string;
-    status: string;
-    nextRun: string;
-  }[];
   plusActive: boolean;
   kycStatus: KycStatus;
   referralCode: string | null;
@@ -184,7 +177,6 @@ type DemoState = {
   markAllNotificationsRead: () => void;
   createTicket: (category: string, subject: string, message: string) => string;
   replyTicket: (id: string, text: string) => void;
-  addScheduledPurchase: (amountRial: number, cadence: string) => { ok: boolean; error?: string };
   refreshMarketPrice: () => Promise<void>;
 };
 
@@ -263,7 +255,6 @@ const seed = {
   alerts: [] as DemoAlert[],
   notifications: [] as DemoNotification[],
   tickets: [] as SupportTicket[],
-  scheduledPurchases: [] as DemoState["scheduledPurchases"],
   plusActive: false,
   kycStatus: "UNVERIFIED" as KycStatus,
   referralCode: null as string | null,
@@ -343,7 +334,6 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
                 goals: bundle.goals,
                 notifications: bundle.notifications,
                 tickets: bundle.tickets,
-                scheduledPurchases: bundle.scheduledPurchases,
                 alerts: bundle.alerts,
                 pin: s.pin,
               })
@@ -934,41 +924,6 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             persistTicketReply(id, text, "user")
           );
         }
-      },
-      addScheduledPurchase: (amountRial, cadence) => {
-        const max = state.plusActive
-          ? state.commerceSettings.plus.maxDcaPlus
-          : state.commerceSettings.plus.maxDcaFree;
-        const active = state.scheduledPurchases.filter(
-          (s) => s.status === "ACTIVE"
-        ).length;
-        if (active >= max) {
-          return {
-            ok: false,
-            error: state.plusActive
-              ? `حداکثر ${max} برنامه خرید دوره‌ای فعال دارید.`
-              : `در پلن رایگان فقط ${max} برنامه مجاز است. گرم پلاس را فعال کنید.`,
-          };
-        }
-        const nextRun = new Date();
-        nextRun.setDate(nextRun.getDate() + 1);
-        const next = {
-          id: newId(),
-          amountRial,
-          cadence,
-          status: "ACTIVE",
-          nextRun: nextRun.toLocaleDateString("fa-IR"),
-        };
-        setState((s) => ({
-          ...s,
-          scheduledPurchases: [...s.scheduledPurchases, next],
-        }));
-        if (liveDb) {
-          void import("@/lib/db/platform-sync").then(
-            ({ persistScheduledPurchase }) => persistScheduledPurchase(next)
-          );
-        }
-        return { ok: true };
       },
       refreshMarketPrice,
     }),

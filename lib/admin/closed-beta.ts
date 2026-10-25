@@ -16,7 +16,6 @@ export const CLOSED_BETA_INACTIVE_ADMIN_ROUTES = [
   "/admin/inventory",
   "/admin/custody",
   "/admin/goals",
-  "/admin/dca",
   "/admin/alerts",
   "/admin/plus",
   "/admin/notifications",
