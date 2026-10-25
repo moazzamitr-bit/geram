@@ -687,6 +687,24 @@ export class FinancialCore {
     return stale.length;
   }
 
+  /** Price calculator: same price, spread, fee and rounding as a quote, nothing stored. */
+  async previewQuote(input: Omit<IssueQuoteInput, "userId">) {
+    const price = await this.deps.prices.getExecutable(input.asset);
+    if (price.health === "UNAVAILABLE" || price.health === "PARSE_ERROR" || price.source === "seed") {
+      throw new CoreError("price_unavailable", "قیمت لحظه‌ای در دسترس نیست.", 503);
+    }
+    const execution = applySpread(price.irrPerGram, input.side, this.spread());
+    const computed = computeQuote({
+      side: input.side,
+      inputMode: input.inputMode,
+      requestedIrr: input.requestedIrr ?? 0n,
+      requestedWeightUg: input.requestedWeightUg ?? 0n,
+      executionPriceIrrPerGram: execution,
+      fees: input.fees ?? this.fees(),
+    });
+    return { ...computed, stale: Boolean(price.stale || price.health === "STALE"), observedAt: price.observedAt ?? null };
+  }
+
   async issueQuote(input: IssueQuoteInput): Promise<Quote> {
     const spec = ASSET_SPECS[input.asset];
     if (!spec) throw new CoreError("unknown_asset", "Unknown asset");

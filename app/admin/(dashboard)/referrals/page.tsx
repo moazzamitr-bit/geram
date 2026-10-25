@@ -52,7 +52,7 @@ export default async function AdminReferralsPage() {
       <AdminTable headers={["زمان", "دعوت‌کننده", "دعوت‌شده", "معامله", "کارمزد", "سهم", "پاداش"]} empty={recent.length === 0}>
         {recent.map((r) => (
           <tr key={String(r.trade_id)} className="border-b border-white/5">
-            <td className="px-4 py-3 text-[12px]">{new Date(String(r.created_at)).toLocaleString("fa-IR-u-ca-persian")}</td>
+            <td className="px-4 py-3 text-[12px]">{new Date(String(r.created_at)).toLocaleString("fa-IR-u-ca-persian", { timeZone: "Asia/Tehran" })}</td>
             <td className="px-4 py-3">{maskPhone(String(r.referrer_phone ?? ""))}</td>
             <td className="px-4 py-3">{maskPhone(String(r.referee_phone ?? ""))}</td>
             <td className="px-4 py-3 text-[12px]">{r.side} {r.asset}</td>

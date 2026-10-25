@@ -29,7 +29,7 @@ const links = [
   { href: "/app/profile/security", label: "امنیت حساب", desc: "ورود و اعلان‌ها", icon: Lock },
   { href: "/app/profile/bank-accounts", label: "حساب‌های بانکی", desc: "واریز و برداشت", icon: Building2 },
   { href: "/app/profile/sessions", label: "نشست‌های فعال", desc: "دستگاه‌ها و ورودها", icon: MonitorSmartphone },
-  { href: "/app/profile/documents", label: "اسناد", desc: "رسیدها و گزارش‌ها", icon: FileText },
+  { href: "/app/reports", label: "گزارش‌ها", desc: "ریز معاملات، خروجی اکسل و ماشین‌حساب قیمت", icon: FileText },
   { href: "/app/profile/consents", label: "رضایت‌نامه‌ها", desc: "قوانین و حریم خصوصی", icon: Scale },
 ];
 

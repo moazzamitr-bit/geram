@@ -24,6 +24,7 @@ export function irrToTomanLabel(irr: string | number | bigint): string {
 export function faDate(iso: string, withTime = false): string {
   const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
   return d.toLocaleString("fa-IR-u-ca-persian", {
+    timeZone: "Asia/Tehran",
     year: "numeric",
     month: "long",
     day: "numeric",
