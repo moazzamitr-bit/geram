@@ -31,3 +31,9 @@
 		reverse_proxy app:3000
 	}
 }
+
+# Roundcube webmail; this cert is also used by the mail server (/opt/mail).
+mail.{$GERAM_DOMAIN} {
+	encode gzip
+	reverse_proxy roundcube:80
+}
