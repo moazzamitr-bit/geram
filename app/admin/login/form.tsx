@@ -70,12 +70,12 @@ export function AdminLoginForm({ initialError = "" }: { initialError?: string })
       <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0F1724] p-7">
         <BrandLogo href="/" size="md" />
         <h1 className="mt-6 text-[24px] font-extrabold text-white">ورود ادمین</h1>
-        <p className="mt-2 text-[13px] leading-7 text-white/50">
+        <p className="mt-2 text-[13px] leading-7 text-white/65">
           فقط حساب‌هایی با نقش admin در جدول profiles وارد می‌شوند.
         </p>
         <form action="/api/auth/admin-login" method="POST" onSubmit={onSubmit} className="mt-6 space-y-4">
           <label className="block text-[13px]">
-            <span className="text-white/50">ایمیل</span>
+            <span className="text-white/65">ایمیل</span>
             <input
               name="email"
               type="email"
@@ -86,7 +86,7 @@ export function AdminLoginForm({ initialError = "" }: { initialError?: string })
             />
           </label>
           <label className="block text-[13px]">
-            <span className="text-white/50">رمز عبور</span>
+            <span className="text-white/65">رمز عبور</span>
             <input
               name="password"
               type="password"

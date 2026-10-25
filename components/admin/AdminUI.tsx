@@ -27,7 +27,7 @@ export function AdminStatCard({
   return (
     <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.25)]">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[13px] text-white/50">{label}</p>
+        <p className="text-[13px] text-white/65">{label}</p>
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.04] text-gold">
           <Icon size={18} />
         </span>
@@ -42,7 +42,7 @@ export function AdminStatCard({
         {unavailable ? UNAVAILABLE : value}
       </p>
       {(hint || unavailable) && (
-        <p className="mt-2 text-[12px] text-white/40">{hint}</p>
+        <p className="mt-2 text-[12px] text-white/60">{hint}</p>
       )}
     </div>
   );
@@ -62,7 +62,7 @@ export function AdminPageHeader({
       <div>
         <h1 className="text-[24px] font-extrabold md:text-[28px]">{title}</h1>
         {description && (
-          <p className="mt-1.5 max-w-2xl text-[14px] leading-7 text-white/50">
+          <p className="mt-1.5 max-w-2xl text-[14px] leading-7 text-white/65">
             {description}
           </p>
         )}
@@ -83,7 +83,7 @@ export function AdminTable({
 }) {
   if (empty) {
     return (
-      <div className="rounded-2xl border border-dashed border-white/10 bg-[#0F1724] px-6 py-16 text-center text-[14px] text-white/50">
+      <div className="rounded-2xl border border-dashed border-white/10 bg-[#0F1724] px-6 py-16 text-center text-[14px] text-white/65">
         داده‌ای برای نمایش نیست. اتصال سوپابیس یا seed را بررسی کنید.
       </div>
     );

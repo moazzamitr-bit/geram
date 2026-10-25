@@ -62,7 +62,7 @@ export default async function AdminTradeDetailPage({
           submitLabel="باز کردن حادثه"
         />
         {!isClosedBetaInactiveAdminPath("/admin/reconciliation") ? (
-          <p className="text-[13px] text-white/50">
+          <p className="text-[13px] text-white/65">
             مشاهده تطبیق: <Link className="text-gold" href="/admin/reconciliation">مرکز تطبیق</Link>
           </p>
         ) : null}

@@ -65,19 +65,19 @@ export default async function AdminWalletsPage() {
                 <td className="px-4 py-3">{formatToman(view.reservedToman)}</td>
                 <td className="px-4 py-3">
                   {formatUgAsGrams(view.metals.GOLD.availableUg)}
-                  <span className="mt-1 block text-[11px] text-white/40">
+                  <span className="mt-1 block text-[11px] text-white/60">
                     رزرو {formatUgAsGrams(view.metals.GOLD.reservedUg)}
                   </span>
                 </td>
                 <td className="px-4 py-3">
                   {formatUgAsGrams(view.metals.SILVER.availableUg)}
-                  <span className="mt-1 block text-[11px] text-white/40">
+                  <span className="mt-1 block text-[11px] text-white/60">
                     رزرو {formatUgAsGrams(view.metals.SILVER.reservedUg)}
                   </span>
                 </td>
                 <td className="px-4 py-3">
                   {formatUgAsGrams(view.metals.COPPER.availableUg)}
-                  <span className="mt-1 block text-[11px] text-white/40">
+                  <span className="mt-1 block text-[11px] text-white/60">
                     رزرو {formatUgAsGrams(view.metals.COPPER.reservedUg)}
                   </span>
                 </td>

@@ -195,7 +195,7 @@ export function PriceChart({
       <div
         className={cn(
           "mt-2 flex items-center justify-center gap-4 text-[12px]",
-          light ? "text-muted-app" : "text-[#8e928d]"
+          light ? "text-muted-app" : "text-muted-app"
         )}
       >
         <span>

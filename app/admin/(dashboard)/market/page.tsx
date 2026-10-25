@@ -65,7 +65,7 @@ export default async function AdminMarketPage() {
               <p className="mt-1 text-white/45">
                 سلامت: {quote ? (quote.stale ? "STALE" : "LIVE") : "خوانده نشد"} · منبع: {quote?.sourceKey ?? "—"}
               </p>
-              <p className="text-white/40">
+              <p className="text-white/60">
                 {quote?.updatedAt ? new Date(quote.updatedAt).toLocaleString("fa-IR") : "—"} · permittedForProduction: false
               </p>
             </div>
