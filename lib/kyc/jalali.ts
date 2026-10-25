@@ -78,3 +78,25 @@ export function formatFinnotechBirthDate(
 export function persianJalaliDate(ascii: string): string {
   return toPersianDigits(ascii);
 }
+
+export type BirthParts = { year: number; month: number; day: number };
+
+/**
+ * Keep whatever was picked, in any order. Only drop a month or day once the
+ * year (and month) are known and make it impossible, e.g. 31 in Mehr or 30
+ * Esfand in a non-leap year.
+ */
+export function reconcileBirthParts(next: BirthParts, now = new Date()): BirthParts {
+  let { month, day } = next;
+  const { year } = next;
+  if (year && month && !jalaliAdultBirthMonths(year, now).includes(month)) month = 0;
+  if (day) {
+    if (year && month) {
+      if (!jalaliAdultBirthDays(year, month, now).includes(day)) day = 0;
+    } else if (month) {
+      if (day > (month <= 6 ? 31 : 30)) day = 0;
+    }
+  }
+  return { year, month, day };
+}
+

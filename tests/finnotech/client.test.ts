@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FINNOTECH_SCOPES, finnotechTimeoutMs } from "@/lib/finnotech/config";
+import { FINNOTECH_SCOPE, finnotechTimeoutMs } from "@/lib/finnotech/config";
 import {
   finnotechCall,
   finnotechDispatcher,
@@ -21,7 +21,7 @@ function tokenBody(lifeTime = 600_000) {
       value: "access-token-value",
       refreshToken: "refresh-token-value",
       lifeTime,
-      scopes: FINNOTECH_SCOPES.split(","),
+      scopes: [],
     },
   };
 }
@@ -68,8 +68,8 @@ describe("finnotech client", () => {
       logs.push(args.map(String).join(" "));
     });
 
-    const first = await getFinnotechAccessToken(1_000);
-    const second = await getFinnotechAccessToken(2_000);
+    const first = await getFinnotechAccessToken(FINNOTECH_SCOPE.identification, 1_000);
+    const second = await getFinnotechAccessToken(FINNOTECH_SCOPE.identification, 2_000);
     expect(first).toBe("access-token-value");
     expect(second).toBe(first);
     expect(calls).toHaveLength(1);
@@ -78,21 +78,13 @@ describe("finnotech client", () => {
     expect(minted).toEqual({
       grant_type: "client_credentials",
       nid: NID,
-      scopes: FINNOTECH_SCOPES,
+      scopes: "kyc:identification-inquiry:get",
     });
-    expect(FINNOTECH_SCOPES).toContain("kyc:sms-shahkar-send:get");
-    expect(FINNOTECH_SCOPES).toContain("kyc:sms-shahkar-verification:get");
-    expect(FINNOTECH_SCOPES).toContain("facility:sms-shahkar-send:get");
-    expect(FINNOTECH_SCOPES).toContain("facility:sms-shahkar-verification:get");
-    expect(FINNOTECH_SCOPES).toContain("kyc:sms-shahkar-verification:post");
-    expect(FINNOTECH_SCOPES).toContain("kyc:identification-inquiry:get");
-    expect(FINNOTECH_SCOPES).toContain("messaging:otp-initiate:post");
-    expect(FINNOTECH_SCOPES).toContain("messaging:otp-verify:post");
     const auth = (calls[0].init.headers as Record<string, string>).Authorization;
     expect(auth.startsWith("Basic ")).toBe(true);
     expect(auth).not.toContain(SECRET);
 
-    const refreshed = await getFinnotechAccessToken(541_000);
+    const refreshed = await getFinnotechAccessToken(FINNOTECH_SCOPE.identification, 541_000);
     expect(refreshed).toBe("access-2");
     const refreshCall = calls.find((call) => call.url.includes("/token/refresh"));
     expect(refreshCall).toBeTruthy();
@@ -128,7 +120,7 @@ describe("finnotech client", () => {
     });
 
     const result = await finnotechCall<{ firstName: string }>({
-      method: "GET",
+      method: "GET", scopes: ["kyc:identification-inquiry:get"],
       path: "/kyc/v2/clients/geram/identificationInquiry",
       query: { nationalCode: NID, birthDate: "1370/06/15" },
     });
@@ -170,7 +162,7 @@ describe("finnotech client", () => {
     });
     await expect(
       finnotechCall({
-        method: "GET",
+        method: "GET", scopes: ["kyc:identification-inquiry:get"],
         path: "/kyc/v2/clients/geram/shahkar/smsVerification",
         query: { otp: "12345", nationalCode: NID, mobile: "09120000000" },
       })
@@ -198,7 +190,7 @@ describe("finnotech client", () => {
       })
     );
     await expect(
-      finnotechCall({ method: "GET", path: "/kyc/v2/clients/geram/identificationInquiry" })
+      finnotechCall({ method: "GET", scopes: ["kyc:identification-inquiry:get"], path: "/kyc/v2/clients/geram/identificationInquiry" })
     ).rejects.toBeInstanceOf(FinnotechError);
   });
 
@@ -216,7 +208,7 @@ describe("finnotech client", () => {
         return Response.json({ status: "DONE", result: { ok: true } });
       })
     );
-    await finnotechCall({ method: "GET", path: "/kyc/v2/clients/geram/identificationInquiry" });
+    await finnotechCall({ method: "GET", scopes: ["kyc:identification-inquiry:get"], path: "/kyc/v2/clients/geram/identificationInquiry" });
     expect(inits.length).toBeGreaterThanOrEqual(2);
     for (const init of inits) {
       expect((init as { dispatcher?: unknown }).dispatcher).toBe(finnotechDispatcher);
@@ -235,7 +227,7 @@ describe("finnotech client", () => {
         return Response.json(tokenBody());
       })
     );
-    await expect(getFinnotechAccessToken(1_000)).resolves.toBe("access-token-value");
+    await expect(getFinnotechAccessToken(FINNOTECH_SCOPE.identification, 1_000)).resolves.toBe("access-token-value");
     expect(tokenHits).toBe(3);
   });
 
@@ -256,7 +248,7 @@ describe("finnotech client", () => {
       logs.push(args.map(String).join(" "));
     });
     await expect(
-      finnotechCall({ method: "POST", path: "/facility/v2/clients/geram/finnotextOtp", body: { to: "09120000000" } })
+      finnotechCall({ method: "POST", scopes: ["kyc:identification-inquiry:get"], path: "/facility/v2/clients/geram/finnotextOtp", body: { to: "09120000000" } })
     ).resolves.toMatchObject({ result: { sent: true } });
     expect(apiHits).toBe(3);
 
@@ -271,7 +263,7 @@ describe("finnotech client", () => {
     );
     resetFinnotechAuthCache();
     await expect(
-      finnotechCall({ method: "POST", path: "/messaging/v2/clients/geram/otp/initiate", body: {} })
+      finnotechCall({ method: "POST", scopes: ["kyc:identification-inquiry:get"], path: "/messaging/v2/clients/geram/otp/initiate", body: {} })
     ).rejects.toMatchObject({ code: "network" });
     expect(apiHits).toBe(3);
     expect(logs.join("\n")).toContain("finnotech_network POST /messaging/v2/clients/geram/otp/initiate UND_ERR_CONNECT_TIMEOUT");
@@ -289,7 +281,7 @@ describe("finnotech client", () => {
       })
     );
     await expect(
-      finnotechCall({ method: "POST", path: "/facility/v2/clients/geram/finnotextOtp", body: { to: "09120000000" } })
+      finnotechCall({ method: "POST", scopes: ["kyc:identification-inquiry:get"], path: "/facility/v2/clients/geram/finnotextOtp", body: { to: "09120000000" } })
     ).rejects.toBeInstanceOf(FinnotechError);
     expect(apiHits).toBe(2);
 
@@ -308,7 +300,7 @@ describe("finnotech client", () => {
       logs.push(args.map(String).join(" "));
     });
     await expect(
-      finnotechCall({ method: "POST", path: "/messaging/v2/clients/geram/otp/verify", body: { traceId: "t", otp: "12345" } })
+      finnotechCall({ method: "POST", scopes: ["kyc:identification-inquiry:get"], path: "/messaging/v2/clients/geram/otp/verify", body: { traceId: "t", otp: "12345" } })
     ).rejects.toMatchObject({ code: "network" });
     expect(apiHits).toBe(1);
     expect(logs.join("\n")).toContain("TimeoutError");
@@ -328,3 +320,42 @@ function connectFailure(code: string, syscall?: string) {
   const cause = Object.assign(new Error(code), { code, syscall });
   return Object.assign(new TypeError("fetch failed"), { cause });
 }
+
+describe("finnotech per-scope tokens", () => {
+  afterEach(() => {
+    resetFinnotechAuthCache();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("caches one token per scope set and never mixes ungranted scopes", async () => {
+    vi.stubEnv("FINNOTECH_CLIENT_ID", "geram");
+    vi.stubEnv("FINNOTECH_CLIENT_SECRET", SECRET);
+    vi.stubEnv("FINNOTECH_NID", NID);
+    const minted: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const scopes = JSON.parse(String(init.body)).scopes as string;
+        minted.push(scopes);
+        return Response.json({ status: "DONE", result: { value: `t-${scopes}`, refreshToken: "r", lifeTime: 600_000 } });
+      })
+    );
+    const a = await getFinnotechAccessToken(FINNOTECH_SCOPE.shahkarSend, 1_000);
+    const b = await getFinnotechAccessToken(FINNOTECH_SCOPE.loginOtp, 1_000);
+    const a2 = await getFinnotechAccessToken([...FINNOTECH_SCOPE.shahkarSend], 2_000);
+    expect(a).not.toBe(b);
+    expect(a2).toBe(a);
+    expect(minted).toEqual(["kyc:sms-shahkar-send:get", [...FINNOTECH_SCOPE.loginOtp].sort().join(",")]);
+    const all = Object.values(FINNOTECH_SCOPE).flat();
+    for (const banned of [
+      "kyc:sms-shahkar-verification:post",
+      "facility:sms-shahkar-verification:get",
+      "facility:sms-shahkar-verification:post",
+      "facility:shahkar:get",
+      "kyc:shahkar:get",
+    ]) {
+      expect(all).not.toContain(banned);
+    }
+  });
+});

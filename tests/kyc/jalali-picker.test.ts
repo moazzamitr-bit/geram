@@ -8,6 +8,7 @@ import {
   jalaliAdultBirthYears,
   jalaliMonthLength,
   JALALI_BIRTH_YEAR_MIN,
+  reconcileBirthParts,
 } from "@/lib/kyc/jalali";
 import { normalizeJalaliBirthDate } from "@/lib/kyc/national-id";
 
@@ -59,5 +60,22 @@ describe("jalali birth date picker", () => {
     expect(normalizeJalaliBirthDate("1403/12/30")).toBe("1403/12/30");
     expect(normalizeJalaliBirthDate("1404/12/30")).toBeNull();
     expect(normalizeJalaliBirthDate("1371/12/30")).toBeNull();
+  });
+});
+
+describe("birth date parts in any order", () => {
+  it("keeps day and month chosen before the year", () => {
+    let p = reconcileBirthParts({ year: 0, month: 0, day: 15 }, NOW);
+    expect(p).toEqual({ year: 0, month: 0, day: 15 });
+    p = reconcileBirthParts({ ...p, month: 7 }, NOW);
+    expect(p).toEqual({ year: 0, month: 7, day: 15 });
+    p = reconcileBirthParts({ ...p, year: 1370 }, NOW);
+    expect(p).toEqual({ year: 1370, month: 7, day: 15 });
+    expect(formatFinnotechBirthDate(p.year, p.month, p.day, NOW)).toBe("1370/07/15");
+  });
+  it("drops impossible days per month and leap year", () => {
+    expect(reconcileBirthParts({ year: 0, month: 7, day: 31 }, NOW).day).toBe(0);
+    expect(reconcileBirthParts({ year: 1370, month: 12, day: 30 }, NOW).day).toBe(30);
+    expect(reconcileBirthParts({ year: 1371, month: 12, day: 30 }, NOW).day).toBe(0);
   });
 });

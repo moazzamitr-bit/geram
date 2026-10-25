@@ -1,4 +1,5 @@
 import { finnotechCall, FinnotechError } from "@/lib/finnotech/client";
+import { FINNOTECH_SCOPE } from "@/lib/finnotech/config";
 import { finnotechClientId } from "@/lib/finnotech/config";
 
 /**
@@ -27,6 +28,7 @@ export async function verifyCardOwner(card: string, nationalCode: string): Promi
   const checked = await finnotechCall<{ isValid?: boolean; matched?: boolean }>({
     method: "POST",
     path: `${clientPath()}/cardOwnerVerification`,
+    scopes: FINNOTECH_SCOPE.cardOwner,
     body: { card, nationalCode },
     idempotent: false,
   });
@@ -37,6 +39,7 @@ export async function verifyIbanOwner(iban: string, nationalCode: string): Promi
   const checked = await finnotechCall<{ isValid?: boolean; matched?: boolean }>({
     method: "GET",
     path: `${clientPath()}/ibanOwnerVerification`,
+    scopes: FINNOTECH_SCOPE.ibanOwner,
     query: { iban, nationalCode },
   });
   return { matched: interpret(checked.result), trackId: checked.trackId };
