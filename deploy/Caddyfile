@@ -15,6 +15,10 @@
 {$GERAM_DOMAIN}, www.{$GERAM_DOMAIN} {
 	encode gzip
 	import supabase_api
+	redir /webmail /webmail/ 308
+	handle_path /webmail/* {
+		reverse_proxy roundcube:80
+	}
 	handle {
 		reverse_proxy app:3000
 	}
