@@ -298,6 +298,27 @@ describe("abandoned buy quotes", () => {
   });
 });
 
+describe("buy cost basis", () => {
+  it("includes the buy fee in the gross cost", async () => {
+    const { core, store } = makeMemoryCore();
+    const user = "cost-user";
+    await core.sandboxDeposit(user, tomanToIrr(20_000_000), "dep-cost");
+    const quote = await core.issueQuote({
+      userId: user,
+      asset: "GOLD",
+      side: "BUY",
+      inputMode: "RIAL_AMOUNT",
+      requestedIrr: tomanToIrr(5_000_000),
+    });
+    expect(quote.feeIrr > 0n).toBe(true);
+    expect(quote.grossIrr).toBe(quote.netIrr + quote.feeIrr);
+    await core.executeTrade({ userId: user, quoteId: quote.id, idempotencyKey: "buy-cost" });
+    const basis = await store.getCostBasis(user, "GOLD");
+    expect(basis.quantityUg).toBe(quote.weightUg);
+    expect(basis.costIrr).toBe(quote.grossIrr);
+  });
+});
+
 describe("admin kill switches", () => {
   it("a switch persisted by the admin stops quotes and open-quote execution", async () => {
     const store = new MemoryCoreStore();
