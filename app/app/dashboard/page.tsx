@@ -9,7 +9,10 @@ import { unrealizedPnl } from "@/lib/app/pnl";
 import { INSTRUMENTS, type InstrumentId } from "@/lib/market/instruments";
 import { tradePathForInstrument } from "@/lib/market/trade-routes";
 import { cn, formatFaNumber, formatToman } from "@/lib/utils";
+import { VerificationBanner } from "@/components/app/VerificationBanner";
+import { useVerificationGate } from "@/components/app/VerificationGate";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 const CARD_ORDER: InstrumentId[] = ["copper", "silver925", "gold18"];
@@ -34,6 +37,8 @@ const CARD_TITLE: Record<InstrumentId, string> = {
 
 export default function DashboardPage() {
   const store = useDemoStore();
+  const gate = useVerificationGate();
+  const router = useRouter();
   const [range, setRange] = useState<ChartRange>("1m");
   const [chartMetal, setChartMetal] = useState<InstrumentId>("gold18");
 
@@ -58,6 +63,8 @@ export default function DashboardPage() {
     <div className="mx-auto max-w-6xl space-y-4">
       <h1 className="text-[22px] font-extrabold text-text">خانه</h1>
 
+      <VerificationBanner />
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <article className="rounded-2xl border border-border bg-white p-4 shadow-[0_10px_30px_rgba(28,25,23,0.04)]">
           <div className="flex items-center justify-between gap-2">
@@ -69,18 +76,20 @@ export default function DashboardPage() {
             <span className="mr-1 text-[13px] font-semibold text-muted-app">تومان</span>
           </p>
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <Link
-              href="/app/wallet"
+            <button
+              type="button"
+              onClick={() => gate.guard() && router.push("/app/wallet")}
               className="flex h-10 items-center justify-center rounded-xl border border-black/10 text-[13px] font-bold text-text"
             >
               برداشت
-            </Link>
-            <Link
-              href="/app/wallet"
+            </button>
+            <button
+              type="button"
+              onClick={() => gate.guard() && router.push("/app/wallet")}
               className="flex h-10 items-center justify-center rounded-xl bg-[#161616] text-[13px] font-bold text-white"
             >
               واریز
-            </Link>
+            </button>
           </div>
         </article>
 

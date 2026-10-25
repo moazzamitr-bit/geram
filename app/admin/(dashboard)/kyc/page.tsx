@@ -5,6 +5,8 @@ import {
   AdminTable,
 } from "@/components/admin/AdminUI";
 import { listProfiles } from "@/lib/db/admin-queries";
+import { getUserCards } from "@/lib/admin/queries";
+import { verificationState } from "@/lib/kyc/verification";
 import { maskEmail, maskPhone } from "@/lib/admin/mask";
 import { maskNationalCode } from "@/lib/kyc/national-id";
 import { finnotechConfigured } from "@/lib/finnotech/config";
@@ -36,6 +38,7 @@ export default async function AdminKycQueuePage({
     ? rows.filter((u) => (MAP[u.kyc_status] ?? u.kyc_status) === sp.status)
     : rows;
   const configured = finnotechConfigured();
+  const cards = await getUserCards(filtered.map((u) => u.id));
 
   return (
     <div>
@@ -60,7 +63,7 @@ export default async function AdminKycQueuePage({
         ))}
       </div>
       <AdminTable
-        headers={["کاربر", "تماس", "کد ملی", "سطح", "وضعیت", "حساب", "زمان تأیید", "سرویس", "صف"]}
+        headers={["کاربر", "تماس", "کد ملی", "سطح", "وضعیت", "کارت", "زمان تأیید", "سرویس", "صف"]}
         empty={filtered.length === 0}
       >
         {filtered.map((u) => {
@@ -68,9 +71,9 @@ export default async function AdminKycQueuePage({
             national_code?: string | null;
             kyc_verified_at?: string | null;
             kyc_provider?: string | null;
-            kyc_level?: number | null;
-            kyc_bank_mask?: string | null;
           };
+          const own = cards.filter((c) => c.user_id === u.id && c.status === "VERIFIED");
+          const level = verificationState(u.kyc_status, own.length).level;
           return (
             <tr key={u.id} className="border-b border-white/5">
               <td className="px-4 py-3">
@@ -80,13 +83,13 @@ export default async function AdminKycQueuePage({
               </td>
               <td className="px-4 py-3" dir="ltr">{maskPhone(u.phone)} · {maskEmail(u.email)}</td>
               <td className="px-4 py-3" dir="ltr">{row.national_code ? maskNationalCode(row.national_code) : "—"}</td>
-              <td className="px-4 py-3">{row.kyc_level ?? (u.kyc_status === "VERIFIED" ? 1 : 0)}</td>
+              <td className="px-4 py-3">{level}</td>
               <td className="px-4 py-3">
                 <AdminBadge tone={u.kyc_status === "VERIFIED" ? "positive" : u.kyc_status === "REJECTED" ? "negative" : "warning"}>
                   {MAP[u.kyc_status] ?? u.kyc_status}
                 </AdminBadge>
               </td>
-              <td className="px-4 py-3 text-white/70">{row.kyc_bank_mask || "—"}</td>
+              <td className="px-4 py-3 text-white/70" dir="ltr">{own.map((c) => c.pan_masked).join("، ") || "—"}</td>
               <td className="px-4 py-3 text-white/70">{when(row.kyc_verified_at)}</td>
               <td className="px-4 py-3 text-white/45">{row.kyc_provider || "—"}</td>
               <td className="px-4 py-3">

@@ -132,8 +132,8 @@ API: `POST /api/auth/otp/request` سپس `POST /api/auth/phone-login` `{ phone, 
 
 وضعیت‌ها: `UNVERIFIED | PENDING | VERIFIED | REJECTED | NEEDS_UPDATE`
 
-- UI کاربر: `/app/profile/kyc` — سه مرحله. سطح ۱ کد ملی (رقم کنترل) و تاریخ تولد شمسی بالای ۱۸ سال. سرور شاهکار و استعلام ثبت احوال فینوتک را صدا می‌زند و در صورت تطبیق `kyc_status=VERIFIED` و `kyc_level=1` می‌شود. سطح ۲ کارت یا شبا را با همان کد ملی تطبیق می‌دهد و `kyc_level=2` می‌شود. شماره کامل کارت ذخیره نمی‌شود. توکن خام ذخیره نمی‌شود.
-- خرید/فروش: در `PRODUCTION` (یا با `REQUIRE_KYC_FOR_TRADE=true`) بدون سطح ۱ رد می‌شود. سقف روزانه سطح ۱ پایین‌تر از سطح ۲ است. در سندباکس پیش‌فرض خاموش است و سقف سطح اعمال نمی‌شود.
+- UI کاربر: `/app/profile/kyc` — سه مرحله با `?return=`. مرحله ۲ کد ملی و تاریخ تولد شمسی بالای ۱۸ سال؛ شاهکار و ثبت احوال فینوتک، نتیجه `kyc_status=VERIFIED`. مرحله ۳ کارت ۱۶ رقمی (Luhn، بانک از BIN) با `POST /kyc/v2/clients/{clientId}/cardOwnerVerification` بدنه `{card, nid}`؛ فقط با `isValid=true` در `user_bank_cards` (ماسک، هش، بانک، `verified_at`) ثبت می‌شود. سطح از همین دو منبع محاسبه می‌شود (`lib/kyc/verification.ts`).
+- دروازه: `assertVerified` در قیمت‌گیری و معامله. بدون هویت یا کارت: `403 {error:"verification_required", nextStep:"identity"|"card"}`. کلاینت با `VerificationGateProvider` همان را برای واریز و برداشت نشان می‌دهد (این دو هنوز endpoint سرور ندارند).
 - ادمین `/admin/kyc`: سطح، وضعیت شاهکار و ماسک حساب بانکی را نشان می‌دهد. تغییر پلن (لغو پلاس) از صفحه کاربر با دلیل و رکورد حسابرسی است.
 
 ---

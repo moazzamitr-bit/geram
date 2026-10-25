@@ -142,7 +142,6 @@ type DemoState = {
   }[];
   plusActive: boolean;
   kycStatus: KycStatus;
-  kycRequiredForTrade: boolean;
   referralCode: string | null;
   commerceSettings: CommerceSettings;
   getMetalMg: (instrument: InstrumentId) => number;
@@ -288,7 +287,6 @@ const seed = {
   scheduledPurchases: [] as DemoState["scheduledPurchases"],
   plusActive: false,
   kycStatus: "UNVERIFIED" as KycStatus,
-  kycRequiredForTrade: false,
   referralCode: null as string | null,
   commerceSettings: DEFAULT_COMMERCE_SETTINGS,
 };
@@ -386,14 +384,12 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
                   planTier: "free" | "plus";
                   referralCode: string | null;
                   kycStatus: KycStatus;
-                  kycRequiredForTrade?: boolean;
                 };
                 setState((s) => ({
                   ...s,
                   plusActive: plan.planTier === "plus",
                   referralCode: plan.referralCode,
                   kycStatus: plan.kycStatus ?? "UNVERIFIED",
-                  kycRequiredForTrade: Boolean(plan.kycRequiredForTrade),
                 }));
               }
             } catch {
@@ -446,14 +442,12 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
               planTier: "free" | "plus";
               referralCode: string | null;
               kycStatus: KycStatus;
-              kycRequiredForTrade?: boolean;
             };
             setState((s) => ({
               ...s,
               plusActive: plan.planTier === "plus",
               referralCode: plan.referralCode,
               kycStatus: plan.kycStatus ?? s.kycStatus,
-              kycRequiredForTrade: Boolean(plan.kycRequiredForTrade),
             }));
           }
         } catch {

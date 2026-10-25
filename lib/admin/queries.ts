@@ -33,6 +33,28 @@ export async function getUserBanks(userId: string) {
   return data ?? [];
 }
 
+export type AdminCardRow = {
+  user_id: string;
+  pan_masked: string;
+  bank_name: string;
+  status: string;
+  owner_track_id: string | null;
+  verified_at: string | null;
+};
+
+/** Verified bank cards (user_bank_cards). Pass no ids for every user. */
+export async function getUserCards(userIds?: string[]): Promise<AdminCardRow[]> {
+  const sb = await adminDb();
+  if (!sb) return [];
+  let query = sb
+    .from("user_bank_cards")
+    .select("user_id, pan_masked, bank_name, status, owner_track_id, verified_at")
+    .order("created_at", { ascending: true });
+  if (userIds) query = query.in("user_id", userIds);
+  const { data } = await query;
+  return (data ?? []) as AdminCardRow[];
+}
+
 export async function getUserTickets(userId: string) {
   const sb = await adminDb();
   if (!sb) return [];

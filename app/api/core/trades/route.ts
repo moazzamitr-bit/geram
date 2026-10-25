@@ -5,7 +5,7 @@ import { assertWithinDailyLimit } from "@/lib/core/limits";
 import { effectiveTradeLimits } from "@/lib/kyc/levels";
 import { irrToSafeTomanNumber } from "@/lib/core/money";
 import { CoreError } from "@/lib/core/types";
-import { assertTradeKyc } from "@/lib/kyc/trade-gate";
+import { assertVerified } from "@/lib/kyc/verification";
 import { loadCommerceSettings } from "@/lib/commerce/settings-server";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const userId = await requireCoreUserId();
-    const kyc = await assertTradeKyc(userId);
+    const kyc = await assertVerified(userId);
     const body = (await request.json()) as { quoteId?: string; idempotencyKey?: string };
     if (!body.quoteId) throw new CoreError("invalid_quote", "quoteId required");
     const key = readIdempotencyKey(request, body.idempotencyKey);
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         userId,
         side: quote.side,
         requestedToman: irrToSafeTomanNumber(quote.grossIrr),
-        limits: effectiveTradeLimits(settings.limits, kyc.level, kyc.required),
+        limits: effectiveTradeLimits(settings.limits, kyc.level),
       });
     }
 

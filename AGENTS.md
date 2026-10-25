@@ -88,9 +88,10 @@ and never leave production broken.
   write the password, so an old password account can sign in by OTP on the same phone.
   Resend waits 2 minutes. The code is 5 digits (what Finnotech SMS sends) unless `FINNOTECH_OTP_LENGTH` says otherwise.
   Do not change `AUTH_METHOD` without the owner's OK.
-- Shahkar KYC is server-side (`/app/profile/kyc`), then an optional card/IBAN ownership match.
-  Levels: 0 mobile, 1 identity (trade), 2 bank (higher caps and withdrawals). Buy/sell require
-  level 1 when `REQUIRE_KYC_FOR_TRADE` is unset and mode is `PRODUCTION` (off in SANDBOX / CLOSED_BETA).
+- Verification (`/app/profile/kyc`, 3-step stepper): mobile, Shahkar identity, then a bank card
+  matched to the national code (Finnotech cardOwnerVerification, `{card, nid}`). Cards live only in
+  `user_bank_cards`. Quotes/trades (and deposit/withdraw in the UI) always require both steps:
+  `403 verification_required` with `nextStep` (`lib/kyc/verification.ts`). No env switch.
   `check-db.sh --apply` records applied files in `geram_schema_migrations` and does not re-run them.
   The first run on an existing database stamps every file older than `20261024210000` and applies
   only that migration and anything newer.

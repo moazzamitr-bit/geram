@@ -13,12 +13,10 @@ import {
   receiptUnitPrice,
   type AmountField as AmountKind,
 } from "@/lib/app/trade-amount";
-import { useAuth } from "@/lib/auth/auth-context";
-import { isKycVerified } from "@/lib/commerce/kyc";
 import type { UiQuote } from "@/lib/core-api";
 import { tomanInWords } from "@/lib/format/amount";
 import { formatTehranJalaliDateTime } from "@/lib/format/datetime";
-import { TRADE_KYC_REQUIRED_MESSAGE } from "@/lib/kyc/messages";
+import { isVerificationRequired, useVerificationGate } from "@/components/app/VerificationGate";
 import {
   INSTRUMENTS,
   parseInstrumentId,
@@ -49,9 +47,7 @@ export function TradeDesk({
   instrument?: InstrumentId;
 }) {
   const store = useDemoStore();
-  const { user } = useAuth();
-  const kycBlocked =
-    store.kycRequiredForTrade && !isKycVerified(user?.kycStatus ?? store.kycStatus);
+  const gate = useVerificationGate();
   const router = useRouter();
   const searchParams = useSearchParams();
   const queried = instrumentFromTradeQuery({
@@ -212,10 +208,7 @@ export function TradeDesk({
     pending.current = true;
     setError("");
     try {
-      if (kycBlocked) {
-        setError(TRADE_KYC_REQUIRED_MESSAGE);
-        return;
-      }
+      if (!gate.guard()) return;
       if (side === "buy") {
         if (preview.toman < meta.minBuyToman) {
           setError(`حداقل خرید ${formatToman(meta.minBuyToman)} است.`);
@@ -232,6 +225,11 @@ export function TradeDesk({
           : { instrument, side: "SELL", metalMg: preview.goldMg }
       );
       if (!res.ok || !res.quote) {
+        if (isVerificationRequired(res.error)) {
+          gate.openGate();
+          void gate.refresh();
+          return;
+        }
         setError(tradeFailureMessage(res.error, "دریافت قیمت ممکن نشد."));
         return;
       }
@@ -260,6 +258,12 @@ export function TradeDesk({
       setLoading(true);
       const res = await store.executeQuote(quote.id);
       if (!res.ok || !res.txId) {
+        if (isVerificationRequired(res.error)) {
+          setLocked(null);
+          gate.openGate();
+          void gate.refresh();
+          return;
+        }
         setError(
           tradeFailureMessage(
             res.error,
@@ -323,14 +327,6 @@ export function TradeDesk({
       <h1 className="text-[22px] font-extrabold text-text md:text-[26px]">
         خرید و فروش {meta.title}
       </h1>
-      {kycBlocked && (
-        <p className="rounded-xl border border-black/[0.06] bg-[#FBF8F2] px-4 py-3 text-[13px] leading-7 text-text">
-          {TRADE_KYC_REQUIRED_MESSAGE}{" "}
-          <Link href="/app/profile/kyc" className="font-bold text-gold">
-            احراز هویت
-          </Link>
-        </p>
-      )}
 
       <div
         dir="ltr"

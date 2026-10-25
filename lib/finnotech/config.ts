@@ -9,7 +9,6 @@ export const FINNOTECH_SCOPE = {
   shahkarVerify: ["kyc:sms-shahkar-verification:get"],
   identification: ["kyc:identification-inquiry:get"],
   cardOwner: ["kyc:card-owner-verification:post"],
-  ibanOwner: ["kyc:iban-owner-verification:get"],
   /** Login OTP: messaging initiate/verify, or finnotext delivery when a sender line is set. */
   loginOtp: ["messaging:otp-initiate:post", "messaging:otp-verify:post", "facility:finnotext-otp:post"],
 } as const satisfies Record<string, readonly string[]>;

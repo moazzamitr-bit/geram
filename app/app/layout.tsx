@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app/AppShell";
+import { VerificationGateProvider } from "@/components/app/VerificationGate";
 import { DemoStoreProvider } from "@/lib/app/demo-store";
 import { AuthProvider } from "@/lib/auth/auth-context";
 import type { Metadata, Viewport } from "next";
@@ -34,7 +35,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <DemoStoreProvider>
-        <AppShell>{children}</AppShell>
+        <VerificationGateProvider>
+          <AppShell>{children}</AppShell>
+        </VerificationGateProvider>
       </DemoStoreProvider>
     </AuthProvider>
   );
