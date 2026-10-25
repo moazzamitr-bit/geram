@@ -76,10 +76,10 @@ describe("shahkar sms requests", () => {
     const verified = await verifyShahkarSms("123456", sent.trackId, MOBILE, NID);
     expect(verified).toEqual({ matched: true, trackId: "sms-verify-track-id" });
 
-    const shahkar = urls.filter((href) => href.includes("/shahkar/"));
+    const shahkar = urls.filter((href) => href.includes("hahkar"));
     expect(shahkar).toEqual([
       `https://api.finnotech.ir/kyc/v2/clients/geram/shahkar/smsSend?trackId=${SEND_TRACK}&mobile=${MOBILE}&nationalCode=${NID}`,
-      `https://api.finnotech.ir/kyc/v2/clients/geram/shahkar/smsVerification?trackId=${VERIFY_TRACK}&otp=123456&inquiryTrackId=sms-send-track-id&mobile=${MOBILE}&nationalCode=${NID}`,
+      `https://api.finnotech.ir/kyc/v2/clients/geram/smsShahkarVerification?trackId=${VERIFY_TRACK}&otp=123456&inquiryTrackId=sms-send-track-id&mobile=${MOBILE}&nationalCode=${NID}`,
     ]);
     expect(SEND_TRACK).not.toBe(VERIFY_TRACK);
     expect(shahkar[1]).not.toContain(`trackId=${SEND_TRACK}`);
@@ -149,8 +149,8 @@ describe("shahkar sms requests", () => {
       code: "OTP_MISMATCH",
       httpStatus: 400,
     });
-    expect(urls.filter((href) => href.includes("/shahkar/"))).toEqual([
-      `https://api.finnotech.ir/kyc/v2/clients/geram/shahkar/smsVerification?trackId=${VERIFY_TRACK}&otp=123456&inquiryTrackId=track-send&mobile=${MOBILE}&nationalCode=${NID}`,
+    expect(urls.filter((href) => href.includes("hahkar"))).toEqual([
+      `https://api.finnotech.ir/kyc/v2/clients/geram/smsShahkarVerification?trackId=${VERIFY_TRACK}&otp=123456&inquiryTrackId=track-send&mobile=${MOBILE}&nationalCode=${NID}`,
     ]);
   });
 });

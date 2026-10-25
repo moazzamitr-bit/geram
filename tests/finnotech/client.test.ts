@@ -163,12 +163,12 @@ describe("finnotech client", () => {
     await expect(
       finnotechCall({
         method: "GET", scopes: ["kyc:identification-inquiry:get"],
-        path: "/kyc/v2/clients/geram/shahkar/smsVerification",
+        path: "/kyc/v2/clients/geram/smsShahkarVerification",
         query: { otp: "12345", nationalCode: NID, mobile: "09120000000" },
       })
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR", httpStatus: 400 });
     const blob = logs.join("\n");
-    expect(blob).toContain("finnotech_http GET /kyc/v2/clients/geram/shahkar/smsVerification 400 VALIDATION_ERROR");
+    expect(blob).toContain("finnotech_http GET /kyc/v2/clients/geram/smsShahkarVerification 400 VALIDATION_ERROR");
     expect(blob).toContain("invalid nationalCode");
     expect(blob).toContain("FN-BRFH-40099900000");
     expect(blob).not.toContain(NID);

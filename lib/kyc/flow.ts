@@ -1,5 +1,6 @@
 import {
   isShahkarConfigError,
+  isShahkarOtpRejected,
   type IdentityInquiry,
   type ShahkarScope,
   type ShahkarSend,
@@ -144,6 +145,7 @@ function providerError(err: unknown, clientError?: KycErrorCode): KycFlowError {
 
 /** Wrong or expired SMS code. VALIDATION_ERROR and FN-BRFH are configuration, not a typo. */
 function isOtpMismatchError(err: FinnotechError): boolean {
+  if (isShahkarOtpRejected(err)) return true;
   if (isShahkarConfigError(err)) return false;
   const blob = `${err.code} ${err.providerMessage}`;
   return /otp|mismatch|not[_\s-]?match|invalid[_\s-]?code|wrong[_\s-]?code|expired|رمز|کد\s*(تایید|تأیید|وارد)/i.test(
