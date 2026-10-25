@@ -278,7 +278,7 @@ API:
 | `market_prices` | تاریخچه قیمت persistشده |
 | `price_alerts` / `price_alert_orders` | هشدار و سفارش خودکار |
 | `platform_settings` | JSON کارمزد/پلاس/رفرال |
-| `referral_events` | دعوت |
+| `referral_rewards` | سهم دعوت‌کننده از کارمزد (هر معامله یک ردیف، سند دفترکل referral_reward) |
 | `audit_logs` | لاگ ادمین (کم‌استفاده) |
 
 RLS: کاربر ردیف خودش را می‌بیند؛ ادمین همه را. `market_prices` خواندنی عمومی. کاربر مجاز به **update کیف خودش** است — این برای سندباکس لازم است اما برای تولید خطرناک است (باید به RPC اتمی منتقل شود).

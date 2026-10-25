@@ -21,9 +21,6 @@ export type PlusSettings = {
 };
 
 export type ReferralSettings = {
-  inviterBonusToman: number;
-  inviteeBonusToman: number;
-  minKycForPayout: boolean;
   /** Share of each invitee's trade fees credited to the inviter (Gerami model). */
   feeSharePercent: number;
 };
@@ -67,9 +64,6 @@ export const DEFAULT_COMMERCE_SETTINGS: CommerceSettings = {
     smsAlertsPlusOnly: true,
   },
   referral: {
-    inviterBonusToman: 0,
-    inviteeBonusToman: 0,
-    minKycForPayout: true,
     feeSharePercent: 0.15,
   },
   limits: {

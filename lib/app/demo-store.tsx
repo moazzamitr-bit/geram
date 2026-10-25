@@ -185,7 +185,6 @@ type DemoState = {
   createTicket: (category: string, subject: string, message: string) => string;
   replyTicket: (id: string, text: string) => void;
   addScheduledPurchase: (amountRial: number, cadence: string) => { ok: boolean; error?: string };
-  applyReferralCode: (code: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
   refreshMarketPrice: () => Promise<void>;
 };
 
@@ -970,24 +969,6 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           );
         }
         return { ok: true };
-      },
-      applyReferralCode: async (code) => {
-        try {
-          const res = await fetch("/api/referral/apply", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code }),
-          });
-          const data = (await res.json()) as {
-            ok: boolean;
-            error?: string;
-            message?: string;
-          };
-          if (!data.ok) return { ok: false, error: data.error ?? "خطا" };
-          return { ok: true, message: data.message };
-        } catch {
-          return { ok: false, error: "خطا در ثبت کد دعوت" };
-        }
       },
       refreshMarketPrice,
     }),

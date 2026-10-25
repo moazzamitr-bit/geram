@@ -265,39 +265,8 @@ export function CommerceSettingsForm({ initial }: Props) {
             />
           </Field>
           <div className="self-end pb-2 text-[12px] text-white/40">
-            مدل درآمد مشترک؛ پاداش ثابت را صفر بگذارید مگر برای کمپین.
+            پاداش فقط به دعوت‌کننده‌ای با احراز کامل (شاهکار + کارت) واریز می‌شود.
           </div>
-          <Field label="پاداش دعوت‌کننده (تومان)">
-            <NumberInput
-              value={referral.inviterBonusToman}
-              onChange={(n) =>
-                setReferral((r) => ({ ...r, inviterBonusToman: n }))
-              }
-              words
-            />
-          </Field>
-          <Field label="پاداش دعوت‌شده (تومان)">
-            <NumberInput
-              value={referral.inviteeBonusToman}
-              onChange={(n) =>
-                setReferral((r) => ({ ...r, inviteeBonusToman: n }))
-              }
-              words
-            />
-          </Field>
-          <label className="flex items-center gap-2 text-[13px] text-white/70 sm:col-span-2">
-            <input
-              type="checkbox"
-              checked={referral.minKycForPayout}
-              onChange={(e) =>
-                setReferral((r) => ({
-                  ...r,
-                  minKycForPayout: e.target.checked,
-                }))
-              }
-            />
-            واریز پاداش فقط پس از احراز هویت
-          </label>
         </div>
       </div>
 

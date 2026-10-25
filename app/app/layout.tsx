@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app/AppShell";
+import { ReferralCookieApply } from "@/components/app/ReferralCookieApply";
 import { VerificationGateProvider } from "@/components/app/VerificationGate";
 import { DemoStoreProvider } from "@/lib/app/demo-store";
 import { AuthProvider } from "@/lib/auth/auth-context";
@@ -36,6 +37,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <DemoStoreProvider>
         <VerificationGateProvider>
+          <ReferralCookieApply />
           <AppShell>{children}</AppShell>
         </VerificationGateProvider>
       </DemoStoreProvider>

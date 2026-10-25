@@ -97,7 +97,7 @@ export const adminNavCatalog: AdminNavGroup[] = [
       { label: "اهداف", href: "/admin/goals", icon: Target },
       { label: "خرید دوره‌ای", href: "/admin/dca", icon: Flag },
       { label: "هشدار قیمت", href: "/admin/alerts", icon: Bell },
-      { label: "رفرال", href: "/admin/referrals", icon: Gift },
+      { label: "معرفی دوستان", href: "/admin/referrals", icon: Gift },
       { label: "گرم پلاس", href: "/admin/plus", icon: Flag },
       { label: "برداشت فیزیکی", href: "/admin/delivery", icon: Package },
     ],
