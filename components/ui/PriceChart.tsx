@@ -25,6 +25,8 @@ export type PriceChartProps = {
   stroke?: string;
   appearance?: "dark" | "light";
   showAxis?: boolean;
+  /** Shows the period high and low under the chart. */
+  showExtremes?: boolean;
 };
 
 export function PriceChart({
@@ -36,6 +38,7 @@ export function PriceChart({
   stroke = "#F0C568",
   appearance = "dark",
   showAxis = false,
+  showExtremes = false,
 }: PriceChartProps) {
   const [data, setData] = useState<Point[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,12 +122,16 @@ export function PriceChart({
     );
   }
 
+  const values = data.map((d) => d.value);
+  const high = Math.max(...values);
+  const low = Math.min(...values);
   const gradId = `goldFill-${variant}-${stroke.replace("#", "")}`;
   const light = appearance === "light";
   const axisFill = light ? "#a8a29e" : "#8e928d";
 
   return (
-    <div className={cn("w-full", className)} style={{ height }}>
+    <div className={cn("w-full", className)}>
+    <div className="w-full" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={data}
@@ -183,6 +190,29 @@ export function PriceChart({
           />
         </AreaChart>
       </ResponsiveContainer>
+    </div>
+    {showExtremes && (
+      <div
+        className={cn(
+          "mt-2 flex items-center justify-center gap-4 text-[12px]",
+          light ? "text-muted-app" : "text-[#8e928d]"
+        )}
+      >
+        <span>
+          بیشترین{" "}
+          <span className={cn("font-bold tabular-nums", light ? "text-[#1C1917]" : "text-white")}>
+            {formatToman(high)}
+          </span>
+        </span>
+        <span className="h-4 w-px bg-current opacity-30" />
+        <span>
+          کمترین{" "}
+          <span className={cn("font-bold tabular-nums", light ? "text-[#1C1917]" : "text-white")}>
+            {formatToman(low)}
+          </span>
+        </span>
+      </div>
+    )}
     </div>
   );
 }
