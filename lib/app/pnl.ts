@@ -4,6 +4,8 @@ type TradeLike = {
   goldMg: number;
   pricePerGram: number;
   instrument?: string;
+  /** Buy fee in toman. Included so cost basis is the gross amount paid. */
+  feeRial?: number;
 };
 
 /** Weighted average buy price (تومان / گرم) from completed buy trades. */
@@ -22,7 +24,8 @@ export function averageBuyPriceFromTrades(
     const txInstrument = tx.instrument ?? "gold18";
     if (instrument && txInstrument !== instrument) continue;
     totalMg += tx.goldMg;
-    totalCost += (tx.goldMg / 1000) * tx.pricePerGram;
+    const fee = tx.feeRial != null && tx.feeRial > 0 ? tx.feeRial : 0;
+    totalCost += (tx.goldMg / 1000) * tx.pricePerGram + fee;
   }
 
   if (totalMg <= 0) return fallbackPrice;

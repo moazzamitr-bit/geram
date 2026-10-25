@@ -1,39 +1,34 @@
 import { finnotechCall, FinnotechError } from "@/lib/finnotech/client";
 import { finnotechClientId } from "@/lib/finnotech/config";
+import { redactSecrets } from "@/lib/finnotech/redact";
 
 /**
  * Shahkar SMS send + verification, then civil-registry identification.
  *
- * smsSend contract, operation facilityShahkarSmsSendGet in
- * https://docs.finnotech.ir/openapi-public.json (fetched 2026-10-24):
+ * Public OpenAPI (docs.finnotech.ir/openapi-public.json):
  *   GET /facility/v2/clients/{clientId}/shahkar/smsSend
- *   required query: trackId (UUID, max 40), mobile, nationalCode
- *   optional query: version=2
- *   result.smsSent
- * Scope facility:sms-shahkar-send:get. The live client still answers the KYC
- * alias first (scope kyc:sms-shahkar-send:get):
- *   GET /kyc/v2/clients/{clientId}/shahkar/smsSend
- *   query: trackId, mobile, nationalCode
- * Facility is the 404 fallback and sends version=2.
- *
- * smsVerification is not in that public OpenAPI. Production
+ *     operation facilityShahkarSmsSendGet
+ *     query: trackId, mobile, nationalCode, optional version=2
+ *     scope facility:sms-shahkar-send:get
+ *   GET /facility/v2/clients/{clientId}/shahkar/verify
+ *     operation facilityShahkarVerifyGet
+ *     query: mobile, nationalCode only — no otp. This is a direct match,
+ *     not proof the user received the SMS, so it is never used as verify.
+ * SMS OTP verification itself is not in that public document. Production
  *   GET /kyc/v2/clients/{clientId}/shahkar/smsVerification
- *   (scope kyc:sms-shahkar-verification:get)
- * returns 400 VALIDATION_ERROR when the query is only otp and inquiryTrackId.
- * The call sends the smsSend subject keys (mobile, nationalCode), the code
- * (otp), the smsSend response track id as inquiryTrackId (the follow-up name
- * used by finnotextInquiry and transactionCreditInquiryVerify in the same
- * spec), and a new trackId. finnotechCall sets a fresh UUID trackId on every call.
- *
- * Identification (scope kyc:identification-inquiry:get):
- *   GET /kyc/v2/clients/{clientId}/identificationInquiry
- *     nationalCode, birthDate yyyy/mm/dd
+ * returns 400 VALIDATION_ERROR (FN-BRFH-…) "invalid request, Please check
+ * service url and http method". Those 400s and 404s try the next candidate.
+ * Verify is ordered to the scope whose smsSend succeeded: smsVerification,
+ * then POST {otp,inquiryTrackId,mobile,nationalCode}, then the smsVerify
+ * alias, on both kyc and facility. Facility calls send version=2.
  */
 
+export type ShahkarScope = "kyc" | "facility";
+
 export type ShahkarSend =
-  | { outcome: "otp_required"; trackId: string }
-  | { outcome: "mismatch"; trackId: string }
-  | { outcome: "matched_without_otp"; trackId: string };
+  | { outcome: "otp_required"; trackId: string; scope: ShahkarScope }
+  | { outcome: "mismatch"; trackId: string; scope: ShahkarScope }
+  | { outcome: "matched_without_otp"; trackId: string; scope: ShahkarScope };
 
 export type IdentityInquiry = {
   firstName: string;
@@ -49,12 +44,12 @@ function clientPath(prefix: string) {
 
 type SendBody = { smsSent?: boolean; isValid?: boolean };
 
-function interpretSend(trackId: string, result: SendBody): ShahkarSend {
+function interpretSend(trackId: string, scope: ShahkarScope, result: SendBody): ShahkarSend {
   if (result.isValid === false || result.smsSent === false) {
-    return { outcome: "mismatch", trackId };
+    return { outcome: "mismatch", trackId, scope };
   }
-  if (result.smsSent === true) return { outcome: "otp_required", trackId };
-  if (result.isValid === true) return { outcome: "matched_without_otp", trackId };
+  if (result.smsSent === true) return { outcome: "otp_required", trackId, scope };
+  if (result.isValid === true) return { outcome: "matched_without_otp", trackId, scope };
   throw new FinnotechError("send_unrecognized", 200);
 }
 
@@ -62,50 +57,122 @@ function mismatchError(err: unknown) {
   return err instanceof FinnotechError && /mismatch|not_?match|shahkar_reject|nid_mobile/i.test(err.code);
 }
 
-export async function sendShahkarSms(mobile: string, nationalCode: string): Promise<ShahkarSend> {
-  const query = { mobile, nationalCode };
-  try {
-    const sent = await finnotechCall<SendBody>({
-      method: "GET",
-      path: `${clientPath("kyc")}/shahkar/smsSend`,
-      query,
-    });
-    return interpretSend(sent.trackId, sent.result);
-  } catch (err) {
-    if (mismatchError(err)) return { outcome: "mismatch", trackId: "" };
-    if (!(err instanceof FinnotechError) || err.httpStatus !== 404) throw err;
+/** Wrong URL/method or a missing route. A real OTP rejection uses another code. */
+export function isShahkarConfigError(err: unknown): boolean {
+  if (!(err instanceof FinnotechError)) return false;
+  if (err.httpStatus === 404) return true;
+  if (err.httpStatus !== 400) return false;
+  const blob = `${err.code}\n${err.providerMessage}\n${err.providerBody}`;
+  return err.code === "VALIDATION_ERROR" || /FN-BRFH/i.test(blob);
+}
+
+function logShahkar(method: string, path: string, status: number, detail: string, secrets: string[]) {
+  let safe = redactSecrets(detail);
+  for (const secret of secrets) {
+    if (secret.length >= 4) safe = safe.split(secret).join("[redacted]");
   }
-  const sent = await finnotechCall<SendBody>({
-    method: "GET",
-    path: `${clientPath("facility")}/shahkar/smsSend`,
-    query: { ...query, version: 2 },
-  });
-  return interpretSend(sent.trackId, sent.result);
+  console.error("shahkar_sms", method, path, status, safe);
+}
+
+function errorDetail(err: unknown): { status: number; detail: string } {
+  if (err instanceof FinnotechError) {
+    return {
+      status: err.httpStatus,
+      detail: JSON.stringify({
+        code: err.code,
+        message: err.providerMessage,
+        body: err.providerBody,
+      }),
+    };
+  }
+  return { status: 0, detail: err instanceof Error ? err.name : "error" };
+}
+
+export async function sendShahkarSms(mobile: string, nationalCode: string): Promise<ShahkarSend> {
+  const secrets = [mobile, nationalCode];
+  const attempts: { scope: ShahkarScope; query: Record<string, string | number> }[] = [
+    { scope: "kyc", query: { mobile, nationalCode } },
+    { scope: "facility", query: { mobile, nationalCode, version: 2 } },
+  ];
+  let last: unknown;
+  for (const attempt of attempts) {
+    const path = `${clientPath(attempt.scope)}/shahkar/smsSend`;
+    try {
+      const sent = await finnotechCall<SendBody>({
+        method: "GET",
+        path,
+        query: attempt.query,
+      });
+      logShahkar(
+        "GET",
+        path,
+        200,
+        JSON.stringify({ smsSent: sent.result.smsSent ?? null, isValid: sent.result.isValid ?? null }),
+        secrets
+      );
+      return interpretSend(sent.trackId, attempt.scope, sent.result);
+    } catch (err) {
+      const logged = errorDetail(err);
+      logShahkar("GET", path, logged.status, logged.detail, secrets);
+      if (mismatchError(err)) return { outcome: "mismatch", trackId: "", scope: attempt.scope };
+      last = err;
+      if (!isShahkarConfigError(err)) throw err;
+    }
+  }
+  throw last instanceof Error ? last : new FinnotechError("send_missing", 404);
+}
+
+type VerifyAttempt = {
+  scope: ShahkarScope;
+  method: "GET" | "POST";
+  alias: "smsVerification" | "smsVerify";
+};
+
+function verifyAttempts(preferred?: ShahkarScope): VerifyAttempt[] {
+  const scopes: ShahkarScope[] = preferred === "facility" ? ["facility", "kyc"] : ["kyc", "facility"];
+  const attempts: VerifyAttempt[] = [];
+  for (const scope of scopes) {
+    attempts.push({ scope, method: "GET", alias: "smsVerification" });
+    attempts.push({ scope, method: "POST", alias: "smsVerification" });
+    attempts.push({ scope, method: "GET", alias: "smsVerify" });
+    attempts.push({ scope, method: "POST", alias: "smsVerify" });
+  }
+  return attempts;
 }
 
 export async function verifyShahkarSms(
   otp: string,
   inquiryTrackId: string,
   mobile: string,
-  nationalCode: string
+  nationalCode: string,
+  scope?: ShahkarScope
 ) {
-  const query = { otp, inquiryTrackId, mobile, nationalCode };
-  const paths = [
-    `${clientPath("kyc")}/shahkar/smsVerification`,
-    `${clientPath("kyc")}/shahkar/smsVerify`,
-  ];
+  const secrets = [otp, inquiryTrackId, mobile, nationalCode];
+  const subject = { otp, inquiryTrackId, mobile, nationalCode };
   let last: unknown;
-  for (const path of paths) {
+  for (const attempt of verifyAttempts(scope)) {
+    const path = `${clientPath(attempt.scope)}/shahkar/${attempt.alias}`;
+    const version = attempt.scope === "facility" ? { version: 2 as const } : {};
     try {
       const verified = await finnotechCall<{ isValid?: boolean }>({
-        method: "GET",
+        method: attempt.method,
         path,
-        query,
+        query: attempt.method === "GET" ? { ...subject, ...version } : version,
+        body: attempt.method === "POST" ? subject : undefined,
       });
+      logShahkar(
+        attempt.method,
+        path,
+        200,
+        JSON.stringify({ isValid: verified.result.isValid === true }),
+        secrets
+      );
       return { matched: verified.result.isValid === true, trackId: verified.trackId };
     } catch (err) {
+      const logged = errorDetail(err);
+      logShahkar(attempt.method, path, logged.status, logged.detail, secrets);
       last = err;
-      if (!(err instanceof FinnotechError) || err.httpStatus !== 404) throw err;
+      if (!isShahkarConfigError(err)) throw err;
     }
   }
   throw last instanceof Error ? last : new FinnotechError("verify_missing", 404);

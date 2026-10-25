@@ -82,6 +82,7 @@ export function tgjuExecutableFeed(fetchCurrent: () => Promise<Record<string, un
           throw new CoreError("price_unavailable", "gold 18k price invalid", 503);
         }
         const observedRaw = picked!.row.ts;
+        // geram18's ts is often Tehran midnight (the daily bar), not the last tick.
         const stale = isTimestampStale(observedRaw, SPOT_STALE_AFTER_MS);
         return quote({
           instrument: "IRAN_GOLD_18K_IRR_PER_GRAM",

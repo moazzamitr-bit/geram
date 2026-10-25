@@ -19,7 +19,10 @@ async function coreFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const data = (await res.json()) as T & CoreApiError;
   if (!res.ok || (data as CoreApiError).ok === false) {
     const err = data as CoreApiError;
-    throw new Error(err.message || err.error || `core_api_${res.status}`);
+    const code = typeof err.error === "string" ? err.error.trim() : "";
+    const message = typeof err.message === "string" ? err.message.trim() : "";
+    const text = [code, message].filter(Boolean).join(" ");
+    throw new Error(text || `core_api_${res.status}`);
   }
   return data;
 }

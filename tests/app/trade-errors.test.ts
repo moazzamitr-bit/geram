@@ -17,6 +17,18 @@ describe("trade failure copy", () => {
     expect(tradeFailureMessage("quote_expired", "خطا")).toBe(
       "اعتبار قیمت تمام شد. قیمت جدید بگیرید."
     );
+    expect(tradeFailureMessage("price_stale Execution price is stale", "دریافت قیمت ممکن نشد.")).toBe(
+      "قیمت بازار کهنه شده است. چند لحظه بعد دوباره قیمت بگیرید."
+    );
+    expect(tradeFailureMessage("price_unavailable market feed unreachable", "دریافت قیمت ممکن نشد.")).toBe(
+      "دریافت قیمت از بازار ممکن نشد. کمی بعد دوباره تلاش کنید."
+    );
+    expect(tradeFailureMessage("not_executable Temporary public market data", "دریافت قیمت ممکن نشد.")).toBe(
+      "این قیمت فعلاً برای خرید و فروش قابل اجرا نیست."
+    );
+    expect(tradeFailureMessage("insufficient_inventory Not enough metal available to sell", "خطا")).toBe(
+      "موجودی فلز کافی نیست."
+    );
     expect(tradeFailureMessage("مقدار فلز قابل فروش کافی نیست.", "خطا")).toBe(
       "مقدار فلز قابل فروش کافی نیست."
     );

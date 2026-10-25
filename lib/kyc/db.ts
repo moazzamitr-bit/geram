@@ -1,6 +1,14 @@
 import { createServiceClient } from "@/lib/supabase/admin";
 import { safeFinnotechLog } from "@/lib/finnotech/client";
-import { KycFlowError, type KycChallenge, type KycProfile, type KycStore, type VerifiedIdentity } from "@/lib/kyc/flow";
+import {
+  KycFlowError,
+  packInquiryTrack,
+  unpackInquiryTrack,
+  type KycChallenge,
+  type KycProfile,
+  type KycStore,
+  type VerifiedIdentity,
+} from "@/lib/kyc/flow";
 import { writeAudit } from "@/lib/admin/audit";
 
 type ChallengeRow = {
@@ -14,10 +22,12 @@ type ChallengeRow = {
 };
 
 function rowToChallenge(row: ChallengeRow): KycChallenge {
+  const packed = unpackInquiryTrack(row.inquiry_track_id);
   return {
     nationalCode: row.national_code,
     birthDate: row.birth_date,
-    inquiryTrackId: row.inquiry_track_id,
+    inquiryTrackId: packed.trackId,
+    sendScope: packed.scope,
     expiresAt: new Date(row.expires_at).getTime(),
     attempts: Number(row.attempts ?? 0),
     shahkarMatched: Boolean(row.shahkar_matched),
@@ -62,7 +72,7 @@ export function supabaseKycStore(): KycStore {
         user_id: userId,
         national_code: challenge.nationalCode,
         birth_date: challenge.birthDate,
-        inquiry_track_id: challenge.inquiryTrackId,
+        inquiry_track_id: packInquiryTrack(challenge.inquiryTrackId, challenge.sendScope),
         expires_at: new Date(challenge.expiresAt).toISOString(),
         attempts: challenge.attempts,
         shahkar_matched: challenge.shahkarMatched,

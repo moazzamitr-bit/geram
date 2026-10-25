@@ -1035,6 +1035,8 @@ export class FinancialCore {
 
     const metalCost = quote.netIrr;
     const fee = quote.feeIrr;
+    // Cash control keeps the metal leg. The user's cost basis is what they paid, fee included.
+    const grossCost = quote.grossIrr;
     await postJournal(this.deps.store, {
       id: newId("jnl"),
       createdAt: trade.createdAt,
@@ -1050,7 +1052,7 @@ export class FinancialCore {
       ],
     });
     await this.deps.store.updateReservationStatus(res.id, ["OPEN"], "CONSUMED");
-    await this.addUserCost(quote.userId, quote.asset, quote.weightUg, metalCost);
+    await this.addUserCost(quote.userId, quote.asset, quote.weightUg, grossCost);
   }
 
   private async postSell(quote: Quote, trade: Trade) {

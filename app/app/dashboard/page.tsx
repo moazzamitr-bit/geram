@@ -120,6 +120,13 @@ export default function DashboardPage() {
                   <span className="text-muted-app">—</span>
                 )}
               </p>
+              <HoldingPnl
+                grams={row.grams}
+                marketPrice={row.marketPrice}
+                avgBuyPrice={row.avgBuyPrice}
+                pnl={row.pnl}
+                pnlPct={row.pnlPct}
+              />
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <Link
                   href={tradePathForInstrument(row.id, "sell")}
@@ -173,6 +180,13 @@ export default function DashboardPage() {
                     <p className="mt-1 text-[12px] tabular-nums text-muted-app">
                       {formatFaNumber(row.grams, { maximumFractionDigits: 3 })} گرم
                     </p>
+                    <HoldingPnl
+                      grams={row.grams}
+                      marketPrice={row.marketPrice}
+                      avgBuyPrice={row.avgBuyPrice}
+                      pnl={row.pnl}
+                      pnlPct={row.pnlPct}
+                    />
                   </div>
                   <div className="text-left">
                     <p className="tabular-nums text-text">{formatToman(row.marketValue)}</p>
@@ -251,6 +265,36 @@ export default function DashboardPage() {
           </ul>
         )}
       </section>
+    </div>
+  );
+}
+
+function HoldingPnl({
+  grams,
+  marketPrice,
+  avgBuyPrice,
+  pnl,
+  pnlPct,
+}: {
+  grams: number;
+  marketPrice: number;
+  avgBuyPrice: number;
+  pnl: number;
+  pnlPct: number;
+}) {
+  if (grams <= 0 || marketPrice <= 0) return null;
+  const profit = pnl >= 0;
+  const pct = pnlPct.toLocaleString("fa-IR", { maximumFractionDigits: 1 });
+  return (
+    <div className="mt-2 space-y-0.5 text-[12px]">
+      <p className="text-muted-app">
+        میانگین خرید <span className="tabular-nums text-text">{formatToman(avgBuyPrice)}</span>
+      </p>
+      <p className={cn("font-semibold tabular-nums", profit ? "text-positive" : "text-negative")}>
+        {profit ? "سود" : "زیان"} {profit ? "+" : ""}
+        {formatToman(pnl)} ({profit ? "+" : ""}
+        {pct}٪)
+      </p>
     </div>
   );
 }

@@ -14,6 +14,7 @@ export const KYC_MESSAGES = {
   no_phone: "شماره موبایل روی این حساب ثبت نشده است.",
   already_verified: "هویت این حساب قبلاً تأیید شده است.",
   unavailable: "سرویس احراز هویت موقتاً در دسترس نیست. کمی بعد دوباره تلاش کنید.",
+  provider_config: "تنظیم سرویس تأیید شاهکار کامل نیست. کمی بعد دوباره تلاش کنید.",
   duplicate_national_code: "این کد ملی قبلاً برای حساب دیگری ثبت شده است.",
   provider: "سرویس احراز هویت پاسخ نداد. کمی بعد دوباره تلاش کنید.",
   underage: "افتتاح حساب از ۱۸ سال تمام امکان‌پذیر است.",
@@ -32,6 +33,7 @@ export type KycErrorCode = keyof typeof KYC_MESSAGES;
  */
 export function kycOtpUiError(status: number, data: { error?: string; message?: string } | null): string {
   if (data?.error === "not_configured") return KYC_MESSAGES.not_configured;
+  if (data?.error === "provider_config") return data.message?.trim() || KYC_MESSAGES.provider_config;
   if (status >= 500) return KYC_MESSAGES.unavailable;
   if (status === 400) return data?.message?.trim() || KYC_MESSAGES.invalid_otp;
   if (data?.message?.trim()) return data.message.trim();

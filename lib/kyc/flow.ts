@@ -1,4 +1,9 @@
-import type { IdentityInquiry, ShahkarSend } from "@/lib/finnotech/kyc";
+import {
+  isShahkarConfigError,
+  type IdentityInquiry,
+  type ShahkarScope,
+  type ShahkarSend,
+} from "@/lib/finnotech/kyc";
 import { FinnotechError } from "@/lib/finnotech/client";
 import { redactSecrets } from "@/lib/finnotech/redact";
 import { KYC_MESSAGES, type KycErrorCode } from "@/lib/kyc/messages";
@@ -39,11 +44,25 @@ export type KycChallenge = {
   nationalCode: string;
   birthDate: string;
   inquiryTrackId: string;
+  /** Scope whose smsSend succeeded. Absent on challenges saved before this field. */
+  sendScope?: ShahkarScope;
   expiresAt: number;
   attempts: number;
   shahkarMatched: boolean;
   createdAt: number;
 };
+
+/** Keep the send scope next to the track id without a new column. */
+export function packInquiryTrack(trackId: string, scope?: ShahkarScope): string {
+  if (scope !== "kyc" && scope !== "facility") return trackId;
+  return `${scope}|${trackId}`;
+}
+
+export function unpackInquiryTrack(stored: string): { trackId: string; scope?: ShahkarScope } {
+  const match = /^(kyc|facility)\|([\s\S]+)$/.exec(stored);
+  if (!match) return { trackId: stored };
+  return { scope: match[1] as ShahkarScope, trackId: match[2] };
+}
 
 export type VerifiedIdentity = {
   firstName: string;
@@ -81,7 +100,8 @@ export type KycDeps = {
     otp: string,
     inquiryTrackId: string,
     mobile: string,
-    nationalCode: string
+    nationalCode: string,
+    scope?: ShahkarScope
   ) => Promise<{ matched: boolean; trackId: string }>;
   inquire: (nationalCode: string, birthDate: string) => Promise<IdentityInquiry>;
   limit?: (key: string, max: number, windowMs: number, now: number) => { ok: boolean; retryAfterSec: number };
@@ -115,6 +135,29 @@ function providerError(err: unknown, clientError?: KycErrorCode): KycFlowError {
   }
   if (clientError && err instanceof FinnotechError && err.httpStatus === 400) {
     return new KycFlowError(clientError, 400, safeShahkarReason(err.providerMessage) ?? undefined);
+  }
+  return new KycFlowError("provider", 502);
+}
+
+/** Wrong or expired SMS code. VALIDATION_ERROR and FN-BRFH are configuration, not a typo. */
+function isOtpMismatchError(err: FinnotechError): boolean {
+  if (isShahkarConfigError(err)) return false;
+  const blob = `${err.code} ${err.providerMessage}`;
+  return /otp|mismatch|not[_\s-]?match|invalid[_\s-]?code|wrong[_\s-]?code|expired|رمز|کد\s*(تایید|تأیید|وارد)/i.test(
+    blob
+  );
+}
+
+function verifyProviderError(err: unknown): KycFlowError {
+  if (err instanceof KycFlowError) return err;
+  if (err instanceof FinnotechError && err.code === "not_configured") {
+    return new KycFlowError("not_configured", 503);
+  }
+  if (err instanceof FinnotechError && isShahkarConfigError(err)) {
+    return new KycFlowError("provider_config", 503);
+  }
+  if (err instanceof FinnotechError && isOtpMismatchError(err)) {
+    return new KycFlowError("invalid_otp", 400, safeShahkarReason(err.providerMessage) ?? undefined);
   }
   return new KycFlowError("provider", 502);
 }
@@ -246,6 +289,7 @@ export async function startShahkarKyc(
     nationalCode,
     birthDate,
     inquiryTrackId: sent.trackId,
+    sendScope: sent.scope,
     expiresAt: now + CHALLENGE_TTL_MS,
     attempts: 0,
     shahkarMatched: false,
@@ -286,9 +330,15 @@ export async function confirmShahkarKyc(
     if (!/^09\d{9}$/.test(phone)) throw new KycFlowError("no_phone", 400);
     let verified: { matched: boolean; trackId: string };
     try {
-      verified = await deps.verifyShahkar(otp, challenge.inquiryTrackId, phone, challenge.nationalCode);
+      verified = await deps.verifyShahkar(
+        otp,
+        challenge.inquiryTrackId,
+        phone,
+        challenge.nationalCode,
+        challenge.sendScope
+      );
     } catch (err) {
-      throw providerError(err, "invalid_otp");
+      throw verifyProviderError(err);
     }
     if (!verified.matched) {
       await deps.store.saveChallenge(input.userId, {

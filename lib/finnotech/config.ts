@@ -11,7 +11,10 @@
 export const FINNOTECH_SCOPES = [
   "kyc:sms-shahkar-send:get",
   "kyc:sms-shahkar-verification:get",
+  "kyc:sms-shahkar-verification:post",
   "facility:sms-shahkar-send:get",
+  "facility:sms-shahkar-verification:get",
+  "facility:sms-shahkar-verification:post",
   "kyc:identification-inquiry:get",
   "kyc:card-owner-verification:post",
   "kyc:iban-owner-verification:get",

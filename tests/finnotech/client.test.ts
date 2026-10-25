@@ -83,6 +83,8 @@ describe("finnotech client", () => {
     expect(FINNOTECH_SCOPES).toContain("kyc:sms-shahkar-send:get");
     expect(FINNOTECH_SCOPES).toContain("kyc:sms-shahkar-verification:get");
     expect(FINNOTECH_SCOPES).toContain("facility:sms-shahkar-send:get");
+    expect(FINNOTECH_SCOPES).toContain("facility:sms-shahkar-verification:get");
+    expect(FINNOTECH_SCOPES).toContain("kyc:sms-shahkar-verification:post");
     expect(FINNOTECH_SCOPES).toContain("kyc:identification-inquiry:get");
     expect(FINNOTECH_SCOPES).toContain("messaging:otp-initiate:post");
     expect(FINNOTECH_SCOPES).toContain("messaging:otp-verify:post");
