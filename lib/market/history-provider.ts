@@ -59,7 +59,7 @@ async function fetchJson(url: string) {
       "User-Agent": "GramPriceBot/1.0",
     },
     cache: "no-store",
-    signal: AbortSignal.timeout(45_000),
+    signal: AbortSignal.timeout(90_000),
   });
   if (!res.ok) throw new Error(`history HTTP ${res.status}`);
   return res.json();
@@ -293,76 +293,106 @@ async function loadInstrumentIntraday(instrument: InstrumentId) {
   }
 }
 
-export async function getInstrumentHistory(
-  instrumentInput: InstrumentId | string = "gold18",
-  range: HistoryRange = "7d",
-  opts: { wait?: boolean } = {}
-): Promise<{
+type HistoryResult = {
   points: HistoryPoint[];
   range: HistoryRange;
   instrument: InstrumentId;
   unit: "toman_per_gram";
   source: string;
   stale: boolean;
-}> {
-  const instrument = parseInstrumentId(String(instrumentInput));
-  const cacheKey = `${instrument}:${range}`;
-  const hit = cache.get(cacheKey);
-  const now = Date.now();
-  if (hit && (hit.expiresAt > now || !opts.wait)) {
-    if (hit.expiresAt <= now) {
-      void getInstrumentHistory(instrument, range, { wait: true }).catch(() => undefined);
-    }
-    return {
-      points: hit.points,
-      range,
-      instrument,
-      unit: "toman_per_gram",
-      source: "بازار آزاد",
-      stale: false,
-    };
-  }
+};
 
+/** A user request waits at most this long on TGJU (often 10–60 s) before getting the last saved series. */
+const USER_WAIT_MS = 2_500;
+const inflight = new Map<string, Promise<HistoryPoint[]>>();
+
+function result(instrument: InstrumentId, range: HistoryRange, points: HistoryPoint[], stale: boolean): HistoryResult {
+  return { points, range, instrument, unit: "toman_per_gram", source: "بازار آزاد", stale };
+}
+
+async function readPersisted(cacheKey: string): Promise<{ points: HistoryPoint[]; updatedAt: number } | null> {
   try {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+    const { createServiceClient } = await import("@/lib/supabase/admin");
+    const { data } = await createServiceClient()
+      .from("market_history_cache")
+      .select("points, updated_at")
+      .eq("key", cacheKey)
+      .maybeSingle();
+    if (!data || !Array.isArray(data.points)) return null;
+    return { points: data.points as HistoryPoint[], updatedAt: new Date(data.updated_at as string).getTime() };
+  } catch {
+    return null;
+  }
+}
+
+async function writePersisted(cacheKey: string, points: HistoryPoint[]) {
+  try {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY || points.length === 0) return;
+    const { createServiceClient } = await import("@/lib/supabase/admin");
+    await createServiceClient()
+      .from("market_history_cache")
+      .upsert({ key: cacheKey, points, updated_at: new Date().toISOString() }, { onConflict: "key" });
+  } catch {
+    /* the in-memory copy still serves */
+  }
+}
+
+/** Fetches from TGJU once per key at a time; stores in memory and in the DB. */
+function refreshKey(instrument: InstrumentId, range: HistoryRange): Promise<HistoryPoint[]> {
+  const cacheKey = `${instrument}:${range}`;
+  const running = inflight.get(cacheKey);
+  if (running) return running;
+  const p = (async () => {
     const points =
       range === "1d"
         ? await loadInstrumentIntraday(instrument)
         : sliceByRange(await loadInstrumentDaily(instrument), range);
+    if (points.length === 0) throw new Error("empty history");
+    cache.set(cacheKey, { points, expiresAt: Date.now() + CACHE_TTL_MS[range] });
+    await writePersisted(cacheKey, points);
+    return points;
+  })().finally(() => inflight.delete(cacheKey));
+  inflight.set(cacheKey, p);
+  p.catch((err) => console.error(`[market] history refresh failed (${cacheKey})`, err?.message ?? err));
+  return p;
+}
 
-    cache.set(cacheKey, {
-      points,
-      expiresAt: now + CACHE_TTL_MS[range],
-    });
+export async function getInstrumentHistory(
+  instrumentInput: InstrumentId | string = "gold18",
+  range: HistoryRange = "7d",
+  opts: { wait?: boolean } = {}
+): Promise<HistoryResult> {
+  const instrument = parseInstrumentId(String(instrumentInput));
+  const cacheKey = `${instrument}:${range}`;
+  const now = Date.now();
+  let hit = cache.get(cacheKey);
 
-    return {
-      points,
-      range,
-      instrument,
-      unit: "toman_per_gram",
-      source: "بازار آزاد",
-      stale: false,
-    };
-  } catch (err) {
-    if (hit) {
-      return {
-        points: hit.points,
-        range,
-        instrument,
-        unit: "toman_per_gram",
-        source: "بازار آزاد",
-        stale: true,
-      };
+  if (!hit) {
+    // Cold process (fresh deploy): the last good series from the DB.
+    const saved = await readPersisted(cacheKey);
+    if (saved) {
+      hit = { points: saved.points, expiresAt: saved.updatedAt + CACHE_TTL_MS[range] };
+      cache.set(cacheKey, hit);
     }
-    console.error(`[market] history fetch failed (${instrument})`, err);
-    return {
-      points: [],
-      range,
-      instrument,
-      unit: "toman_per_gram",
-      source: "بازار آزاد",
-      stale: true,
-    };
   }
+
+  if (hit && hit.expiresAt > now) return result(instrument, range, hit.points, false);
+
+  const refresh = refreshKey(instrument, range);
+  if (opts.wait) {
+    try {
+      return result(instrument, range, await refresh, false);
+    } catch {
+      return result(instrument, range, hit?.points ?? [], true);
+    }
+  }
+  if (hit) return result(instrument, range, hit.points, true);
+
+  // Nothing saved yet: wait briefly, never the full upstream latency.
+  const timeout = new Promise<null>((r) => setTimeout(() => r(null), USER_WAIT_MS));
+  const points = await Promise.race([refresh.catch(() => null), timeout]);
+  return result(instrument, range, points ?? [], !points);
 }
 
 /** @deprecated Prefer getInstrumentHistory("gold18", range) */
