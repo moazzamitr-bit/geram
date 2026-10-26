@@ -11,10 +11,8 @@ import { adminNav, adminNavCatalog, adminNavGroups } from "@/lib/admin/navigatio
 
 const HIDDEN = [
   "/admin/incidents",
-  "/admin/bank-accounts",
   "/admin/sessions",
   "/admin/security",
-  "/admin/withdrawals",
   "/admin/transactions",
   "/admin/cash",
   "/admin/reconciliation",
@@ -52,6 +50,8 @@ const VISIBLE = [
   "/admin/support",
   "/admin/delivery",
   "/admin/referrals",
+  "/admin/withdrawals",
+  "/admin/bank-accounts",
 ];
 
 describe("closed beta admin routes", () => {
