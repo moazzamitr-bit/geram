@@ -35,7 +35,6 @@ export async function POST(request: Request) {
   // Same body whether the number is new or already registered.
   return NextResponse.json({
     ok: true,
-    sandbox: result.mode === "sandbox",
     resendInSec: result.resendInSec,
     codeLength: result.codeLength,
   });

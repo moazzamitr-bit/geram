@@ -38,6 +38,13 @@ const mem = vi.hoisted(() => {
   };
 });
 
+// The route's OTP check is unit-tested elsewhere; here only the session matters.
+vi.mock("@/lib/auth/otp", async (orig) => ({
+  ...(await orig<typeof import("@/lib/auth/otp")>()),
+  otpMode: () => "sms",
+  verifyOtp: async () => ({ ok: true }),
+}));
+
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
     auth: {
@@ -150,7 +157,6 @@ function supabaseEnv() {
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role");
   vi.stubEnv("GERAM_EXECUTION_MODE", "SANDBOX");
   vi.stubEnv("AUTH_METHOD", "otp");
-  vi.stubEnv("DEMO_OTP", "123456");
   vi.stubEnv("FINNOTECH_CLIENT_ID", "");
   vi.stubEnv("FINNOTECH_CLIENT_SECRET", "");
   vi.stubEnv("FINNOTECH_NID", "");

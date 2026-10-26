@@ -5,13 +5,16 @@ import { rateLimit } from "@/lib/rate-limit";
 describe("otp mode", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it("uses the fixed demo code only in SANDBOX without a provider", async () => {
+  it("has no fixed demo code, even in SANDBOX without a provider", async () => {
     vi.stubEnv("GERAM_EXECUTION_MODE", "SANDBOX");
+    vi.stubEnv("DEMO_OTP", "12345");
+    vi.stubEnv("FINNOTECH_CLIENT_ID", "");
+    vi.stubEnv("SMSIR_API_KEY", "");
     vi.stubEnv("KAVENEGAR_API_KEY", "");
     vi.stubEnv("KAVENEGAR_OTP_TEMPLATE", "");
-    expect(otpMode()).toBe("sandbox");
-    expect(await verifyOtp("09120000000", "12345")).toEqual({ ok: true });
-    expect(await verifyOtp("09120000000", "000000")).toMatchObject({ ok: false });
+    expect(otpMode()).toBe("unavailable");
+    expect(await verifyOtp("09120000000", "12345")).toEqual({ ok: false, error: "unavailable" });
+    expect(await verifyOtp("09120000000", "123456")).toMatchObject({ ok: false });
   });
 
   it("refuses login outside SANDBOX when no SMS provider is configured", async () => {
