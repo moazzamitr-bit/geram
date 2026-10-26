@@ -109,13 +109,19 @@ export const footerGroups = [
       { label: "درباره ما", href: "#about" },
       { label: "پشتیبانی", href: "/app/support" },
       { label: "تماس با ما", href: "#contact" },
+      { label: "قوانین و مقررات", href: "/terms" },
+      { label: "حریم خصوصی", href: "/privacy" },
     ],
   },
 ] as const;
 
 export const contactInfo = {
-  phone: "۰۲۱-۹۱۰۰۹۰۰۰",
-  email: "support@gram.ir",
-  address: "تهران، خیابان ولیعصر، برج آناهیتا، طبقه ۱۲",
+  email: "info@geram.co",
+  address: "تهران، خیابان ولیعصر، نرسیده به چهارراه پارک‌وی، کوچه مهناز، پلاک ۲۷",
+} as const;
+
+export const legalEntity = {
+  name: "گرم",
+  nationalId: "۱۴۰۱۴۲۵۵۵۶۶",
 } as const;
 

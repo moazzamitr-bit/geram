@@ -1,6 +1,6 @@
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { contactInfo, footerGroups } from "@/lib/data";
-import { Instagram, Linkedin, Mail, MapPin, Phone, Send } from "lucide-react";
+import { Instagram, Linkedin, Mail, MapPin, Send } from "lucide-react";
 import Link from "next/link";
 
 const socials = [
@@ -61,14 +61,8 @@ export function Footer() {
             <h3 className="mb-4 text-[15px] font-bold text-text">تماس با ما</h3>
             <ul className="space-y-3.5 text-[13px] text-text-secondary">
               <li className="flex items-start gap-2.5">
-                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-gold" strokeWidth={1.5} />
-                <span dir="ltr" className="text-right">
-                  {contactInfo.phone}
-                </span>
-              </li>
-              <li className="flex items-start gap-2.5">
                 <Mail className="mt-0.5 h-4 w-4 shrink-0 text-gold" strokeWidth={1.5} />
-                <span dir="ltr">{contactInfo.email}</span>
+                <a href={`mailto:${contactInfo.email}`} dir="ltr" className="hover:text-gold">{contactInfo.email}</a>
               </li>
               <li className="flex items-start gap-2.5">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gold" strokeWidth={1.5} />
@@ -81,6 +75,11 @@ export function Footer() {
         <div className="mt-12 border-t border-white/[0.06] pt-6 text-center">
           <p className="text-[12px] text-text-muted">
             تمام حقوق این وب‌سایت متعلق به گرم است.
+          </p>
+          <p className="mt-2 text-[12px] text-text-muted">
+            <Link href="/terms" className="hover:text-gold">قوانین و مقررات</Link>
+            <span className="mx-2">·</span>
+            <Link href="/privacy" className="hover:text-gold">حریم خصوصی</Link>
           </p>
         </div>
       </div>

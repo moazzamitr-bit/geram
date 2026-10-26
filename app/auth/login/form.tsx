@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { OtpCodeFields } from "@/components/auth/OtpCodeFields";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { GoldButton } from "@/components/ui/GoldButton";
@@ -307,6 +308,10 @@ function PasswordLogin({ initialTab }: { initialTab: "login" | "register" }) {
             {error}
           </p>
         )}
+        <p className="text-[12px] leading-6 text-muted-app">
+          با ثبت‌نام، <Link href="/terms" target="_blank" className="text-gold underline-offset-2 hover:underline">قوانین و مقررات</Link> و{" "}
+          <Link href="/privacy" target="_blank" className="text-gold underline-offset-2 hover:underline">سیاست حریم خصوصی</Link> گرم را می‌پذیرید.
+        </p>
         <GoldButton type="submit" variant="black" className="w-full" disabled={loading !== null}>
           {loading === "register" ? "لطفاً صبر کنید..." : "ثبت‌نام و ورود"}
         </GoldButton>
@@ -490,6 +495,10 @@ function OtpLogin({ codeLength }: { codeLength: number }) {
           {error}
         </p>
       )}
+      <p className="text-[12px] leading-6 text-muted-app">
+        ورود یا ثبت‌نام به معنای پذیرش <Link href="/terms" target="_blank" className="text-gold hover:underline">قوانین و مقررات</Link> و{" "}
+        <Link href="/privacy" target="_blank" className="text-gold hover:underline">حریم خصوصی</Link> گرم است.
+      </p>
       <GoldButton type="submit" variant="black" className="w-full" disabled={loading}>
         {loading ? "لطفاً صبر کنید..." : "ادامه"}
       </GoldButton>
