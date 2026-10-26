@@ -6,7 +6,7 @@ import { AuthProvider } from "@/lib/auth/auth-context";
 import type { Metadata, Viewport } from "next";
 
 export const viewport: Viewport = {
-  themeColor: "#F6F4F1",
+  themeColor: "#FAF8F5",
   viewportFit: "cover",
 };
 

@@ -140,8 +140,8 @@ describe("install prompt", () => {
 describe("manifest and icons", () => {
   it("uses the cream logged-in shell, portrait, and maskable icons", () => {
     const manifest = JSON.parse(readFileSync("public/manifest.webmanifest", "utf8"));
-    expect(manifest.background_color).toBe("#F6F4F1");
-    expect(manifest.theme_color).toBe("#F6F4F1");
+    expect(manifest.background_color).toBe("#FAF8F5");
+    expect(manifest.theme_color).toBe("#FAF8F5");
     expect(manifest.theme_color).not.toBe("#080B0D");
     expect(manifest.orientation).toBe("portrait-primary");
     expect(manifest.display).toBe("standalone");
