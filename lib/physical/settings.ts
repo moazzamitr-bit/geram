@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/admin";
 
 export const physicalSettingsSchema = z.object({
-  /** Service fee as a share of the delivered weight, charged in metal (Gerami: ~1%). */
+  /** Fallback fee for products without their own fee_percent, charged in metal. */
   feePercent: z.number().min(0).max(0.2),
   branches: z
     .array(
@@ -27,8 +27,8 @@ export const DEFAULT_PHYSICAL_SETTINGS: PhysicalSettings = {
   branches: [
     {
       id: "tehran",
-      name: "دفتر مرکزی گرم - تهران",
-      address: "آدرس دقیق پس از تأیید درخواست پیامک می‌شود",
+      name: "شعبه تهران - پارک‌وی",
+      address: "تهران، خیابان ولیعصر، نرسیده به چهارراه پارک‌وی، کوچه مهناز، پلاک ۲۷",
       hours: "شنبه تا چهارشنبه ۱۰ تا ۱۷",
     },
   ],

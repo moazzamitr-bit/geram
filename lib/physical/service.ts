@@ -56,9 +56,9 @@ function tomorrowIso(leadDays: number) {
 export async function listActiveProducts() {
   const { q } = ctx();
   const { rows } = await q(
-    "select id, asset, kind, title, weight_ug::text as weight_ug, active, sort from physical_products order by sort, created_at"
+    "select id, asset, kind, brand, title, weight_ug::text as weight_ug, fee_percent::float8 as fee_percent, active, sort from physical_products order by sort, created_at"
   );
-  return rows as { id: string; asset: AssetCode; kind: string; title: string; weight_ug: string; active: boolean; sort: number }[];
+  return rows as { id: string; asset: AssetCode; kind: string; brand: string | null; title: string; weight_ug: string; fee_percent: number | null; active: boolean; sort: number }[];
 }
 
 export async function listUserRequests(userId: string): Promise<PhysicalRow[]> {
@@ -116,14 +116,14 @@ export async function createPhysicalRequest(input: {
   return store.withTransaction(() =>
     store.withAdvisoryLock(userFundsLockKey(input.userId), async () => {
       const { rows: prods } = await q(
-        "select id, asset, title, weight_ug::text weight_ug, active from physical_products where id = $1",
+        "select id, asset, title, weight_ug::text weight_ug, fee_percent::float8 fee_percent, active from physical_products where id = $1",
         [input.productId]
       );
-      const product = prods[0] as { id: string; asset: AssetCode; title: string; weight_ug: string; active: boolean } | undefined;
+      const product = prods[0] as { id: string; asset: AssetCode; title: string; weight_ug: string; fee_percent: number | null; active: boolean } | undefined;
       if (!product || !product.active) throw new CoreError("invalid_product", "این محصول در دسترس نیست.", 400);
 
       const weightUg = BigInt(product.weight_ug) * BigInt(qty);
-      const feeUg = physicalFeeUg(weightUg, input.settings.feePercent);
+      const feeUg = physicalFeeUg(weightUg, product.fee_percent ?? input.settings.feePercent);
       const total = weightUg + feeUg;
       await requireBalance(
         store,
@@ -261,22 +261,24 @@ export async function transitionPhysical(input: {
 export async function upsertProduct(input: {
   id?: string;
   asset: AssetCode;
-  kind: "COIN" | "BAR";
+  kind: "COIN" | "BAR" | "GRANULE";
+  brand: string | null;
   title: string;
   weightUg: bigint;
+  feePercent: number | null;
   active: boolean;
   sort: number;
 }) {
   const { q } = ctx();
   if (input.id) {
     await q(
-      "update physical_products set asset=$2, kind=$3, title=$4, weight_ug=$5, active=$6, sort=$7 where id=$1",
-      [input.id, input.asset, input.kind, input.title, input.weightUg.toString(), input.active, input.sort]
+      "update physical_products set asset=$2, kind=$3, title=$4, weight_ug=$5, active=$6, sort=$7, brand=$8, fee_percent=$9 where id=$1",
+      [input.id, input.asset, input.kind, input.title, input.weightUg.toString(), input.active, input.sort, input.brand, input.feePercent]
     );
   } else {
     await q(
-      "insert into physical_products (asset, kind, title, weight_ug, active, sort) values ($1,$2,$3,$4,$5,$6)",
-      [input.asset, input.kind, input.title, input.weightUg.toString(), input.active, input.sort]
+      "insert into physical_products (asset, kind, title, weight_ug, active, sort, brand, fee_percent) values ($1,$2,$3,$4,$5,$6,$7,$8)",
+      [input.asset, input.kind, input.title, input.weightUg.toString(), input.active, input.sort, input.brand, input.feePercent]
     );
   }
 }
