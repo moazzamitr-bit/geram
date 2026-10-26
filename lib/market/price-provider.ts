@@ -73,34 +73,41 @@ async function fetchTgjuCurrent(): Promise<Record<string, unknown>> {
     return rawCurrentCache.data;
   }
 
-  let lastError: Error | null = null;
-  for (const url of TGJU_URLS) {
-    try {
-      const res = await fetch(url, {
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "GramPriceBot/1.0",
-        },
-        cache: "no-store",
-        signal: AbortSignal.timeout(12_000),
-      });
-      if (!res.ok) {
-        lastError = new Error(`TGJU HTTP ${res.status}`);
-        continue;
-      }
-      const json = (await res.json()) as { current?: Record<string, unknown> };
-      const current = json.current;
-      if (!current) {
-        lastError = new Error("TGJU payload missing current");
-        continue;
-      }
-      rawCurrentCache = { data: current, expiresAt: now + CACHE_TTL_MS };
+  if (inflightCurrent) return inflightCurrent;
+  // Race every mirror at once; one slow mirror no longer stalls a cold call.
+  const ctrl = new AbortController();
+  const attempt = async (url: string) => {
+    const res = await fetch(url, {
+      headers: { Accept: "application/json", "User-Agent": "GramPriceBot/1.0" },
+      cache: "no-store",
+      signal: AbortSignal.any([ctrl.signal, AbortSignal.timeout(6_000)]),
+    });
+    if (!res.ok) throw new Error(`TGJU HTTP ${res.status}`);
+    const json = (await res.json()) as { current?: Record<string, unknown> };
+    if (!json.current) throw new Error("TGJU payload missing current");
+    return json.current;
+  };
+  inflightCurrent = Promise.any(TGJU_URLS.map(attempt))
+    .then((current) => {
+      ctrl.abort();
+      rawCurrentCache = { data: current, expiresAt: Date.now() + CACHE_TTL_MS };
       return current;
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-    }
-  }
-  throw lastError ?? new Error("TGJU unreachable");
+    })
+    .catch(() => {
+      throw new Error("TGJU unreachable");
+    })
+    .finally(() => {
+      inflightCurrent = null;
+    });
+  return inflightCurrent;
+}
+
+let inflightCurrent: Promise<Record<string, unknown>> | null = null;
+
+/** Keeps the quote cache warm so user requests never wait on TGJU. */
+export async function refreshLivePrices() {
+  rawCurrentCache = null;
+  await getLivePrices(["gold18", "silver925", "copper"]).catch(() => undefined);
 }
 
 function quoteFromRialRow(input: {
@@ -238,7 +245,7 @@ export async function getLivePrice(
   const instrument = parseInstrumentId(String(instrumentInput));
   const now = Date.now();
   const hit = cache.get(instrument);
-  if (hit && hit.expiresAt > now) return hit.quote;
+  if (hit && hit.expiresAt > now && rawCurrentCache) return hit.quote;
 
   try {
     const current = await fetchTgjuCurrent();
@@ -269,4 +276,16 @@ export async function getLivePrices(
 /** @deprecated Prefer getLivePrice("gold18") */
 export async function getLiveGold18Price(): Promise<MarketPriceQuote> {
   return getLivePrice("gold18");
+}
+
+/** Current free-market dollar in toman (from the same live TGJU payload). */
+export async function getLiveDollarToman(): Promise<number | null> {
+  try {
+    const current = await fetchTgjuCurrent();
+    const dollar = pickRow(current, ["price_dollar_rl", "price_dollar_dt", "price_dollar_afshar"]);
+    const rial = dollar ? parseFaNumber(dollar.row.p) : null;
+    return rial && rial >= 10_000 ? rialToToman(rial) : null;
+  } catch {
+    return null;
+  }
 }
