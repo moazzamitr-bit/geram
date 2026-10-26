@@ -98,17 +98,15 @@ export const footerGroups = [
     title: "امکانات",
     links: [
       { label: "پرتفوی چندفلزی", href: "/app/portfolio" },
-      { label: "پس‌انداز هدفمند", href: "/app/goals" },
+      { label: "پس‌انداز خودکار", href: "/app/savings" },
       { label: "سقف تراکنش‌ها", href: "/app/profile/limits" },
       { label: "اپلیکیشن", href: "#app" },
-      { label: "مرکز اعتماد", href: "/app/trust" },
     ],
   },
   {
     title: "شرکت",
     links: [
       { label: "درباره ما", href: "#about" },
-      { label: "مجوزها و تاییدیه‌ها", href: "/app/trust" },
       { label: "پشتیبانی", href: "/app/support" },
       { label: "تماس با ما", href: "#contact" },
     ],
