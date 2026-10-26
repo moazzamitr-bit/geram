@@ -59,7 +59,7 @@ export const adminNavCatalog: AdminNavGroup[] = [
     items: [
       { label: "کاربران", href: "/admin/users", icon: Users },
       { label: "احراز هویت", href: "/admin/kyc", icon: ShieldCheck },
-      { label: "حساب‌های بانکی", href: "/admin/bank-accounts", icon: Landmark },
+      { label: "کارت‌ها و شبا", href: "/admin/bank-accounts", icon: Landmark },
       { label: "نشست‌ها و دستگاه", href: "/admin/sessions", icon: Shield },
       { label: "رویدادهای امنیتی", href: "/admin/security", icon: AlertTriangle },
     ],
@@ -71,7 +71,7 @@ export const adminNavCatalog: AdminNavGroup[] = [
       { label: "معاملات", href: "/admin/trades", icon: Scale },
       { label: "نقل‌قول‌ها", href: "/admin/quotes", icon: Search },
       { label: "واریز", href: "/admin/deposits", icon: Banknote },
-      { label: "برداشت", href: "/admin/withdrawals", icon: CreditCard },
+      { label: "برداشت تومانی", href: "/admin/withdrawals", icon: CreditCard },
       { label: "دفترکل", href: "/admin/ledger", icon: BookOpen },
       { label: "کیف پول‌ها", href: "/admin/wallets", icon: Wallet },
       { label: "تراکنش‌ها", href: "/admin/transactions", icon: Wallet },
