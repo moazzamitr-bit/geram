@@ -95,7 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="geram-app min-h-svh bg-bg text-text">
       <aside className="fixed inset-y-0 right-0 z-30 hidden w-[var(--sidebar-w)] flex-col border-l border-black/[0.06] bg-white lg:flex">
         <div className="flex h-16 items-center px-5">
-          <BrandLogo href="/app/dashboard" size="sm" />
+          <BrandLogo href="/app/dashboard" size="sm" showWordmark />
         </div>
 
         <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-2" aria-label="منوی اصلی">
@@ -149,6 +149,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="lg:mr-[var(--sidebar-w)]">
         <header className="sticky top-0 z-20 flex min-h-12 items-center justify-between gap-3 bg-bg/90 px-4 py-2 backdrop-blur-md md:px-6">
+          <BrandLogo href="/app/dashboard" size="sm" showWordmark className="shrink-0 lg:hidden" markClassName="!h-8 !w-8" wordmarkClassName="text-[18px]" />
           <PriceTicker className="min-w-0 flex-1" />
           <div className="flex shrink-0 items-center gap-1.5">
             <Link

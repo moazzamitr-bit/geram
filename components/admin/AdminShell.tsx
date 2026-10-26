@@ -60,7 +60,7 @@ export function AdminShell({
         )}
       >
         <div className="flex h-16 items-center justify-between px-5">
-          <BrandLogo href="/admin" size="sm" />
+          <BrandLogo href="/admin" size="sm" showWordmark wordmarkClassName="text-white" />
           <button
             type="button"
             className="lg:hidden"
@@ -128,6 +128,7 @@ export function AdminShell({
             >
               <Menu size={18} />
             </button>
+            <BrandLogo href="/admin" size="sm" className="shrink-0 lg:hidden" />
             <div className="min-w-0">
               <p className="text-[15px] font-bold">مدیریت گرم</p>
               <p className="truncate text-[12px] text-white/45">RTL · عملیات چنددارایی</p>
