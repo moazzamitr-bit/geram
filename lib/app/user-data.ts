@@ -206,7 +206,7 @@ export async function replyTicket(userId: string, ticketId: string, body: Record
 export async function listBankAccounts(userId: string) {
   const { data, error } = await db()
     .from("user_bank_cards")
-    .select("id, iban, bank_name, iban_bank_name, pan_masked, status")
+    .select("id, iban, bank_name, iban_bank_name, pan_masked, status, is_deposit_default")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
   fail(error, "bank cards");
@@ -216,5 +216,23 @@ export async function listBankAccounts(userId: string) {
     bank: ((b.iban_bank_name as string | null) ?? (b.bank_name as string)) || "کارت بانکی",
     panMasked: b.pan_masked as string,
     verified: b.status === "VERIFIED",
+    depositDefault: !!b.is_deposit_default,
   }));
+}
+
+/** Marks one verified card as the deposit card (gateway deposits use it once enabled). */
+export async function setDepositCard(userId: string, cardId: string) {
+  const sb = db();
+  const { data: card, error } = await sb
+    .from("user_bank_cards")
+    .select("id, status")
+    .eq("id", cardId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  fail(error, "bank card");
+  if (!card || card.status !== "VERIFIED") throw new CoreError("not_found", "کارت تأییدشده پیدا نشد.", 404);
+  const r1 = await sb.from("user_bank_cards").update({ is_deposit_default: false }).eq("user_id", userId).neq("id", cardId);
+  fail(r1.error, "deposit card");
+  const r2 = await sb.from("user_bank_cards").update({ is_deposit_default: true }).eq("id", cardId).eq("user_id", userId);
+  fail(r2.error, "deposit card");
 }
