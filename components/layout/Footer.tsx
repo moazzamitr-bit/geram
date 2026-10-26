@@ -3,11 +3,12 @@ import { contactInfo, footerGroups } from "@/lib/data";
 import { Instagram, Linkedin, Mail, MapPin, Send } from "lucide-react";
 import Link from "next/link";
 
-const socials = [
-  { label: "اینستاگرام", icon: Instagram, href: "#" },
-  { label: "تلگرام", icon: Send, href: "#" },
-  { label: "لینکدین", icon: Linkedin, href: "#" },
-  { label: "ایکس", icon: XIcon, href: "#" },
+/** Fill in a real URL to show a social icon; entries without one stay hidden. */
+const socials: { label: string; icon: typeof Instagram | typeof XIcon; href: string }[] = [
+  { label: "اینستاگرام", icon: Instagram, href: "" },
+  { label: "تلگرام", icon: Send, href: "" },
+  { label: "لینکدین", icon: Linkedin, href: "" },
+  { label: "ایکس", icon: XIcon, href: "" },
 ];
 
 export function Footer() {
@@ -22,8 +23,9 @@ export function Footer() {
               پلتفرم خرید و فروش طلا، نقره و مس — با قیمت لایو، کارمزد شفاف و
               تجربه‌ای مدرن برای مدیریت دارایی.
             </p>
+            {socials.some((x) => x.href) ? (
             <div className="mt-5 flex items-center gap-2.5">
-              {socials.map(({ label, icon: Icon, href }) => (
+              {socials.filter((x) => x.href).map(({ label, icon: Icon, href }) => (
                 <a
                   key={label}
                   href={href}
@@ -34,6 +36,7 @@ export function Footer() {
                 </a>
               ))}
             </div>
+            ) : null}
           </div>
 
           {footerGroups.map((group) => (
