@@ -113,7 +113,12 @@ export function journalToUi(entry: JournalEntry, userId: string): UiTransaction 
   else if (metal && metal.credit > metal.debit) type = "خرید";
   else if (metal && metal.debit > metal.credit) type = "فروش";
   const metalLine = special ? anyMetal : metal;
-  const amountIrr = special && special.type !== "رزرو" ? 0n : irr ? (irr.credit > 0n ? irr.credit : irr.debit) : 0n;
+  // Toman withdrawals: show the reserved/settled sum (paid touches only USER_RESERVED).
+  const irrAny = irr ?? mine.find((l) => l.asset === "IRR");
+  const amountIrr =
+    special && special.type === "برداشت"
+      ? irrAny ? (irrAny.credit > 0n ? irrAny.credit : irrAny.debit) : 0n
+      : special && special.type !== "رزرو" ? 0n : irr ? (irr.credit > 0n ? irr.credit : irr.debit) : 0n;
   const weightUg = metalLine ? (metalLine.credit > 0n ? metalLine.credit : metalLine.debit) : 0n;
   const feeIrr = fee?.credit ?? 0n;
   const asset = metalLine && metalLine.asset !== "IRR" ? (metalLine.asset as AssetCode) : "GOLD";
