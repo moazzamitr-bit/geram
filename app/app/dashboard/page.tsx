@@ -265,7 +265,7 @@ export default function DashboardPage() {
                     <p className="font-medium text-text">{tx.type}</p>
                     <p className="text-muted-app">{tx.createdAt}</p>
                   </div>
-                  <p className="tabular-nums text-text-secondary">{formatToman(tx.amountRial)}</p>
+                  <p className="tabular-nums text-text-secondary">{tx.amountRial ? formatToman(tx.amountRial) : "—"}</p>
                 </Link>
               </li>
             ))}

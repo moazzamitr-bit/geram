@@ -18,6 +18,7 @@ const filters: Array<"همه" | TxType> = [
   "واریز",
   "برداشت",
   "تحویل",
+  "هدیه",
 ];
 
 export default function TransactionsPage() {
@@ -95,7 +96,7 @@ export default function TransactionsPage() {
                     <td className="px-5 py-3.5">
                       <Link href={`/app/transactions/${t.id}`} className="text-text hover:text-gold">
                         {t.type}
-                        {(t.type === "خرید" || t.type === "فروش" || t.type === "تحویل") && (
+                        {(t.type === "خرید" || t.type === "فروش" || t.type === "تحویل" || t.type === "هدیه" || t.type === "پاداش") && (
                           <span className="mr-1 text-muted-app">
                             {instrumentLabel((t.instrument as InstrumentId) ?? "gold18")}
                           </span>
@@ -105,7 +106,7 @@ export default function TransactionsPage() {
                     <td className="px-3 py-3.5 text-text-secondary">
                       {t.goldMg ? `${mgToGramsLabel(t.goldMg)} گرم` : "—"}
                     </td>
-                    <td className="px-3 py-3.5">{formatToman(t.amountRial)}</td>
+                    <td className="px-3 py-3.5">{t.amountRial ? formatToman(t.amountRial) : "—"}</td>
                     <td className="px-3 py-3.5">
                       <StatusBadge status={t.status} />
                     </td>

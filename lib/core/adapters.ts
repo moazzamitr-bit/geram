@@ -7,7 +7,7 @@ import type { InstrumentId } from "@/lib/market/instruments";
 export type UiTransaction = {
   id: string;
   trackingCode: string;
-  type: "خرید" | "فروش" | "واریز" | "برداشت" | "تحویل" | "کارمزد";
+  type: "خرید" | "فروش" | "واریز" | "برداشت" | "تحویل" | "کارمزد" | "هدیه" | "پاداش" | "رزرو";
   instrument: InstrumentId;
   goldMg: number;
   amountRial: number;
@@ -81,27 +81,50 @@ function faStamp(iso: string) {
 }
 
 /** One user-visible row for a ledger journal that touches this holder. */
+/** Journal reasons that are not cash trades: never render them as «خرید ۰ تومان». */
+const REASON_UI: Record<string, { type: UiTransaction["type"]; label: string }> = {
+  GIFT_RESERVE: { type: "هدیه", label: "صدور کارت هدیه (رزرو)" },
+  GIFT_REDEEM: { type: "هدیه", label: "دریافت کارت هدیه" },
+  GIFT_RELEASE: { type: "هدیه", label: "لغو کارت هدیه و بازگشت موجودی" },
+  REFERRAL_SHARE: { type: "پاداش", label: "پاداش معرفی دوستان" },
+  PHYSICAL_RESERVE: { type: "تحویل", label: "درخواست تحویل فیزیکی (رزرو)" },
+  PHYSICAL_RELEASE: { type: "تحویل", label: "لغو تحویل فیزیکی و بازگشت موجودی" },
+  PHYSICAL_DELIVER: { type: "تحویل", label: "تحویل فیزیکی انجام شد" },
+  BUY_SOFT_RESERVATION: { type: "رزرو", label: "رزرو مبلغ سفارش" },
+  QUOTE_EXPIRE_RELEASE: { type: "رزرو", label: "آزادسازی رزرو سفارش" },
+};
+
 export function journalToUi(entry: JournalEntry, userId: string): UiTransaction {
   const mine = entry.lines.filter((line) => line.holderId === userId);
   const irr = mine.find((line) => line.accountCode === "USER_AVAILABLE" && line.asset === "IRR");
   const metal = mine.find((line) => line.accountCode === "USER_AVAILABLE" && line.asset !== "IRR");
   const fee = entry.lines.find((line) => line.accountCode === "PLATFORM_FEE_REVENUE");
+  const anyMetal = mine.find((line) => line.asset !== "IRR");
+  const special = REASON_UI[entry.reason];
   let type: UiTransaction["type"] = "کارمزد";
-  if (entry.reason === "BUY_SETTLE") type = "خرید";
+  if (special) type = special.type;
+  else if (entry.reason === "BUY_SETTLE") type = "خرید";
   else if (entry.reason === "SELL_SETTLE") type = "فروش";
   else if (irr && irr.credit > irr.debit) type = "واریز";
   else if (irr && irr.debit > irr.credit) type = "برداشت";
   else if (metal && metal.credit > metal.debit) type = "خرید";
   else if (metal && metal.debit > metal.credit) type = "فروش";
-  const amountIrr = irr ? (irr.credit > 0n ? irr.credit : irr.debit) : 0n;
-  const weightUg = metal ? (metal.credit > 0n ? metal.credit : metal.debit) : 0n;
+  const metalLine = special ? anyMetal : metal;
+  const amountIrr = special && special.type !== "رزرو" ? 0n : irr ? (irr.credit > 0n ? irr.credit : irr.debit) : 0n;
+  const weightUg = metalLine ? (metalLine.credit > 0n ? metalLine.credit : metalLine.debit) : 0n;
   const feeIrr = fee?.credit ?? 0n;
-  const asset = metal && metal.asset !== "IRR" ? (metal.asset as AssetCode) : "GOLD";
-  const label =
-    type === "واریز"
-      ? "شارژ دفترکل"
+  const asset = metalLine && metalLine.asset !== "IRR" ? (metalLine.asset as AssetCode) : "GOLD";
+  const giftIncoming = entry.reason === "GIFT_REDEEM" && Boolean(metal && metal.credit > 0n);
+  const label = special
+    ? entry.reason === "GIFT_REDEEM"
+      ? giftIncoming
+        ? "دریافت کارت هدیه"
+        : "کارت هدیه شما استفاده شد"
+      : special.label
+    : type === "واریز"
+      ? "شارژ کیف پول"
       : type === "برداشت"
-        ? "برگشت شارژ"
+        ? "برداشت از کیف پول"
         : entry.reason;
   return {
     id: entry.id,
@@ -118,7 +141,7 @@ export function journalToUi(entry: JournalEntry, userId: string): UiTransaction 
       { label, done: true },
       { label: "ثبت در دفترکل", done: true },
     ],
-    note: entry.reason,
+    note: label,
     paymentRef: entry.refType,
   };
 }
