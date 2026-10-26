@@ -47,7 +47,7 @@ export default function TransactionDetailPage() {
             label={`مقدار ${metal}`}
             value={tx.goldMg ? `${mgToGramsLabel(tx.goldMg)} گرم` : "—"}
           />
-          <Row label="مبلغ ناخالص/پرداختی" value={formatToman(tx.amountRial)} />
+          <Row label="مبلغ ناخالص/پرداختی" value={tx.amountRial ? formatToman(tx.amountRial) : "—"} />
           <Row label="کارمزد" value={formatToman(tx.feeRial)} />
           {tx.paymentRef && <Row label="مرجع پرداخت" value={tx.paymentRef} />}
           {tx.note && <Row label="توضیح" value={tx.note} />}
