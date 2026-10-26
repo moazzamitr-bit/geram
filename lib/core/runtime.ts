@@ -2,6 +2,7 @@ import { FinancialCore, feesFromCommercePercent } from "@/lib/core/engine";
 import { MemoryCoreStore, type CoreStore } from "@/lib/core/store";
 import { PostgresCoreStore } from "@/lib/core/pg-store";
 import { tgjuExecutableFeed, staticPriceFeed, withEstjtGoldFallback } from "@/lib/core/price";
+import { withPriceGuard } from "@/lib/core/price-guard";
 import { assertTgjuNotSimulatedDown, fetchEstjt } from "@/lib/market/estjt";
 import {
   getExecutionMode,
@@ -134,7 +135,25 @@ export function getFinancialCore(): FinancialCore {
   const store = getStore();
   const flags = getFeatureFlags(mode);
   const useStatic = process.env.GERAM_PRICE_FEED === "static" || process.env.VITEST === "true";
-  const prices = useStatic ? testPrices() : withEstjtGoldFallback(tgjuExecutableFeed(fetchTgjuCurrent), fetchEstjt);
+  const primary = tgjuExecutableFeed(fetchTgjuCurrent);
+  const prices = useStatic
+    ? testPrices()
+    : withPriceGuard(withEstjtGoldFallback(primary, fetchEstjt), {
+        onHalt: async ({ asset, reason, values }) => {
+          const msg = `AUTO_PRICE_GUARD ${reason}: ${JSON.stringify(values)}`.slice(0, 900);
+          for (const side of ["BUY", "SELL"]) await store.setKillSwitch?.(`${asset}_${side}_ENABLED`, false, msg);
+        },
+        // Gold: compare whichever source priced it with the other one.
+        crossSource: async (asset, q) => {
+          if (asset !== "GOLD") return null;
+          if (q.source.startsWith("estjt")) {
+            const t = await primary.getExecutable("GOLD").catch(() => null);
+            return t && !t.stale ? { source: t.source, irrPerGram: t.irrPerGram } : null;
+          }
+          const e = await fetchEstjt().catch(() => null);
+          return e?.gold18Rial ? { source: "estjt:gold18", irrPerGram: e.gold18Rial } : null;
+        },
+      });
   const fees = DEFAULT_COMMERCE_SETTINGS.fees;
   g.__geramCore = new FinancialCore({
     store,

@@ -88,6 +88,9 @@ export interface CoreStore {
   openReservationQuantityUg(asset: AssetCode): Promise<bigint>;
   /** Operator kill switches persisted by the admin console (key → enabled). */
   listKillSwitches(): Promise<Record<string, boolean>>;
+  setKillSwitch?(key: string, enabled: boolean, reason: string): Promise<void>;
+  userBuyIrrSince?(userId: string, sinceIso: string): Promise<bigint>;
+  platformNetBuyIrrSince?(sinceIso: string): Promise<bigint>;
   /** ACTIVE quotes past expiry whose BUY reservation still holds inventory. */
   listExpiredOpenQuotes(asset: AssetCode, nowIso: string, limit: number): Promise<Quote[]>;
   insertTrade(trade: Trade): Promise<void>;
@@ -425,6 +428,10 @@ export class MemoryCoreStore implements CoreStore {
 
   async listKillSwitches(): Promise<Record<string, boolean>> {
     return { ...this.killSwitches };
+  }
+
+  async setKillSwitch(key: string, enabled: boolean): Promise<void> {
+    this.killSwitches[key] = enabled;
   }
 
   async listExpiredOpenQuotes(asset: AssetCode, nowIso: string, limit: number): Promise<Quote[]> {

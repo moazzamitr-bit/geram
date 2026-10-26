@@ -2,6 +2,20 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { requireAdmin } from "@/lib/db/admin-queries";
 import { isSupabaseConfigured } from "@/lib/db/types";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { createServiceClient } from "@/lib/supabase/admin";
+
+async function haltedSwitches() {
+  try {
+    const { data } = await createServiceClient()
+      .from("core_kill_switches")
+      .select("key, reason, updated_at")
+      .eq("enabled", false);
+    return (data ?? []) as { key: string; reason: string | null; updated_at: string }[];
+  } catch {
+    return [];
+  }
+}
 
 // Admin pages need cookies + service-role at request time; never prerender
 // them into the Docker image (build has public Supabase URL but no secrets).
@@ -35,8 +49,25 @@ export default async function AdminDashboardLayout({
     auth.profile.email ||
     "ادمین";
 
+  const halted = await haltedSwitches();
+
   return (
     <AdminShell adminName={name} roleLabel={auth.profile.role === "admin" ? "SUPER_ADMIN" : auth.profile.role}>
+      {halted.length ? (
+        <div role="alert" className="mb-6 rounded-2xl border border-negative/40 bg-negative/10 p-4 text-[13px] leading-7 text-negative">
+          <div className="font-bold">معاملات متوقف است ({halted.length} کلید خاموش)</div>
+          <ul className="mt-1 space-y-0.5">
+            {halted.map((h) => (
+              <li key={h.key} dir="auto">
+                <code>{h.key}</code> — {h.reason || "بدون دلیل"}
+              </li>
+            ))}
+          </ul>
+          <Link href="/admin/switches" className="mt-2 inline-block font-semibold underline">
+            بررسی و ازسرگیری در «کلیدها»
+          </Link>
+        </div>
+      ) : null}
       {children}
     </AdminShell>
   );
