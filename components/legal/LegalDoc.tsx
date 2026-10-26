@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackBar } from "./BackBar";
 import { contactInfo, legalEntity } from "@/lib/data";
 
 export type LegalSection = { title: string; items: string[] };
@@ -18,6 +19,7 @@ export function LegalDoc({
 }) {
   return (
     <main dir="rtl" className="min-h-screen bg-bg text-text">
+      <BackBar />
       <div className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
         <nav className="mb-8 flex items-center justify-between text-[13px]">
           <Link href="/" className="font-extrabold text-gold">گرم</Link>
