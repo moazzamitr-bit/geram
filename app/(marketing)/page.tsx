@@ -118,7 +118,7 @@ export default function HomePage() {
             <ol className="grid gap-4 md:grid-cols-3">
               {steps.map((s, i) => (
                 <li key={s.title} className="relative rounded-3xl border border-black/[0.06] bg-white p-6">
-                  <span className="absolute left-5 top-5 text-3xl font-black text-[#F1D58A] tabular-nums">۰{(i + 1).toLocaleString("fa-IR")}</span>
+                  <span aria-hidden className="absolute left-5 top-5 grid h-9 w-9 place-items-center rounded-full bg-[#FFF4D6] text-[16px] font-black text-[#8A6100] tabular-nums">{(i + 1).toLocaleString("fa-IR")}</span>
                   <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#FFF4D6] text-[#8A6100]">
                     <s.icon size={22} />
                   </span>
