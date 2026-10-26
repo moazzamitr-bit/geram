@@ -33,14 +33,26 @@ describe("price guard", () => {
     expect(halts[0]).toMatchObject({ asset: "GOLD", reason: "out_of_band" });
   });
 
-  it("rejects a >3% jump vs last good and halts", async () => {
+  it("jump >3%: rejects single reads without halting, accepts after 3 consecutive reads", async () => {
     halts.length = 0;
     let p = 261_185_000n;
     const g = withPriceGuard(feedOf(() => ({ irrPerGram: p })), { onHalt });
     await g.getExecutable("GOLD");
     p = 271_000_000n; // +3.76%
     await expect(g.getExecutable("GOLD")).rejects.toMatchObject({ code: "price_guard" });
-    expect(halts[0].reason).toBe("jump");
+    await expect(g.getExecutable("GOLD")).rejects.toMatchObject({ code: "price_guard" });
+    await expect(g.getExecutable("GOLD")).resolves.toMatchObject({ irrPerGram: 271_000_000n });
+    expect(halts).toHaveLength(0);
+  });
+
+  it("jump spike that reverts keeps last good", async () => {
+    let p = 261_185_000n;
+    const g = withPriceGuard(feedOf(() => ({ irrPerGram: p })), { onHalt });
+    await g.getExecutable("GOLD");
+    p = 290_000_000n;
+    await expect(g.getExecutable("GOLD")).rejects.toMatchObject({ code: "price_guard" });
+    p = 262_000_000n;
+    await expect(g.getExecutable("GOLD")).resolves.toMatchObject({ irrPerGram: 262_000_000n });
   });
 
   it("allows small moves", async () => {
@@ -51,14 +63,44 @@ describe("price guard", () => {
     await expect(g.getExecutable("GOLD")).resolves.toMatchObject({ irrPerGram: p });
   });
 
-  it("halts when gold sources disagree >2%", async () => {
+  it("cross-source disagreement is a soft fault that auto-clears after 2 good reads", async () => {
     halts.length = 0;
+    let other: bigint | null = 270_000_000n;
     const g = withPriceGuard(feedOf(() => ({})), {
       onHalt,
-      crossSource: async () => ({ source: "estjt:gold18", irrPerGram: 270_000_000n }),
+      crossSource: async () => (other ? { source: "estjt:gold18", irrPerGram: other } : null),
     });
     await expect(g.getExecutable("GOLD")).rejects.toMatchObject({ code: "price_guard" });
-    expect(halts[0].reason).toBe("cross_source");
+    other = 261_500_000n;
+    await expect(g.getExecutable("GOLD")).rejects.toMatchObject({ code: "price_recovering" });
+    await expect(g.getExecutable("GOLD")).resolves.toBeTruthy();
+    expect(halts).toHaveLength(0);
+  });
+
+  it("single healthy source trades alone (other source unavailable)", async () => {
+    const g = withPriceGuard(feedOf(() => ({ source: "estjt:gold18" })), { onHalt, crossSource: async () => null });
+    await expect(g.getExecutable("GOLD")).resolves.toMatchObject({ source: "estjt:gold18" });
+  });
+
+  it("staleness and feed outage auto-recover after 2 good reads (no admin halt)", async () => {
+    halts.length = 0;
+    let mode: "stale" | "down" | "ok" = "stale";
+    const g = withPriceGuard(
+      {
+        async getExecutable(a) {
+          if (mode === "down") throw new Error("down");
+          return feedOf(() => (mode === "stale" ? { stale: true } : {})).getExecutable(a);
+        },
+      },
+      { onHalt }
+    );
+    await expect(g.getExecutable("GOLD")).rejects.toMatchObject({ code: "price_stale" });
+    mode = "down";
+    await expect(g.getExecutable("GOLD")).rejects.toThrow();
+    mode = "ok";
+    await expect(g.getExecutable("GOLD")).rejects.toMatchObject({ code: "price_recovering" });
+    await expect(g.getExecutable("GOLD")).resolves.toBeTruthy();
+    expect(halts).toHaveLength(0);
   });
 
   it("rejects stale or old prices", async () => {

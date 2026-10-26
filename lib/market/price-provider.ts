@@ -82,7 +82,7 @@ async function fetchTgjuCurrent(): Promise<Record<string, unknown>> {
     const res = await fetch(url, {
       headers: { Accept: "application/json", "User-Agent": "GramPriceBot/1.0" },
       cache: "no-store",
-      signal: AbortSignal.any([ctrl.signal, AbortSignal.timeout(6_000)]),
+      signal: AbortSignal.any([ctrl.signal, AbortSignal.timeout(10_000)]),
     });
     if (!res.ok) throw new Error(`TGJU HTTP ${res.status}`);
     const json = (await res.json()) as { current?: Record<string, unknown> };
@@ -95,8 +95,9 @@ async function fetchTgjuCurrent(): Promise<Record<string, unknown>> {
       rawCurrentCache = { data: current, expiresAt: Date.now() + CACHE_TTL_MS };
       return current;
     })
-    .catch(() => {
-      throw new Error("TGJU unreachable");
+    .catch((err: unknown) => {
+      const why = err instanceof AggregateError ? err.errors.map((e) => (e instanceof Error ? e.message : String(e))).join(" | ") : String(err);
+      throw new Error(`TGJU unreachable: ${why}`);
     })
     .finally(() => {
       inflightCurrent = null;

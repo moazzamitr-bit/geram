@@ -63,12 +63,26 @@ export type GuardOptions = {
   now?: () => number;
 };
 
+export const RECOVERY = { goodReadsToClear: 2, jumpConfirmReads: 3 };
+
+/**
+ * Hard faults (out-of-band, e.g. a 10x unit slip) persist a kill switch until an admin resumes.
+ * Soft faults (stale, cross-source disagreement) only reject the read; trading resumes by itself
+ * after RECOVERY.goodReadsToClear consecutive good reads. A >3% jump rejects that read and keeps
+ * the last good price; if the new level repeats for RECOVERY.jumpConfirmReads reads it is accepted.
+ */
 export function withPriceGuard(feed: PriceFeed, opts: GuardOptions): PriceFeed & { resetLastGood(asset?: AssetCode): void } {
   const now = opts.now ?? Date.now;
-  const lastGood = new Map<AssetCode, { irr: bigint; at: number; source: string }>();
+  type St = { lastGood?: { irr: bigint; at: number; source: string }; recovering: number; jump?: { irr: bigint; count: number } };
+  const state = new Map<AssetCode, St>();
+  const st = (a: AssetCode) => {
+    let v = state.get(a);
+    if (!v) state.set(a, (v = { recovering: 0 }));
+    return v;
+  };
 
-  const halt = async (asset: AssetCode, reason: string, values: Record<string, string>) => {
-    lastGood.delete(asset);
+  const hardHalt = async (asset: AssetCode, reason: string, values: Record<string, string>) => {
+    state.delete(asset);
     try {
       await opts.onHalt({ asset, reason, values });
     } catch (err) {
@@ -77,61 +91,69 @@ export function withPriceGuard(feed: PriceFeed, opts: GuardOptions): PriceFeed &
     console.error(`[price-guard] HALT ${asset}: ${reason}`, values);
     throw new CoreError("price_guard", `Price rejected: ${reason}`, 503);
   };
+  const soft = (asset: AssetCode, code: string, reason: string, values: Record<string, string> = {}) => {
+    st(asset).recovering = RECOVERY.goodReadsToClear;
+    console.warn(`[price-guard] soft ${asset}: ${reason}`, values);
+    throw new CoreError(code, `Price rejected: ${reason}`, 503);
+  };
 
   return {
     resetLastGood(asset) {
-      if (asset) lastGood.delete(asset);
-      else lastGood.clear();
+      if (asset) state.delete(asset);
+      else state.clear();
     },
     async getExecutable(asset) {
-      let q = await feed.getExecutable(asset);
+      let q = await feed.getExecutable(asset).catch((err) => {
+        st(asset).recovering = RECOVERY.goodReadsToClear;
+        throw err;
+      });
       const drill = gd.__priceGuardDrill;
       if (drill && drill.asset === asset && drill.until > Date.now()) {
         q = { ...q, irrPerGram: q.irrPerGram / drill.divisor, source: `${q.source}+drill` };
       }
       const p = q.irrPerGram;
       const t = now();
+      const s = st(asset);
 
       if (!inBand(asset, p)) {
         const [lo, hi] = PRICE_BANDS_IRR[asset];
-        await halt(asset, "out_of_band", { source: q.source, irrPerGram: p.toString(), bandIrr: `${lo}-${hi}` });
+        await hardHalt(asset, "out_of_band", { source: q.source, irrPerGram: p.toString(), bandIrr: `${lo}-${hi}` });
       }
 
       const observed = Date.parse(q.observedAt);
       if (q.stale || !Number.isFinite(observed) || t - observed > GUARD.maxAgeMs) {
-        // Never trade stale. Auto-recovers once a fresh, valid price arrives.
-        throw new CoreError("price_stale", "No fresh validated price", 503);
-      }
-
-      const prev = lastGood.get(asset);
-      if (prev && t - prev.at < GUARD.jumpWindowMs) {
-        const jump = pctDiff(prev.irr, p);
-        if (jump > GUARD.maxJumpPct) {
-          await halt(asset, "jump", {
-            lastGoodIrr: prev.irr.toString(),
-            lastGoodSource: prev.source,
-            newIrr: p.toString(),
-            newSource: q.source,
-            pct: jump.toFixed(2),
-          });
-        }
+        soft(asset, "price_stale", "stale");
       }
 
       if (opts.crossSource) {
+        // Only compared when the other source is fresh too; single healthy source trades alone.
         const other = await opts.crossSource(asset, q).catch(() => null);
         if (other) {
           const d = pctDiff(other.irrPerGram, p);
           if (d > GUARD.crossMaxPct) {
-            await halt(asset, "cross_source", {
-              [q.source]: p.toString(),
-              [other.source]: other.irrPerGram.toString(),
-              pct: d.toFixed(2),
-            });
+            soft(asset, "price_guard", "cross_source", { [q.source]: p.toString(), [other.source]: other.irrPerGram.toString(), pct: d.toFixed(2) });
           }
         }
       }
 
-      lastGood.set(asset, { irr: p, at: t, source: q.source });
+      const prev = s.lastGood;
+      if (prev && t - prev.at < GUARD.jumpWindowMs && pctDiff(prev.irr, p) > GUARD.maxJumpPct) {
+        const same = s.jump && pctDiff(s.jump.irr, p) <= GUARD.maxJumpPct;
+        s.jump = { irr: p, count: same ? s.jump!.count + 1 : 1 };
+        if (s.jump.count < RECOVERY.jumpConfirmReads) {
+          console.warn(`[price-guard] jump ${asset} rejected (${s.jump.count}/${RECOVERY.jumpConfirmReads})`, { last: prev.irr.toString(), next: p.toString() });
+          throw new CoreError("price_guard", "Price rejected: jump", 503);
+        }
+        console.warn(`[price-guard] jump ${asset} accepted as real move`, { last: prev.irr.toString(), next: p.toString() });
+      }
+      s.jump = undefined;
+      s.lastGood = { irr: p, at: t, source: q.source };
+
+      if (s.recovering > 0) {
+        s.recovering -= 1;
+        if (s.recovering > 0) throw new CoreError("price_recovering", "Price recovering; retry shortly", 503);
+        console.warn(`[price-guard] ${asset} recovered`);
+      }
       return q;
     },
   };

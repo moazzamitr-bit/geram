@@ -151,7 +151,9 @@ export function getFinancialCore(): FinancialCore {
             return t && !t.stale ? { source: t.source, irrPerGram: t.irrPerGram } : null;
           }
           const e = await fetchEstjt().catch(() => null);
-          return e?.gold18Rial ? { source: "estjt:gold18", irrPerGram: e.gold18Rial } : null;
+          return e?.gold18Rial && Date.now() - Date.parse(e.fetchedAt) < 3 * 60_000
+            ? { source: "estjt:gold18", irrPerGram: e.gold18Rial }
+            : null;
         },
       });
   const fees = DEFAULT_COMMERCE_SETTINGS.fees;
