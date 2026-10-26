@@ -74,6 +74,17 @@ export type SupportTicket = {
   messages: { from: "user" | "support"; text: string; at: string }[];
 };
 
+export type WithdrawalReceipt = {
+  id: string;
+  bank_name: string;
+  iban: string;
+  amount_irr: string;
+  fee_irr: string;
+  status: string;
+  tracking_code: string;
+  created_at: string;
+};
+
 type AppDataState = {
   hydrated: boolean;
   goldMg: number;
@@ -153,7 +164,7 @@ type AppDataState = {
     destination: "wallet" | "bank"
   ) => Promise<{ ok: boolean; error?: string; txId?: string }>;
   deposit: (rial: number) => Promise<{ ok: boolean; error?: string }>;
-  withdraw: (amountToman: number, cardId: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
+  withdraw: (amountToman: number, cardId: string) => Promise<{ ok: boolean; error?: string; message?: string; request?: WithdrawalReceipt }>;
   refreshFinancial: () => Promise<void>;
   addAlert: (alert: Omit<PriceAlert, "id" | "status">) => Promise<MutationResult>;
   markNotificationRead: (id: string) => Promise<MutationResult>;
@@ -668,13 +679,13 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
   const withdraw = useCallback(
     async (amountToman: number, cardId: string) => {
-      const r = await call<{ message?: string }>("/api/withdrawals", {
+      const r = await call<{ message?: string; request?: WithdrawalReceipt }>("/api/withdrawals", {
         method: "POST",
         body: JSON.stringify({ amountToman, cardId }),
       });
       if (!r.ok) return { ok: false, error: r.error };
       await refreshFinancial();
-      return { ok: true, message: r.data.message };
+      return { ok: true, message: r.data.message, request: r.data.request };
     },
     [refreshFinancial]
   );
