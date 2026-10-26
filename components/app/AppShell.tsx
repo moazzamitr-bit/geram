@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/auth/auth-context";
 import { cn } from "@/lib/utils";
 import { LogOut } from "lucide-react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
 
@@ -92,7 +93,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="geram-app min-h-svh bg-bg text-text">
+    <div className="geram-app min-h-dvh bg-bg text-text">
       <aside className="fixed inset-y-0 right-0 z-30 hidden w-[var(--sidebar-w)] flex-col border-l border-black/[0.06] bg-white lg:flex">
         <div className="flex h-16 items-center px-5">
           <BrandLogo href="/app/dashboard" size="sm" showWordmark />
@@ -182,8 +183,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
+      {/* Portaled to <body> so no transformed/filtered ancestor or scroll container
+          can turn position:fixed into position:absolute on iOS Safari. */}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <div className="geram-app">
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-black/[0.06] bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
+        className="geram-mobile-nav fixed inset-x-0 bottom-0 z-30 border-t border-black/[0.06] bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
         aria-label="ناوبری موبایل"
       >
         <ul className="mx-auto grid max-w-lg grid-cols-5 px-1 py-1.5">
@@ -214,6 +220,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </ul>
       </nav>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
