@@ -105,7 +105,7 @@ type AppDataState = {
     }
   >;
   /** Verified cards (user_bank_cards) with the IBAN Finnotech returned for each. */
-  bankAccounts: { id: string; iban: string | null; bank: string; panMasked: string; verified: boolean }[];
+  bankAccounts: { id: string; iban: string | null; bank: string; panMasked: string; verified: boolean; depositDefault?: boolean }[];
   transactions: AppTransaction[];
   alerts: PriceAlert[];
   notifications: AppNotification[];
@@ -252,7 +252,7 @@ const seed = {
       stale: boolean;
     }
   >,
-  bankAccounts: [] as { id: string; iban: string | null; bank: string; panMasked: string; verified: boolean }[],
+  bankAccounts: [] as { id: string; iban: string | null; bank: string; panMasked: string; verified: boolean; depositDefault?: boolean }[],
   transactions: [] as AppTransaction[],
   alerts: [] as PriceAlert[],
   notifications: [] as AppNotification[],

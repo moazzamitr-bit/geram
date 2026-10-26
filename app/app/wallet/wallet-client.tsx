@@ -11,7 +11,7 @@ import { withdrawFee } from "@/lib/commerce/fees";
 import { useVerificationGate } from "@/components/app/VerificationGate";
 import { useAppData } from "@/lib/app/app-data";
 import { formatToman } from "@/lib/utils";
-import Link from "next/link";
+import { BankCardPicker } from "@/components/app/BankCardPicker";
 import { useCallback, useEffect, useState } from "react";
 
 type PayoutRequest = {
@@ -46,6 +46,20 @@ export function WalletClient() {
 
   const payoutCards = store.bankAccounts.filter((b) => b.verified && b.iban);
   const selected = payoutCards.find((b) => b.id === cardId) ?? payoutCards[0];
+  const depositCards = store.bankAccounts.filter((b) => b.verified);
+  const depositSel = depositCards.find((b) => b.depositDefault) ?? depositCards[0];
+  const pickDeposit = async (id: string) => {
+    const res = await fetch("/api/me/bank-accounts", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ depositCardId: id }),
+    }).catch(() => null);
+    if (res?.ok) {
+      await store.refreshUserData();
+      setErr("");
+      setMsg("کارت واریز انتخاب شد.");
+    } else setErr("انتخاب کارت واریز انجام نشد.");
+  };
 
   const loadInfo = useCallback(async () => {
     const res = await fetch("/api/withdrawals", { cache: "no-store" }).catch(() => null);
@@ -90,8 +104,11 @@ export function WalletClient() {
         <AppCard>
           <h2 className="text-[15px] font-bold">واریز</h2>
           <p className="mt-3 text-[13px] leading-7 text-muted-app">
-            واریز شخصی در این نسخه خاموش است. موجودی کیف پول را ادمین از دفترکل شارژ می‌کند. درگاه بانکی فعال نیست.
+            درگاه بانکی هنوز فعال نیست. واریز فقط از کارت‌های تأییدشده خودتان پذیرفته می‌شود؛ کارت واریز را از الان انتخاب کنید.
           </p>
+          <div className="mt-3">
+            <BankCardPicker mode="deposit" selectedId={depositSel?.id} onSelect={(id) => void pickDeposit(id)} onMessage={(m) => { setErr(""); setMsg(m); }} />
+          </div>
           <GoldButton
             type="button"
             variant="black"
@@ -111,36 +128,9 @@ export function WalletClient() {
           <p className="mt-1 text-[12px] leading-6 text-muted-app">
             فقط به شبای کارت‌های تأییدشده خودتان واریز می‌شود.
           </p>
-          {payoutCards.length === 0 ? (
-            <p className="mt-3 rounded-xl bg-white/[0.04] px-3 py-3 text-[13px] leading-6 text-muted-app">
-              کارت تأییدشده‌ای با شبا ندارید.{" "}
-              <Link className="text-gold" href="/app/profile/kyc?return=/app/wallet">ثبت کارت بانکی</Link>
-            </p>
-          ) : (
-            <div className="mt-3 space-y-2" role="radiogroup" aria-label="کارت مقصد">
-              {payoutCards.map((b) => (
-                <label
-                  key={b.id}
-                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2 text-[13px] ${
-                    selected?.id === b.id ? "border-gold bg-gold/5" : "border-white/10"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="payout-card"
-                    className="sr-only"
-                    checked={selected?.id === b.id}
-                    onChange={() => setCardId(b.id)}
-                  />
-                  <span>
-                    <span className="block text-text">{b.bank}</span>
-                    <span dir="ltr" className="block font-mono text-[11px] text-muted-app">{b.iban}</span>
-                  </span>
-                  <span dir="ltr" className="font-mono text-[11px] text-muted-app">{b.panMasked}</span>
-                </label>
-              ))}
-            </div>
-          )}
+          <div className="mt-3">
+            <BankCardPicker mode="withdraw" selectedId={selected?.id} onSelect={setCardId} onMessage={(m) => { setErr(""); setMsg(m); }} />
+          </div>
           <AmountField
             aria-label="مبلغ برداشت به تومان"
             value={withdrawAmount}
