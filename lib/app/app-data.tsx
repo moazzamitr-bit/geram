@@ -1,6 +1,5 @@
 "use client";
 
-import { stripDemoFixtures } from "@/lib/app/demo-fixtures";
 import { tradeFailureMessage } from "@/lib/app/trade-errors";
 import type { KycStatus } from "@/lib/auth/auth-context";
 import type { UiQuote, UiTx } from "@/lib/core-api";
@@ -30,7 +29,7 @@ export type TxStatus =
   | "ناموفق"
   | "لغو شده";
 
-export type DemoTransaction = {
+export type AppTransaction = {
   id: string;
   trackingCode: string;
   type: TxType;
@@ -46,16 +45,7 @@ export type DemoTransaction = {
   note?: string;
 };
 
-export type DemoGoal = {
-  id: string;
-  name: string;
-  targetRial: number;
-  currentRial: number;
-  targetDate: string;
-  monthlyRial: number;
-};
-
-export type DemoAlert = {
+export type PriceAlert = {
   id: string;
   direction: "above" | "below";
   priceRial: number;
@@ -65,7 +55,7 @@ export type DemoAlert = {
   autoBuyToman?: number;
 };
 
-export type DemoNotification = {
+export type AppNotification = {
   id: string;
   type: string;
   title: string;
@@ -84,7 +74,7 @@ export type SupportTicket = {
   messages: { from: "user" | "support"; text: string; at: string }[];
 };
 
-type DemoState = {
+type AppDataState = {
   hydrated: boolean;
   goldMg: number;
   silverMg: number;
@@ -114,12 +104,10 @@ type DemoState = {
       stale: boolean;
     }
   >;
-  pin: string | null;
   bankAccounts: { id: string; iban: string; bank: string; verified: boolean }[];
-  transactions: DemoTransaction[];
-  goals: DemoGoal[];
-  alerts: DemoAlert[];
-  notifications: DemoNotification[];
+  transactions: AppTransaction[];
+  alerts: PriceAlert[];
+  notifications: AppNotification[];
   tickets: SupportTicket[];
   plusActive: boolean;
   kycStatus: KycStatus;
@@ -166,40 +154,56 @@ type DemoState = {
   deposit: (rial: number) => Promise<{ ok: boolean; error?: string }>;
   withdraw: (rial: number, bankId: string) => Promise<{ ok: boolean; error?: string }>;
   refreshFinancial: () => Promise<void>;
-  addGoal: (goal: Omit<DemoGoal, "id" | "currentRial">) => string;
-  contributeGoal: (goalId: string, rial: number) => { ok: boolean; error?: string };
-  setPin: (pin: string) => void;
-  addBankAccount: (iban: string, bank: string) => void;
-  addAlert: (
-    alert: Omit<DemoAlert, "id" | "status">
-  ) => { ok: boolean; error?: string };
-  markNotificationRead: (id: string) => void;
-  markAllNotificationsRead: () => void;
-  createTicket: (category: string, subject: string, message: string) => string;
-  replyTicket: (id: string, text: string) => void;
+  addBankAccount: (iban: string, bank: string) => Promise<MutationResult>;
+  addAlert: (alert: Omit<PriceAlert, "id" | "status">) => Promise<MutationResult>;
+  markNotificationRead: (id: string) => Promise<MutationResult>;
+  markAllNotificationsRead: () => Promise<MutationResult>;
+  createTicket: (category: string, subject: string, message: string) => Promise<MutationResult & { id?: string }>;
+  replyTicket: (id: string, text: string) => Promise<MutationResult>;
+  refreshUserData: () => Promise<void>;
+  /** Last load error for alerts/tickets/notifications, shown instead of an empty list. */
+  userDataError: string | null;
   refreshMarketPrice: () => Promise<void>;
 };
 
-const STORAGE_KEY = "gram_demo_platform_v2";
+export type MutationResult = { ok: boolean; error?: string; message?: string };
 
-const DemoContext = createContext<DemoState | null>(null);
+/** Pre-launch demo data lived in these keys; removed on load. */
+const LEGACY_KEYS = ["gram_demo_platform_v2", "gram_demo_platform_v1", "gram_plus_sandbox"];
 
-function nowFa() {
-  return new Intl.DateTimeFormat("fa-IR", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date());
+const fa = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : new Intl.DateTimeFormat("fa-IR", { timeZone: "Asia/Tehran", dateStyle: "short", timeStyle: "short" }).format(d);
+};
+
+async function call<T = Record<string, unknown>>(
+  url: string,
+  init?: RequestInit
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      credentials: "same-origin",
+      ...init,
+      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      signal: AbortSignal.timeout(15_000),
+    });
+    const data = (await res.json().catch(() => ({}))) as T & { ok?: boolean; message?: string; error?: string };
+    if (!res.ok || data.ok === false) {
+      return { ok: false, error: data.message || (res.status === 401 ? "نشست شما منقضی شده است. دوباره وارد شوید." : "درخواست انجام نشد. دوباره تلاش کنید.") };
+    }
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "ارتباط با سرور برقرار نشد. اتصال اینترنت را بررسی کنید." };
+  }
 }
+
+const AppDataContext = createContext<AppDataState | null>(null);
 
 function uid(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
-
-function newId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return uid("id");
 }
 
 const emptyQuoteMeta = {
@@ -248,12 +252,10 @@ const seed = {
       stale: boolean;
     }
   >,
-  pin: null as string | null,
   bankAccounts: [] as { id: string; iban: string; bank: string; verified: boolean }[],
-  transactions: [] as DemoTransaction[],
-  goals: [] as DemoGoal[],
-  alerts: [] as DemoAlert[],
-  notifications: [] as DemoNotification[],
+  transactions: [] as AppTransaction[],
+  alerts: [] as PriceAlert[],
+  notifications: [] as AppNotification[],
   tickets: [] as SupportTicket[],
   plusActive: false,
   kycStatus: "UNVERIFIED" as KycStatus,
@@ -263,183 +265,65 @@ const seed = {
 
 type Persisted = typeof seed;
 
-const LIVE_MARKET_KEYS = [
-  "marketPriceRial",
-  "marketPrices",
-  "marketSource",
-  "marketUpdatedAt",
-  "marketStale",
-  "marketHighToman",
-  "marketLowToman",
-  "marketChangePercent",
-  "marketQuotes",
-] as const;
-
-function stripLiveMarket(state: Persisted): Persisted {
-  const next = { ...state };
-  for (const key of LIVE_MARKET_KEYS) {
-    (next as Record<string, unknown>)[key] = seed[key];
-  }
-  return next;
-}
-
-const FINANCIAL_KEYS = [
-  "goldMg",
-  "silverMg",
-  "copperMg",
-  "rialAvailable",
-  "rialPending",
-  "avgBuyPriceRial",
-  "avgBuyPriceSilverRial",
-  "avgBuyPriceCopperRial",
-] as const;
-
-function stripFinancial(state: Persisted): Persisted {
-  const next = stripLiveMarket(state);
-  for (const key of FINANCIAL_KEYS) {
-    (next as Record<string, unknown>)[key] = seed[key];
-  }
-  return next;
-}
-
-export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
+export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<Persisted>(seed);
   const [hydrated, setHydrated] = useState(false);
-  const [liveDb, setLiveDb] = useState(false);
+  const [userDataError, setUserDataError] = useState<string | null>(null);
+
+  const refreshUserData = useCallback(async () => {
+    const [alerts, tickets, notes, banks] = await Promise.all([
+      call<{ alerts: PriceAlert[] }>("/api/me/alerts"),
+      call<{ tickets: SupportTicket[] }>("/api/me/support"),
+      call<{ notifications: AppNotification[] }>("/api/me/notifications"),
+      call<{ bankAccounts: AppDataState["bankAccounts"] }>("/api/me/bank-accounts"),
+    ]);
+    setState((s) => ({
+      ...s,
+      alerts: alerts.ok ? alerts.data.alerts : s.alerts,
+      tickets: tickets.ok
+        ? tickets.data.tickets.map((t) => ({
+            ...t,
+            createdAt: fa(t.createdAt),
+            messages: t.messages.map((m) => ({ ...m, at: fa(m.at) })),
+          }))
+        : s.tickets,
+      notifications: notes.ok
+        ? notes.data.notifications.map((n) => ({ ...n, createdAt: fa(n.createdAt) }))
+        : s.notifications,
+      bankAccounts: banks.ok ? banks.data.bankAccounts : s.bankAccounts,
+    }));
+    const failed = [alerts, tickets, notes, banks].find((r) => !r.ok);
+    setUserDataError(failed && !failed.ok ? failed.error : null);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-
     async function hydrate() {
       try {
-        const { hasSupabaseEnv } = await import("@/lib/supabase/client");
-        if (hasSupabaseEnv()) {
-          const { loadPlatformBundle } = await import("@/lib/db/platform-sync");
-          const bundle = await loadPlatformBundle();
-          if (bundle && !cancelled) {
-            setLiveDb(true);
-            setState((s) =>
-              stripLiveMarket({
-                ...s,
-                goldMg: bundle.goldMg,
-                silverMg: bundle.silverMg,
-                copperMg: bundle.copperMg,
-                rialAvailable: bundle.rialAvailable,
-                rialPending: bundle.rialPending,
-                avgBuyPriceRial: bundle.avgBuyPriceRial,
-                avgBuyPriceSilverRial: bundle.avgBuyPriceSilverRial,
-                avgBuyPriceCopperRial: bundle.avgBuyPriceCopperRial,
-                bankAccounts: bundle.bankAccounts,
-                transactions: bundle.transactions,
-                goals: bundle.goals,
-                notifications: bundle.notifications,
-                tickets: bundle.tickets,
-                alerts: bundle.alerts,
-                pin: s.pin,
-              })
-            );
-            try {
-              const [settingsRes, planRes] = await Promise.all([
-                fetch("/api/commerce/settings", { cache: "no-store" }),
-                fetch("/api/commerce/plan", { cache: "no-store" }),
-              ]);
-              if (!cancelled && settingsRes.ok) {
-                const settings = (await settingsRes.json()) as CommerceSettings;
-                setState((s) => ({ ...s, commerceSettings: settings }));
-              }
-              if (!cancelled && planRes.ok) {
-                const plan = (await planRes.json()) as {
-                  planTier: "free" | "plus";
-                  referralCode: string | null;
-                  kycStatus: KycStatus;
-                };
-                setState((s) => ({
-                  ...s,
-                  plusActive: plan.planTier === "plus",
-                  referralCode: plan.referralCode,
-                  kycStatus: plan.kycStatus ?? "UNVERIFIED",
-                }));
-              }
-            } catch {
-              /* defaults */
-            }
-            setHydrated(true);
-            return;
-          }
-        }
+        for (const key of LEGACY_KEYS) localStorage.removeItem(key);
       } catch {
-        /* fall back to local sandbox */
+        /* storage unavailable */
       }
-
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem("gram_demo_platform_v1");
-        if (raw && !cancelled) {
-          const parsed = JSON.parse(raw) as Partial<Persisted>;
-          const merged = stripDemoFixtures(
-            stripFinancial({
-              ...seed,
-              ...parsed,
-              marketPrices: { ...seed.marketPrices },
-              marketQuotes: { ...seed.marketQuotes },
-              transactions: parsed.transactions ?? [],
-              goals: parsed.goals ?? [],
-              notifications: parsed.notifications ?? [],
-              bankAccounts: parsed.bankAccounts ?? [],
-              plusActive: false,
-              kycStatus: "UNVERIFIED",
-            })
-          );
-          localStorage.removeItem("gram_plus_sandbox");
-          setState(merged);
-        }
-      } catch {
-        /* ignore */
-      }
-      if (!cancelled) {
-        try {
-          const [settingsRes, planRes] = await Promise.all([
-            fetch("/api/commerce/settings", { cache: "no-store" }),
-            fetch("/api/commerce/plan", { cache: "no-store" }),
-          ]);
-          if (settingsRes.ok) {
-            const settings = (await settingsRes.json()) as CommerceSettings;
-            setState((s) => ({ ...s, commerceSettings: settings }));
-          }
-          if (planRes.ok) {
-            const plan = (await planRes.json()) as {
-              planTier: "free" | "plus";
-              referralCode: string | null;
-              kycStatus: KycStatus;
-            };
-            setState((s) => ({
-              ...s,
-              plusActive: plan.planTier === "plus",
-              referralCode: plan.referralCode,
-              kycStatus: plan.kycStatus ?? s.kycStatus,
-            }));
-          }
-        } catch {
-          /* ignore */
-        }
-        setHydrated(true);
-      }
+      const [settingsRes, planRes] = await Promise.all([
+        call<CommerceSettings>("/api/commerce/settings"),
+        call<{ planTier: "free" | "plus"; referralCode: string | null; kycStatus: KycStatus }>("/api/commerce/plan"),
+        refreshUserData(),
+      ]);
+      if (cancelled) return;
+      setState((s) => ({
+        ...s,
+        commerceSettings: settingsRes.ok ? settingsRes.data : s.commerceSettings,
+        plusActive: planRes.ok ? planRes.data.planTier === "plus" : s.plusActive,
+        referralCode: planRes.ok ? planRes.data.referralCode : s.referralCode,
+        kycStatus: planRes.ok ? (planRes.data.kycStatus ?? "UNVERIFIED") : s.kycStatus,
+      }));
+      setHydrated(true);
     }
-
     void hydrate();
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated || liveDb) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stripFinancial(state)));
-  }, [state, hydrated, liveDb]);
-
-  useEffect(() => {
-    if (!hydrated || !liveDb) return;
-    // Wallet balances are ledger projections. Never write wallets from the client.
-  }, [hydrated, liveDb]);
+  }, [refreshUserData]);
 
   const refreshMarketPrice = useCallback(async () => {
     try {
@@ -581,8 +465,8 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         ...s,
         transactions: txRes.ui.map((t) => ({
           ...t,
-          type: t.type as DemoTransaction["type"],
-          status: t.status as DemoTransaction["status"],
+          type: t.type as AppTransaction["type"],
+          status: t.status as AppTransaction["status"],
           instrument: parseInstrumentId(t.instrument),
         })),
       }));
@@ -788,7 +672,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       error: "برداشت بانکی در این نسخه فعال نیست.",
     };
   }, []);
-  const value = useMemo<DemoState>(
+  const value = useMemo<AppDataState>(
     () => ({
       hydrated,
       ...state,
@@ -804,138 +688,70 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       deposit,
       withdraw,
       refreshFinancial,
-      addGoal: (goal) => {
-        const id = newId();
-        const next = { ...goal, id, currentRial: 0 };
+      addBankAccount: async (iban, bank) => {
+        const r = await call<{ message?: string }>("/api/me/bank-accounts", {
+          method: "POST",
+          body: JSON.stringify({ iban, bank }),
+        });
+        if (!r.ok) return { ok: false, error: r.error };
+        await refreshUserData();
+        return { ok: true, message: r.data.message };
+      },
+      addAlert: async (alert) => {
+        const r = await call<{ message?: string }>("/api/me/alerts", {
+          method: "POST",
+          body: JSON.stringify({ ...alert, priceToman: alert.priceRial }),
+        });
+        if (!r.ok) return { ok: false, error: r.error };
+        await refreshUserData();
+        return { ok: true, message: r.data.message };
+      },
+      markNotificationRead: async (id) => {
         setState((s) => ({
           ...s,
-          goals: [...s.goals, next],
+          notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
         }));
-        if (liveDb) {
-          void import("@/lib/db/platform-sync").then(({ persistGoal }) =>
-            persistGoal(next)
-          );
-        }
-        return id;
+        const r = await call("/api/me/notifications", { method: "POST", body: JSON.stringify({ ids: [id] }) });
+        if (!r.ok) await refreshUserData();
+        return r.ok ? { ok: true } : { ok: false, error: r.error };
       },
-      contributeGoal: () => {
-        return {
-          ok: false,
-          error: "واریز به هدف فعلاً به دفترکل متصل نیست.",
-        };
+      markAllNotificationsRead: async () => {
+        setState((s) => ({ ...s, notifications: s.notifications.map((n) => ({ ...n, read: true })) }));
+        const r = await call("/api/me/notifications", { method: "POST", body: "{}" });
+        if (!r.ok) await refreshUserData();
+        return r.ok ? { ok: true } : { ok: false, error: r.error };
       },
-      setPin: (pin) => setState((s) => ({ ...s, pin })),
-      addBankAccount: (iban, bank) => {
-        const next = { id: newId(), iban, bank, verified: false };
-        setState((s) => ({
-          ...s,
-          bankAccounts: [...s.bankAccounts, next],
-        }));
-        if (liveDb) {
-          void import("@/lib/db/platform-sync").then(({ persistBankAccount }) =>
-            persistBankAccount(next)
-          );
-        }
+      createTicket: async (category, subject, message) => {
+        const r = await call<{ id: string; message?: string }>("/api/me/support", {
+          method: "POST",
+          body: JSON.stringify({ category, subject, message }),
+        });
+        if (!r.ok) return { ok: false, error: r.error };
+        await refreshUserData();
+        return { ok: true, id: r.data.id, message: r.data.message };
       },
-      addAlert: (alert) => {
-        if (
-          alert.channels.includes("sms") &&
-          state.commerceSettings.plus.smsAlertsPlusOnly &&
-          !state.plusActive
-        ) {
-          return { ok: false, error: "اعلان SMS فقط برای اعضای گرم پلاس است." };
-        }
-        const next = {
-          ...alert,
-          id: newId(),
-          status: "ACTIVE" as const,
-        };
-        setState((s) => ({
-          ...s,
-          alerts: [...s.alerts, next],
-        }));
-        if (liveDb) {
-          void import("@/lib/db/platform-sync").then(({ persistAlert }) =>
-            persistAlert(next)
-          );
-        }
-        return { ok: true };
+      replyTicket: async (id, text) => {
+        const r = await call<{ message?: string }>(`/api/me/support/${encodeURIComponent(id)}`, {
+          method: "POST",
+          body: JSON.stringify({ message: text }),
+        });
+        if (!r.ok) return { ok: false, error: r.error };
+        await refreshUserData();
+        return { ok: true, message: r.data.message };
       },
-      markNotificationRead: (id) => {
-        setState((s) => ({
-          ...s,
-          notifications: s.notifications.map((n) =>
-            n.id === id ? { ...n, read: true } : n
-          ),
-        }));
-        if (liveDb) {
-          void import("@/lib/db/platform-sync").then(({ markNotificationsRead }) =>
-            markNotificationsRead([id])
-          );
-        }
-      },
-      markAllNotificationsRead: () => {
-        setState((s) => ({
-          ...s,
-          notifications: s.notifications.map((n) => ({ ...n, read: true })),
-        }));
-        if (liveDb) {
-          void import("@/lib/db/platform-sync").then(({ markNotificationsRead }) =>
-            markNotificationsRead()
-          );
-        }
-      },
-      createTicket: (category, subject, message) => {
-        const id = newId();
-        const ticket: SupportTicket = {
-          id,
-          category,
-          subject,
-          status: "OPEN",
-          createdAt: nowFa(),
-          messages: [{ from: "user", text: message, at: nowFa() }],
-        };
-        setState((s) => ({
-          ...s,
-          tickets: [ticket, ...s.tickets],
-        }));
-        if (liveDb) {
-          void import("@/lib/db/platform-sync").then(({ persistTicket }) =>
-            persistTicket(ticket, message)
-          );
-        }
-        return id;
-      },
-      replyTicket: (id, text) => {
-        setState((s) => ({
-          ...s,
-          tickets: s.tickets.map((t) =>
-            t.id === id
-              ? {
-                  ...t,
-                  status: "WAITING_USER",
-                  messages: [...t.messages, { from: "user", text, at: nowFa() }],
-                }
-              : t
-          ),
-        }));
-        if (liveDb) {
-          void import("@/lib/db/platform-sync").then(({ persistTicketReply }) =>
-            persistTicketReply(id, text, "user")
-          );
-        }
-      },
+      refreshUserData,
+      userDataError,
       refreshMarketPrice,
     }),
-    [hydrated, state, liveDb, buyMetal, sellMetal, requestQuote, executeQuote, buyGold, sellGold, getMetalMg, getAvgBuyPrice, getMarketPrice, deposit, withdraw, refreshMarketPrice, refreshFinancial]
+    [hydrated, state, userDataError, refreshUserData, buyMetal, sellMetal, requestQuote, executeQuote, buyGold, sellGold, getMetalMg, getAvgBuyPrice, getMarketPrice, deposit, withdraw, refreshMarketPrice, refreshFinancial]
   );
 
-  return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
+  return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
 }
 
-export function useDemoStore() {
-  const ctx = useContext(DemoContext);
-  if (!ctx) throw new Error("useDemoStore must be used within DemoStoreProvider");
+export function useAppData() {
+  const ctx = useContext(AppDataContext);
+  if (!ctx) throw new Error("useAppData must be used within AppDataProvider");
   return ctx;
 }
 

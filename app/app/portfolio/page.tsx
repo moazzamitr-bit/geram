@@ -6,7 +6,7 @@ import { NoData } from "@/components/app/NoData";
 import { PageHeader } from "@/components/app/PageHeader";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
-import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
+import { mgToGramsLabel, useAppData } from "@/lib/app/app-data";
 import { unrealizedPnl } from "@/lib/app/pnl";
 import {
   INSTRUMENT_IDS,
@@ -20,7 +20,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 export default function PortfolioPage() {
-  const store = useDemoStore();
+  const store = useAppData();
 
   const rows = useMemo(() => {
     return INSTRUMENT_IDS.map((id) => {

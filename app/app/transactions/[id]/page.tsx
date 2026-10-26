@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { Timeline } from "@/components/app/Timeline";
 import { GoldButton } from "@/components/ui/GoldButton";
-import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
+import { mgToGramsLabel, useAppData } from "@/lib/app/app-data";
 import { instrumentLabel, type InstrumentId } from "@/lib/market/instruments";
 import { formatToman } from "@/lib/utils";
 import Link from "next/link";
@@ -13,7 +13,7 @@ import { useParams } from "next/navigation";
 
 export default function TransactionDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const store = useDemoStore();
+  const store = useAppData();
   const tx = store.transactions.find((t) => t.id === id);
 
   if (!tx) {

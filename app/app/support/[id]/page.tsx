@@ -4,15 +4,17 @@ import { AppCard } from "@/components/app/AppCard";
 import { PageHeader } from "@/components/app/PageHeader";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
-import { useDemoStore } from "@/lib/app/demo-store";
+import { useAppData } from "@/lib/app/app-data";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
 export default function SupportTicketPage() {
   const { id } = useParams<{ id: string }>();
-  const store = useDemoStore();
+  const store = useAppData();
   const ticket = store.tickets.find((t) => t.id === id);
   const [text, setText] = useState("");
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
 
   if (!ticket) return <PageHeader title="تیکت یافت نشد" backHref="/app/support" />;
 
@@ -50,14 +52,27 @@ export default function SupportTicketPage() {
           type="button"
           size="sm"
           className="mt-3"
-          onClick={() => {
+          disabled={busy}
+          onClick={async () => {
             if (!text.trim()) return;
-            store.replyTicket(ticket.id, text);
+            setBusy(true);
+            const res = await store.replyTicket(ticket.id, text);
+            setBusy(false);
+            if (!res.ok) {
+              setNote({ ok: false, text: res.error ?? "ارسال پیام انجام نشد." });
+              return;
+            }
             setText("");
+            setNote({ ok: true, text: res.message ?? "پیام شما ارسال شد." });
           }}
         >
-          ارسال
+          {busy ? "در حال ارسال…" : "ارسال"}
         </GoldButton>
+        {note && (
+          <p role="status" className={`mt-2 text-[13px] ${note.ok ? "text-emerald-700" : "text-rose-700"}`}>
+            {note.text}
+          </p>
+        )}
       </AppCard>
     </div>
   );

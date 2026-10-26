@@ -5,7 +5,7 @@ import { NoData } from "@/components/app/NoData";
 import { TradeSuccessSheet } from "@/components/app/TradeSuccessSheet";
 import { DeferredPriceChart } from "@/components/ui/DeferredPriceChart";
 import type { ChartRange } from "@/components/ui/PriceChart";
-import { mgToGramsLabel, useDemoStore } from "@/lib/app/demo-store";
+import { mgToGramsLabel, useAppData } from "@/lib/app/app-data";
 import { tradeFailureMessage } from "@/lib/app/trade-errors";
 import {
   feeRate,
@@ -46,7 +46,7 @@ export function TradeDesk({
   side: "buy" | "sell";
   instrument?: InstrumentId;
 }) {
-  const store = useDemoStore();
+  const store = useAppData();
   const gate = useVerificationGate();
   const router = useRouter();
   const searchParams = useSearchParams();

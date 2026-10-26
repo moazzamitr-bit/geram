@@ -4,7 +4,7 @@ import { ChartRangeTabs } from "@/components/app/ChartRangeTabs";
 import { NoData } from "@/components/app/NoData";
 import { DeferredPriceChart } from "@/components/ui/DeferredPriceChart";
 import type { ChartRange } from "@/components/ui/PriceChart";
-import { useDemoStore } from "@/lib/app/demo-store";
+import { useAppData } from "@/lib/app/app-data";
 import { unrealizedPnl } from "@/lib/app/pnl";
 import { type InstrumentId } from "@/lib/market/instruments";
 import { tradePathForInstrument } from "@/lib/market/trade-routes";
@@ -37,7 +37,7 @@ const CARD_TITLE: Record<InstrumentId, string> = {
 };
 
 export default function DashboardPage() {
-  const store = useDemoStore();
+  const store = useAppData();
   const gate = useVerificationGate();
   const router = useRouter();
   const [range, setRange] = useState<ChartRange>("1m");

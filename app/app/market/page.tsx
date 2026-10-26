@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { DeferredPriceChart } from "@/components/ui/DeferredPriceChart";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { AmountField } from "@/components/ui/AmountField";
-import { useDemoStore } from "@/lib/app/demo-store";
+import { useAppData } from "@/lib/app/app-data";
 import {
   INSTRUMENT_IDS,
   INSTRUMENTS,
@@ -27,7 +27,7 @@ const periods = [
 ] as const;
 
 export default function MarketPage() {
-  const store = useDemoStore();
+  const store = useAppData();
   const [instrument, setInstrument] = useState<InstrumentId>("gold18");
   const [period, setPeriod] =
     useState<(typeof periods)[number]["range"]>("7d");
@@ -201,9 +201,10 @@ export default function MarketPage() {
           type="button"
           size="sm"
           className="mt-4"
-          onClick={() => {
+          onClick={async () => {
             const channels = ["app", ...(smsChannel ? ["sms"] : [])];
-            const res = store.addAlert({
+            setMsg("در حال ثبت…");
+            const res = await store.addAlert({
               direction,
               priceRial: alertPrice,
               channels,
@@ -211,10 +212,10 @@ export default function MarketPage() {
               autoBuyToman: autoBuy ? autoBuyAmount : 0,
             });
             if (!res.ok) {
-              setMsg(res.error ?? "خطا");
+              setMsg(res.error ?? "ثبت هشدار انجام نشد.");
               return;
             }
-            setMsg("هشدار ذخیره شد.");
+            setMsg(res.message ?? "هشدار قیمت ثبت شد.");
           }}
         >
           ثبت هشدار
@@ -270,7 +271,7 @@ export default function MarketPage() {
         </h2>
         <p className="mt-3 text-[14px] leading-8 text-muted-app">
           یک کیف پول برای طلا، نقره و مس؛ کارمزد شفاف قبل از تأیید؛ بدون اجرت ساخت؛
-          و همان زیرساخت اعتماد، اهداف و گرم پلاس که فقط روی طلا نبود.
+          و همان پس‌انداز خودکار، کارت هدیه و گرم پلاس برای هر سه فلز.
         </p>
       </AppCard>
     </div>

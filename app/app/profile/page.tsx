@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { formatMaskedPhone, useAuth } from "@/lib/auth/auth-context";
-import { useDemoStore } from "@/lib/app/demo-store";
+import { useAppData } from "@/lib/app/app-data";
 import {
   Building2,
   ChevronLeft,
@@ -38,7 +38,7 @@ const links = [
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
-  const store = useDemoStore();
+  const store = useAppData();
   const router = useRouter();
 
   return (

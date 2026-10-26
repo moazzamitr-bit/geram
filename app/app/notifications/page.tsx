@@ -3,13 +3,13 @@
 import { AppCard } from "@/components/app/AppCard";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
-import { useDemoStore } from "@/lib/app/demo-store";
+import { useAppData } from "@/lib/app/app-data";
 import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 
 export default function NotificationsPage() {
-  const store = useDemoStore();
+  const store = useAppData();
   const unread = useMemo(
     () => store.notifications.filter((n) => !n.read).length,
     [store.notifications]
@@ -35,7 +35,7 @@ export default function NotificationsPage() {
             {unread > 0 && (
               <button
                 type="button"
-                onClick={() => store.markAllNotificationsRead()}
+                onClick={() => void store.markAllNotificationsRead()}
                 className="min-h-10 rounded-xl border border-white/10 px-3 text-[12px] text-text-secondary transition-colors hover:border-gold/35 hover:text-gold"
               >
                 همه خوانده شد
@@ -45,6 +45,14 @@ export default function NotificationsPage() {
         }
       />
 
+      {store.userDataError && (
+        <p role="alert" className="rounded-xl border border-rose-600/30 bg-rose-600/5 px-3 py-2 text-[13px] text-rose-700">
+          {store.userDataError}{" "}
+          <button type="button" className="underline" onClick={() => void store.refreshUserData()}>
+            تلاش دوباره
+          </button>
+        </p>
+      )}
       {store.notifications.length === 0 ? (
         <EmptyState
           title="هنوز اعلانی ندارید"
@@ -60,7 +68,7 @@ export default function NotificationsPage() {
               key={n.id}
               type="button"
               className="block w-full cursor-pointer text-right"
-              onClick={() => store.markNotificationRead(n.id)}
+              onClick={() => void store.markNotificationRead(n.id)}
             >
               <AppCard
                 className={`transition duration-200 ${

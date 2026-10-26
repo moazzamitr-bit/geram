@@ -94,7 +94,6 @@ export const adminNavCatalog: AdminNavGroup[] = [
     id: "product",
     label: "عملیات محصول",
     items: [
-      { label: "اهداف", href: "/admin/goals", icon: Target },
       { label: "طرح پس‌انداز", href: "/admin/savings", icon: Flag },
       { label: "هشدار قیمت", href: "/admin/alerts", icon: Bell },
       { label: "معرفی دوستان", href: "/admin/referrals", icon: Gift },

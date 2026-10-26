@@ -5,14 +5,14 @@ import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
-import { useDemoStore } from "@/lib/app/demo-store";
+import { useAppData } from "@/lib/app/app-data";
 import { Building2 } from "lucide-react";
 import { useState } from "react";
 
 const banks = ["بانک ملی", "بانک ملت", "بانک صادرات", "بانک پاسارگاد", "سامان"];
 
 export default function BankAccountsPage() {
-  const store = useDemoStore();
+  const store = useAppData();
   const [iban, setIban] = useState("IR");
   const [bank, setBank] = useState(banks[0]);
   const [msg, setMsg] = useState("");
@@ -74,14 +74,19 @@ export default function BankAccountsPage() {
         <GoldButton
           type="button"
           className="w-full"
-          onClick={() => {
-            if (!iban.startsWith("IR") || iban.length < 24) {
-              setMsg("شبا باید با IR شروع شود و حداقل ۲۴ کاراکتر باشد.");
+          onClick={async () => {
+            if (!/^IR\d{24}$/.test(iban)) {
+              setMsg("شبا باید با IR شروع شود و ۲۴ رقم داشته باشد.");
               return;
             }
-            store.addBankAccount(iban, bank);
+            setMsg("در حال ثبت…");
+            const res = await store.addBankAccount(iban, bank);
+            if (!res.ok) {
+              setMsg(res.error ?? "ثبت حساب انجام نشد.");
+              return;
+            }
             setIban("IR");
-            setMsg("حساب ثبت شد. تأیید مالکیت شبا هنوز انجام نشده است.");
+            setMsg(res.message ?? "حساب ثبت شد. تأیید مالکیت شبا هنوز انجام نشده است.");
           }}
         >
           افزودن حساب

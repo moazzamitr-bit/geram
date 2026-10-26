@@ -95,8 +95,8 @@ describe("balance screens do not read the legacy wallets table", () => {
     "app/api/me/balances/route.ts",
     "app/api/core/quotes/route.ts",
     "app/api/core/trades/route.ts",
-    "lib/db/platform-sync.ts",
-    "lib/app/demo-store.tsx",
+    "lib/app/app-data.tsx",
+    "lib/app/user-data.ts",
     "lib/commerce/cron-jobs.ts",
     "lib/core/engine.ts",
     "lib/admin/ops.ts",
@@ -118,9 +118,7 @@ describe("balance screens do not read the legacy wallets table", () => {
     expect(userPage).toContain("readHolderLedgerView");
     expect(userPage).toContain("USER_AVAILABLE");
 
-    const panel = readFileSync(path.join(root, "lib/db/platform-sync.ts"), "utf8");
-    const store = readFileSync(path.join(root, "lib/app/demo-store.tsx"), "utf8");
-    expect(panel).toContain("/api/me/balances");
+    const store = readFileSync(path.join(root, "lib/app/app-data.tsx"), "utf8");
     expect(store).toContain("/api/me/balances");
     expect(store).not.toContain("databaseBacked");
 
