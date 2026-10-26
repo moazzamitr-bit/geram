@@ -453,3 +453,9 @@ svg text,
 @media (prefers-reduced-motion: reduce) {
   .receipt-check, .receipt-check-path { animation: none; stroke-dashoffset: 0; }
 }
+
+/* Cream behind iOS/Android status bar + overscroll in the installed app and login. */
+html:has(.geram-app),
+html:has(.geram-app) body {
+  background: #faf8f5;
+}

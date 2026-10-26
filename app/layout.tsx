@@ -21,8 +21,8 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    // Marketing pages stay dark. /app overrides this to "default" for the cream shell.
-    statusBarStyle: "black-translucent",
+    // Cream status bar everywhere so the installed app looks seamless.
+    statusBarStyle: "default",
     title: "گرم",
   },
   // Next emits mobile-web-app-capable. Older iOS still reads the apple- prefix.
@@ -40,9 +40,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  // Browser chrome on the marketing site. The installed PWA uses the manifest
-  // cream theme, and /app overrides themeColor so the logged-in shell matches.
-  themeColor: "#080B0D",
+  // Cream browser chrome / status bar matching the app background (#faf8f5).
+  // Keep in sync with manifest theme_color and /app viewport.
+  themeColor: "#FAF8F5",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
