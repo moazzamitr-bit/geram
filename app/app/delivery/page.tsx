@@ -1,6 +1,8 @@
 "use client";
 
 import { AppCard } from "@/components/app/AppCard";
+import { ReceiptSheet } from "@/components/app/ReceiptSheet";
+import { formatTehranJalaliDateTime } from "@/lib/format/datetime";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { useVerificationGate, type VerificationStep } from "@/components/app/VerificationGate";
@@ -8,7 +10,7 @@ import { GoldButton } from "@/components/ui/GoldButton";
 import { apiJson, faDate, faWeekdayDate, METAL_LABEL, ugLabel, upcomingDays } from "@/lib/app/format";
 import { useAppData } from "@/lib/app/app-data";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, MapPin, Package } from "lucide-react";
+import { MapPin, Package } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type Product = { id: string; asset: string; kind: string; brand?: string | null; title: string; weight_ug: string; fee_percent?: number | null };
@@ -123,24 +125,32 @@ export default function PhysicalWithdrawalPage() {
         description="شمش طلای ۱۸ عیار یا ساچمه نقره را حضوری در شعبه تحویل بگیرید. کارمزد ضرب و بسته‌بندی هر محصول کنار آن آمده است."
       />
 
-      {done && (
-        <AppCard className="border-emerald-200 bg-emerald-50">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" />
-            <div className="text-[14px] leading-7">
-              <p className="font-bold text-emerald-800">درخواست شما ثبت شد</p>
-              <p className="text-emerald-800">
-                {done.product_title} × {done.quantity.toLocaleString("fa-IR")} — کد پیگیری{" "}
-                <span className="font-bold" dir="ltr">{done.tracking_code}</span>
-              </p>
-              <p className="text-emerald-700">
-                {ugLabel(BigInt(done.weight_ug) + BigInt(done.fee_ug))} از موجودی شما رزرو شد. بعد از تأیید، نوبت{" "}
-                {faWeekdayDate(done.pickup_date)} ساعت {done.pickup_slot} قطعی می‌شود.
-              </p>
-            </div>
-          </div>
-        </AppCard>
-      )}
+      <ReceiptSheet
+        open={!!done}
+        onClose={() => setDone(null)}
+        title="درخواست برداشت فیزیکی ثبت شد"
+        subtitle="فلز برای شما رزرو شد و درخواست در صف تأیید است."
+        amount={done ? ugLabel(BigInt(done.weight_ug) + BigInt(done.fee_ug)) : undefined}
+        amountCaption="از موجودی شما رزرو شد (وزن + کارمزد)"
+        rows={
+          done
+            ? [
+                { label: "محصول", value: `${done.product_title} × ${done.quantity.toLocaleString("fa-IR")}` },
+                { label: "شعبه", value: done.branch_name },
+                { label: "نوبت مراجعه", value: `${faWeekdayDate(done.pickup_date)} · ${done.pickup_slot}` },
+                { label: "زمان ثبت", value: formatTehranJalaliDateTime(done.created_at) },
+              ]
+            : []
+        }
+        trackingCode={done?.tracking_code}
+        steps={["ثبت", "تأیید", "تحویل"]}
+        activeStep={0}
+        reassurance={["تا تحویل یا لغو، فلز رزروشده از موجودی شما خارج نمی‌شود.", "تحویل فقط با کارت ملی به خود صاحب حساب انجام می‌شود."]}
+        actions={[
+          { label: "پیگیری درخواست", primary: true, onClick: () => { setDone(null); setTimeout(() => document.getElementById("delivery-requests")?.scrollIntoView({ behavior: "smooth" }), 50); } },
+          { label: "بازگشت", onClick: () => setDone(null) },
+        ]}
+      />
 
       <AppCard className="space-y-5">
         <div>
@@ -258,7 +268,7 @@ export default function PhysicalWithdrawalPage() {
         {branch && <p className="text-center text-[11px] text-muted-app">هنگام مراجعه کارت ملی و کد پیگیری همراه داشته باشید.</p>}
       </AppCard>
 
-      <div>
+      <div id="delivery-requests">
         <h2 className="mb-3 text-[16px] font-bold">درخواست‌های من</h2>
         {requests.length === 0 ? (
           <EmptyState title="هنوز درخواستی ندارید" description="درخواست‌های برداشت فیزیکی و وضعیت آن‌ها اینجا دیده می‌شود." icon={Package} />

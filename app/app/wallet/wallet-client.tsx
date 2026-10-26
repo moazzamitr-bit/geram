@@ -12,6 +12,9 @@ import { useVerificationGate } from "@/components/app/VerificationGate";
 import { useAppData } from "@/lib/app/app-data";
 import { formatToman } from "@/lib/utils";
 import { BankCardPicker } from "@/components/app/BankCardPicker";
+import { BankBadge, ReceiptSheet } from "@/components/app/ReceiptSheet";
+import { formatTehranJalaliDateTime } from "@/lib/format/datetime";
+import type { WithdrawalReceipt } from "@/lib/app/app-data";
 import { useCallback, useEffect, useState } from "react";
 
 type PayoutRequest = {
@@ -42,6 +45,7 @@ export function WalletClient() {
   const [err, setErr] = useState("");
   const [cardId, setCardId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [receipt, setReceipt] = useState<{ req: WithdrawalReceipt; panMasked: string } | null>(null);
   const [info, setInfo] = useState<{ enabled: boolean; dailyCapToman: number; usedTodayToman: number; minToman: number; requests: PayoutRequest[] } | null>(null);
 
   const payoutCards = store.bankAccounts.filter((b) => b.verified && b.iban);
@@ -161,8 +165,11 @@ export function WalletClient() {
                   return;
                 }
                 setWithdrawAmount(0);
-                setMsg(res.message ?? "درخواست برداشت ثبت شد.");
                 setErr("");
+                if (res.request) {
+                  setMsg("");
+                  setReceipt({ req: res.request, panMasked: selected.panMasked });
+                } else setMsg(res.message ?? "درخواست برداشت ثبت شد.");
                 await loadInfo();
               })();
             }}
@@ -172,13 +179,55 @@ export function WalletClient() {
         </AppCard>
       </div>
 
+      <ReceiptSheet
+        open={!!receipt}
+        onClose={() => setReceipt(null)}
+        title="درخواست برداشت ثبت شد"
+        subtitle="درخواست شما در صف تسویه قرار گرفت."
+        amount={receipt ? Math.round(Number(receipt.req.amount_irr) / 10).toLocaleString("fa-IR") : undefined}
+        amountUnit="تومان"
+        amountCaption={receipt && Number(receipt.req.fee_irr) > 0 ? `کارمزد ${formatToman(Number(receipt.req.fee_irr) / 10)} جداگانه از کیف پول کسر شد` : undefined}
+        header={
+          receipt ? (
+            <div className="flex items-center gap-3">
+              <BankBadge name={receipt.req.bank_name} />
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-bold text-text">{receipt.req.bank_name}</p>
+                <p dir="ltr" className="truncate text-right font-mono text-[11.5px] text-muted-app">{receipt.panMasked}</p>
+              </div>
+            </div>
+          ) : null
+        }
+        rows={
+          receipt
+            ? [
+                { label: "شبای مقصد", value: receipt.req.iban, mono: true },
+                { label: "زمان ثبت", value: formatTehranJalaliDateTime(receipt.req.created_at) },
+                { label: "زمان تقریبی واریز", value: "اولین چرخه پایا پس از تأیید" },
+              ]
+            : []
+        }
+        trackingCode={receipt?.req.tracking_code}
+        steps={["ثبت", "بررسی", "واریز شد"]}
+        activeStep={0}
+        reassurance={[
+          "مبلغ تا واریز در حساب شما رزرو است.",
+          "واریز فقط به کارت و شبای به نام خودتان انجام می‌شود.",
+          "چرخه‌های پایا در روزهای کاری اجرا می‌شوند؛ درخواست‌های عصر و تعطیلات در روز کاری بعد واریز می‌شوند.",
+        ]}
+        actions={[
+          { label: "پیگیری درخواست", primary: true, onClick: () => { setReceipt(null); setTimeout(() => document.getElementById("withdraw-requests")?.scrollIntoView({ behavior: "smooth" }), 50); } },
+          { label: "بازگشت به کیف پول", onClick: () => setReceipt(null) },
+        ]}
+      />
+
       {(msg || err) && (
         <p className={`text-[13px] ${err ? "text-negative" : "text-positive"}`}>
           {err || msg}
         </p>
       )}
 
-      <AppCard>
+      <AppCard id="withdraw-requests">
         <h2 className="text-[15px] font-bold">درخواست‌های برداشت</h2>
         {!info || info.requests.length === 0 ? (
           <p className="mt-3 text-[13px] text-muted-app">درخواست برداشتی ثبت نشده است.</p>
