@@ -18,7 +18,7 @@ export type KycStatus =
   | "REJECTED"
   | "NEEDS_UPDATE";
 
-export type DemoUser = {
+export type AppUser = {
   id: string;
   firstName: string;
   lastName: string;
@@ -29,7 +29,7 @@ export type DemoUser = {
 };
 
 type AuthState = {
-  user: DemoUser | null;
+  user: AppUser | null;
   hydrated: boolean;
   isAuthenticated: boolean;
   live: boolean;
@@ -55,7 +55,8 @@ type AuthState = {
   setHasPin: (value: boolean) => void;
 };
 
-const STORAGE_KEY = "gram_demo_session_v1";
+/** Pre-launch demo sessions were stored here; cleared on load so none survive. */
+const LEGACY_DEMO_KEY = "gram_demo_session_v1";
 
 const AuthContext = createContext<AuthState | null>(null);
 
@@ -79,7 +80,7 @@ function profileToUser(
     onboarding_done?: boolean | null;
   },
   fallbackPhone: string
-): DemoUser {
+): AppUser {
   return {
     id: profile.id,
     firstName: profile.first_name || "کاربر",
@@ -92,31 +93,27 @@ function profileToUser(
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<DemoUser | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const live = hasSupabaseEnv();
 
   useEffect(() => {
     let cancelled = false;
 
-    function finish(next: DemoUser | null) {
+    function finish(next: AppUser | null) {
       if (cancelled) return;
       setUser(next);
       setHydrated(true);
     }
 
     async function hydrate() {
-      // Demo sessions live only in localStorage. A live deploy must not treat
-      // that as a Supabase session — middleware would bounce /app back here
-      // and the login screen would never settle.
+      try {
+        localStorage.removeItem(LEGACY_DEMO_KEY);
+      } catch {
+        /* storage unavailable */
+      }
       if (!live) {
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          finish(raw ? (JSON.parse(raw) as DemoUser) : null);
-        } catch {
-          localStorage.removeItem(STORAGE_KEY);
-          finish(null);
-        }
+        finish(null);
         return;
       }
 
@@ -125,7 +122,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data } = await withTimeout(supabase.auth.getUser(), 5_000, "auth_timeout");
         const authUser = data.user;
         if (!authUser) {
-          localStorage.removeItem(STORAGE_KEY);
           finish(null);
           return;
         }
@@ -138,7 +134,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           5_000,
           "auth_timeout"
         );
-        localStorage.removeItem(STORAGE_KEY);
         if (profile) {
           finish(profileToUser(profile, (authUser.user_metadata?.phone as string) || ""));
           return;
@@ -163,14 +158,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [live]);
 
-  const persistLocal = useCallback((next: DemoUser | null) => {
-    setUser(next);
-    if (next) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    else localStorage.removeItem(STORAGE_KEY);
-  }, []);
-
   const login = useCallback(
-    async (phone: string, otp = DEMO_OTP) => {
+    async (phone: string, otp = "") => {
       const digits = phone.replace(/\D/g, "").replace(/^98/, "0");
 
       if (live) {
@@ -198,7 +187,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           const supabase = createClient();
           await supabase.auth.setSession(data.session);
-          localStorage.removeItem(STORAGE_KEY);
           setUser(profileToUser(data.profile, digits));
           return { ok: true };
         } catch (err) {
@@ -209,31 +197,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      persistLocal({
-        id: "local-user",
-        firstName: "کاربر",
-        lastName: "",
-        phone: digits,
-        kycStatus: "UNVERIFIED",
-        onboardingDone: false,
-        hasPin: false,
-      });
-      return { ok: true };
+      return { ok: false, error: "unavailable" };
     },
-    [live, persistLocal]
+    [live]
   );
 
   const exchangePassword = useCallback(
     async (
       url: string,
-      body: Record<string, string>,
-      demo: DemoUser
+      body: Record<string, string>
     ): Promise<{ ok: boolean; error?: string; onboardingDone?: boolean }> => {
       const digits = (body.phone || "").replace(/\D/g, "").replace(/^98/, "0");
-      if (!live) {
-        persistLocal({ ...demo, phone: digits });
-        return { ok: true, onboardingDone: demo.onboardingDone };
-      }
+      if (!live) return { ok: false, error: "unavailable" };
       try {
         const res = await fetch(url, {
           method: "POST",
@@ -269,7 +244,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // The route already set the cookies middleware reads.
           }
         }
-        localStorage.removeItem(STORAGE_KEY);
         setUser(profileToUser(data.profile, digits));
         return { ok: true, onboardingDone: Boolean(data.profile.onboarding_done) };
       } catch (err) {
@@ -277,23 +251,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, error: timedOut ? "timeout" : "network" };
       }
     },
-    [live, persistLocal]
+    [live]
   );
 
   const loginWithPassword = useCallback(
     (phone: string, password: string) =>
       exchangePassword(
         "/api/auth/password-login",
-        { phone, password },
-        {
-          id: "local-user",
-          firstName: "کاربر",
-          lastName: "",
-          phone,
-          kycStatus: "UNVERIFIED",
-          onboardingDone: true,
-          hasPin: false,
-        }
+        { phone, password }
       ),
     [exchangePassword]
   );
@@ -307,15 +272,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           password: input.password,
           firstName: input.firstName,
           lastName: input.lastName,
-        },
-        {
-          id: "local-user",
-          firstName: input.firstName,
-          lastName: input.lastName,
-          phone: input.phone,
-          kycStatus: "UNVERIFIED",
-          onboardingDone: false,
-          hasPin: false,
         }
       ),
     [exchangePassword]
@@ -335,8 +291,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         /* ignore */
       }
-    } else {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     }
   }, [live, user]);
 
@@ -349,16 +303,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         /* ignore */
       }
     }
-    persistLocal(null);
-  }, [live, persistLocal]);
+    setUser(null);
+  }, [live]);
 
   const setKycStatus = useCallback(
     async (status: KycStatus) => {
       if (!user) return;
-      if (live) return;
-      const next = { ...user, kycStatus: status };
-      setUser(next);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      // KYC status is server-owned; only a fresh profile read changes it.
+      void status;
     },
     [live, user]
   );
@@ -373,7 +325,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           firstName: patch.firstName || current.firstName,
           lastName: patch.lastName || current.lastName,
         };
-        if (!live) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         return next;
       });
     },
@@ -385,9 +336,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user) return;
       const next = { ...user, hasPin: value };
       setUser(next);
-      if (!live) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     },
-    [live, user]
+    [user]
   );
 
   const value = useMemo(
@@ -435,5 +385,3 @@ export function formatMaskedPhone(phone: string) {
   return maskPhone(phone);
 }
 
-/** Sandbox OTP — always accepts 123456 */
-export const DEMO_OTP = "123456";

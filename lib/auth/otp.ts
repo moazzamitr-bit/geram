@@ -1,5 +1,4 @@
 import { createHash, randomInt, timingSafeEqual } from "crypto";
-import { getExecutionMode } from "@/lib/core/mode";
 import {
   finnotechConfigured,
   finnotechOtpChannel,
@@ -45,14 +44,7 @@ function externalCodeHash(length: number) {
   return `external:${length}`;
 }
 
-/** Sandbox demo code. An explicit DEMO_OTP wins; otherwise it matches the configured length. */
-export function sandboxDemoCode() {
-  const explicit = process.env.DEMO_OTP?.trim() || process.env.NEXT_PUBLIC_DEMO_OTP?.trim();
-  if (explicit) return explicit;
-  return "123456789".slice(0, otpCodeLength());
-}
-
-export type OtpMode = "sms" | "sandbox" | "unavailable";
+export type OtpMode = "sms" | "unavailable";
 
 export type SmsProvider = "finnotech" | "smsir" | "kavenegar";
 
@@ -79,18 +71,11 @@ export function consumeOtpSendRate(phone: string, ip: string, now = Date.now()) 
 
 /**
  * "sms": a real provider is configured (sms.ir verify or Kavenegar lookup).
- * "sandbox": no provider, SANDBOX mode — the fixed demo code is accepted.
  * "unavailable": no provider outside SANDBOX — login must be refused.
  */
 export function otpMode(): OtpMode {
-  if (smsProvider()) {
-    return process.env.SUPABASE_SERVICE_ROLE_KEY ? "sms" : "unavailable";
-  }
-  try {
-    return getExecutionMode() === "SANDBOX" ? "sandbox" : "unavailable";
-  } catch {
-    return "unavailable";
-  }
+  // No fixed/demo code exists in any mode: without a provider, login is refused.
+  return smsProvider() && process.env.SUPABASE_SERVICE_ROLE_KEY ? "sms" : "unavailable";
 }
 
 function hashCode(phone: string, code: string) {
@@ -144,7 +129,6 @@ export type RequestOtpResult =
 
 export async function requestOtp(phone: string, ip = "unknown"): Promise<RequestOtpResult> {
   const mode = otpMode();
-  if (mode === "sandbox") return { ok: true, mode, resendInSec: OTP_RESEND_SEC, codeLength: otpCodeLength() };
   if (mode === "unavailable") return { ok: false, error: "unavailable" };
 
   const db = createServiceClient();
@@ -278,9 +262,6 @@ export type VerifyOtpResult =
 
 export async function verifyOtp(phone: string, code: string): Promise<VerifyOtpResult> {
   const mode = otpMode();
-  if (mode === "sandbox") {
-    return code === sandboxDemoCode() ? { ok: true } : { ok: false, error: "invalid_otp" };
-  }
   if (mode === "unavailable") return { ok: false, error: "unavailable" };
 
   const db = createServiceClient();
