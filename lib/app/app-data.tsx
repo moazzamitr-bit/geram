@@ -104,7 +104,8 @@ type AppDataState = {
       stale: boolean;
     }
   >;
-  bankAccounts: { id: string; iban: string; bank: string; verified: boolean }[];
+  /** Verified cards (user_bank_cards) with the IBAN Finnotech returned for each. */
+  bankAccounts: { id: string; iban: string | null; bank: string; panMasked: string; verified: boolean }[];
   transactions: AppTransaction[];
   alerts: PriceAlert[];
   notifications: AppNotification[];
@@ -152,9 +153,8 @@ type AppDataState = {
     destination: "wallet" | "bank"
   ) => Promise<{ ok: boolean; error?: string; txId?: string }>;
   deposit: (rial: number) => Promise<{ ok: boolean; error?: string }>;
-  withdraw: (rial: number, bankId: string) => Promise<{ ok: boolean; error?: string }>;
+  withdraw: (amountToman: number, cardId: string) => Promise<{ ok: boolean; error?: string; message?: string }>;
   refreshFinancial: () => Promise<void>;
-  addBankAccount: (iban: string, bank: string) => Promise<MutationResult>;
   addAlert: (alert: Omit<PriceAlert, "id" | "status">) => Promise<MutationResult>;
   markNotificationRead: (id: string) => Promise<MutationResult>;
   markAllNotificationsRead: () => Promise<MutationResult>;
@@ -252,7 +252,7 @@ const seed = {
       stale: boolean;
     }
   >,
-  bankAccounts: [] as { id: string; iban: string; bank: string; verified: boolean }[],
+  bankAccounts: [] as { id: string; iban: string | null; bank: string; panMasked: string; verified: boolean }[],
   transactions: [] as AppTransaction[],
   alerts: [] as PriceAlert[],
   notifications: [] as AppNotification[],
@@ -666,12 +666,18 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const withdraw = useCallback(async () => {
-    return {
-      ok: false,
-      error: "برداشت بانکی در این نسخه فعال نیست.",
-    };
-  }, []);
+  const withdraw = useCallback(
+    async (amountToman: number, cardId: string) => {
+      const r = await call<{ message?: string }>("/api/withdrawals", {
+        method: "POST",
+        body: JSON.stringify({ amountToman, cardId }),
+      });
+      if (!r.ok) return { ok: false, error: r.error };
+      await refreshFinancial();
+      return { ok: true, message: r.data.message };
+    },
+    [refreshFinancial]
+  );
   const value = useMemo<AppDataState>(
     () => ({
       hydrated,
@@ -688,15 +694,6 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       deposit,
       withdraw,
       refreshFinancial,
-      addBankAccount: async (iban, bank) => {
-        const r = await call<{ message?: string }>("/api/me/bank-accounts", {
-          method: "POST",
-          body: JSON.stringify({ iban, bank }),
-        });
-        if (!r.ok) return { ok: false, error: r.error };
-        await refreshUserData();
-        return { ok: true, message: r.data.message };
-      },
       addAlert: async (alert) => {
         const r = await call<{ message?: string }>("/api/me/alerts", {
           method: "POST",

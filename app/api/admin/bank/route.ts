@@ -3,27 +3,21 @@ import { adminGate, readActionBody } from "@/lib/admin/auth";
 import { writeAudit } from "@/lib/admin/audit";
 import { createServiceClient } from "@/lib/supabase/admin";
 
+/**
+ * Admin actions on a verified bank card (user_bank_cards). Ownership and IBAN
+ * come only from Finnotech, so the only manual action is disabling a card;
+ * a disabled card can no longer receive withdrawals.
+ */
 export async function POST(request: Request) {
   const gate = await adminGate("bank.view");
   if (!gate.ok) return gate.response;
 
   const body = await readActionBody(request);
-  const accountId = (body.accountId ?? "").trim();
+  const cardId = (body.accountId ?? body.cardId ?? "").trim();
   const action = (body.action ?? "").trim();
   const reason = (body.reason ?? "").trim();
-  if (!accountId || reason.length < 8) {
+  if (!cardId || reason.length < 8 || action !== "disable") {
     return NextResponse.json({ ok: false, error: "invalid_request" }, { status: 400 });
-  }
-
-  if (action === "mark_verified") {
-    return NextResponse.json(
-      {
-        ok: false,
-        error:
-          "تأیید دستی IBAN در این فاز فعال نیست. مجوز bank.mark_verified صادر نشده.",
-      },
-      { status: 403 }
-    );
   }
 
   let db;
@@ -32,53 +26,16 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "service_unavailable" }, { status: 503 });
   }
-
-  if (action === "disable") {
-    const { error } = await db
-      .from("bank_accounts")
-      .update({ account_status: "DISABLED" })
-      .eq("id", accountId);
-    if (error) {
-      await writeAudit({
-        actorId: gate.ctx.userId,
-        role: gate.ctx.role,
-        action: "bank.disable",
-        entity: "bank_account",
-        entityId: accountId,
-        reason,
-        result: "error",
-        meta: { error: error.message, note: "account_status column may be missing" },
-      });
-      return NextResponse.json(
-        { ok: false, error: "ستون account_status هنوز اعمال نشده. اقدام در audit ثبت شد." },
-        { status: 503 }
-      );
-    }
-  }
-
+  const { error } = await db.from("user_bank_cards").update({ status: "DISABLED" }).eq("id", cardId);
   await writeAudit({
     actorId: gate.ctx.userId,
     role: gate.ctx.role,
-    action: `bank.${action}`,
-    entity: "bank_account",
-    entityId: accountId,
+    action: "bank.disable",
+    entity: "user_bank_card",
+    entityId: cardId,
     reason,
-    result: "ok",
-    meta: {
-      note:
-        action === "retry"
-          ? "Bank verification provider is MOCK/NOT READY — retry logged only."
-          : action === "resubmission"
-            ? "User resubmission requested (audit only until product workflow exists)."
-            : null,
-    },
+    result: error ? "error" : "ok",
   });
-
-  return NextResponse.json({
-    ok: true,
-    message:
-      action === "retry"
-        ? "ثبت شد. ارائه‌دهنده مالکیت حساب MOCK است — فراخوان خارجی نیست."
-        : "ثبت شد.",
-  });
+  if (error) return NextResponse.json({ ok: false, error: "update_failed" }, { status: 503 });
+  return NextResponse.json({ ok: true, message: "کارت غیرفعال شد و دیگر مقصد برداشت نیست." });
 }

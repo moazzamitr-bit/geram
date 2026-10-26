@@ -1,7 +1,7 @@
 import { finnotechConfigured } from "@/lib/finnotech/config";
-import { verifyCardOwner } from "@/lib/finnotech/bank";
+import { cardToIban, verifyCardOwner } from "@/lib/finnotech/bank";
 import { inquireIdentity, sendShahkarSms, verifyShahkarSms } from "@/lib/finnotech/kyc";
-import { addVerifiedCard, type CardProfile, type NewCard } from "@/lib/kyc/bank-flow";
+import { addVerifiedCard, type CardIbanRecord, type CardProfile, type NewCard } from "@/lib/kyc/bank-flow";
 import { auditKyc, supabaseKycStore } from "@/lib/kyc/db";
 import { confirmShahkarKyc, startShahkarKyc, type KycDeps } from "@/lib/kyc/flow";
 import { FinnotechError } from "@/lib/finnotech/client";
@@ -57,13 +57,35 @@ async function loadCardProfile(userId: string): Promise<CardProfile | null> {
 }
 
 async function hasCard(userId: string, panHash: string) {
-  const { count, error } = await serviceDb()
+  const { data, error } = await serviceDb()
     .from("user_bank_cards")
-    .select("id", { count: "exact", head: true })
+    .select("id, iban")
+    .eq("user_id", userId)
+    .eq("pan_hash", panHash)
+    .maybeSingle();
+  if (error) throw new KycFlowError("unavailable", 503);
+  return data ? { hasIban: !!data.iban } : false;
+}
+
+function ibanColumns(iban: CardIbanRecord | null | undefined) {
+  if (!iban) return {};
+  return {
+    iban: iban.iban,
+    iban_bank_name: iban.bankName,
+    iban_owners: iban.owners,
+    iban_deposit_status: iban.depositStatus,
+    iban_track_id: iban.trackId,
+    iban_checked_at: iban.checkedAt,
+  };
+}
+
+async function saveIban(userId: string, panHash: string, iban: CardIbanRecord) {
+  const { error } = await serviceDb()
+    .from("user_bank_cards")
+    .update(ibanColumns(iban))
     .eq("user_id", userId)
     .eq("pan_hash", panHash);
   if (error) throw new KycFlowError("unavailable", 503);
-  return (count ?? 0) > 0;
 }
 
 async function saveCard(userId: string, card: NewCard) {
@@ -76,6 +98,7 @@ async function saveCard(userId: string, card: NewCard) {
     status: "VERIFIED",
     owner_track_id: card.trackId,
     verified_at: card.verifiedAt,
+    ...ibanColumns(card.iban),
   });
   if (error?.code === "23505") throw new KycFlowError("card_exists", 409);
   if (error) throw new KycFlowError("unavailable", 503);
@@ -90,6 +113,8 @@ export async function addUserCard(input: { userId: string; card?: string; ip: st
       save: saveCard,
       audit: auditKyc,
       matchCard: verifyCardOwner,
+      lookupIban: cardToIban,
+      saveIban,
     },
     input
   );
@@ -98,7 +123,7 @@ export async function addUserCard(input: { userId: string; card?: string; ip: st
 export async function listUserCards(userId: string) {
   const { data, error } = await serviceDb()
     .from("user_bank_cards")
-    .select("id, pan_masked, bank_code, bank_name, status, verified_at")
+    .select("id, pan_masked, bank_code, bank_name, status, verified_at, iban, iban_bank_name")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
   if (error) throw new KycFlowError("unavailable", 503);
@@ -109,6 +134,8 @@ export async function listUserCards(userId: string) {
     bankName: row.bank_name as string,
     status: row.status as string,
     verifiedAt: (row.verified_at as string | null) ?? null,
+    iban: (row.iban as string | null) ?? null,
+    ibanBankName: (row.iban_bank_name as string | null) ?? null,
   }));
 }
 

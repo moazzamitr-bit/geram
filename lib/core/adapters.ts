@@ -90,6 +90,9 @@ const REASON_UI: Record<string, { type: UiTransaction["type"]; label: string }> 
   PHYSICAL_RESERVE: { type: "تحویل", label: "درخواست تحویل فیزیکی (رزرو)" },
   PHYSICAL_RELEASE: { type: "تحویل", label: "لغو تحویل فیزیکی و بازگشت موجودی" },
   PHYSICAL_DELIVER: { type: "تحویل", label: "تحویل فیزیکی انجام شد" },
+  WITHDRAW_RESERVE: { type: "برداشت", label: "درخواست برداشت تومانی (رزرو)" },
+  WITHDRAW_RELEASE: { type: "برداشت", label: "لغو برداشت تومانی و بازگشت موجودی" },
+  WITHDRAW_PAID: { type: "برداشت", label: "برداشت تومانی واریز شد" },
   BUY_SOFT_RESERVATION: { type: "رزرو", label: "رزرو مبلغ سفارش" },
   QUOTE_EXPIRE_RELEASE: { type: "رزرو", label: "آزادسازی رزرو سفارش" },
 };
