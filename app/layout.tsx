@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import "./globals.css";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://geram.co";
@@ -66,6 +67,7 @@ export default function RootLayout({
           پرش به محتوای اصلی
         </a>
         <RegisterServiceWorker />
+        <GoogleAnalytics />
         {/* AuthProvider is mounted under /auth and /app. Marketing pages do
             not read the session, and the Supabase browser client is large. */}
         {children}
