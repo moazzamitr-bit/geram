@@ -59,7 +59,7 @@ async function fetchJson(url: string) {
       "User-Agent": "GramPriceBot/1.0",
     },
     cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(45_000),
   });
   if (!res.ok) throw new Error(`history HTTP ${res.status}`);
   return res.json();
@@ -180,9 +180,27 @@ async function getDailyCached(
   const now = Date.now();
   const hit = dailyCache.get(cacheKey);
   if (hit && hit.expiresAt > now) return hit.points;
-  const points = await loader();
-  dailyCache.set(cacheKey, { points, expiresAt: now + 10 * 60_000 });
-  return points;
+  if (hit) {
+    // Stale-while-revalidate: serve the last good series, refresh in background.
+    void loadDaily(cacheKey, loader).catch(() => undefined);
+    return hit.points;
+  }
+  return loadDaily(cacheKey, loader);
+}
+
+const dailyInflight = new Map<string, Promise<HistoryPoint[]>>();
+
+function loadDaily(cacheKey: string, loader: () => Promise<HistoryPoint[]>) {
+  const running = dailyInflight.get(cacheKey);
+  if (running) return running;
+  const p = loader()
+    .then((points) => {
+      dailyCache.set(cacheKey, { points, expiresAt: Date.now() + 10 * 60_000 });
+      return points;
+    })
+    .finally(() => dailyInflight.delete(cacheKey));
+  dailyInflight.set(cacheKey, p);
+  return p;
 }
 
 async function nearestDollarTomanByDay(): Promise<Map<string, number>> {
@@ -198,10 +216,18 @@ async function nearestDollarTomanByDay(): Promise<Map<string, number>> {
 }
 
 async function fetchCopperDaily(): Promise<HistoryPoint[]> {
-  const [copperRows, dollarByDay] = await Promise.all([
+  const [copperRows, dollarHistory] = await Promise.all([
     fetchJson(historyUrl("copper")) as Promise<DailyRow[]>,
-    nearestDollarTomanByDay(),
+    nearestDollarTomanByDay().catch(() => new Map<string, number>()),
   ]);
+  let dollarByDay = dollarHistory;
+  if (dollarByDay.size === 0) {
+    // TGJU's dollar history endpoint is often down (HTTP 500 / hangs). Fall back
+    // to the real live dollar print so the copper chart still renders.
+    const { getLiveDollarToman } = await import("@/lib/market/price-provider");
+    const live = await getLiveDollarToman();
+    if (live) dollarByDay = new Map([["__live__", live]]);
+  }
   if (!Array.isArray(copperRows) || copperRows.length === 0) {
     throw new Error("empty copper history");
   }
@@ -269,7 +295,8 @@ async function loadInstrumentIntraday(instrument: InstrumentId) {
 
 export async function getInstrumentHistory(
   instrumentInput: InstrumentId | string = "gold18",
-  range: HistoryRange = "7d"
+  range: HistoryRange = "7d",
+  opts: { wait?: boolean } = {}
 ): Promise<{
   points: HistoryPoint[];
   range: HistoryRange;
@@ -282,7 +309,10 @@ export async function getInstrumentHistory(
   const cacheKey = `${instrument}:${range}`;
   const hit = cache.get(cacheKey);
   const now = Date.now();
-  if (hit && hit.expiresAt > now) {
+  if (hit && (hit.expiresAt > now || !opts.wait)) {
+    if (hit.expiresAt <= now) {
+      void getInstrumentHistory(instrument, range, { wait: true }).catch(() => undefined);
+    }
     return {
       points: hit.points,
       range,
@@ -357,5 +387,16 @@ export function parseHistoryRange(input: string | null): HistoryRange {
       return input;
     default:
       return "7d";
+  }
+}
+
+const ALL_RANGES: HistoryRange[] = ["1d", "7d", "1m", "3m", "1y"];
+
+/** Background warmer: refreshes every instrument/range so requests hit cache. */
+export async function refreshAllHistory() {
+  for (const instrument of ["gold18", "silver925", "copper"] as InstrumentId[]) {
+    for (const range of ALL_RANGES) {
+      await getInstrumentHistory(instrument, range, { wait: true }).catch(() => undefined);
+    }
   }
 }
