@@ -20,6 +20,7 @@ import {
 } from "./mode";
 import { irr, irrToSafeTomanNumber, mulDivFloor, UG_PER_GRAM, type Irr, type Microgram } from "./money";
 import type { PriceFeed } from "./price";
+import { EXPOSURE, GUARD, pctDiff } from "./price-guard";
 import { computeQuote, applySpread } from "./quote-math";
 import { userFundsLockKey } from "./locks";
 import { ensurePlatformAccounts, ensureUserAccounts, newId, type CoreStore } from "./store";
@@ -782,6 +783,31 @@ export class FinancialCore {
     }
     void spendIrr;
 
+    // Exposure caps (server-side; client-shown values are never trusted).
+    if (computed.grossIrr > EXPOSURE.perOrderMaxIrr) {
+      throw new CoreError("trade_limit", "Order above per-order maximum");
+    }
+    if (input.side === "BUY") {
+      const dayStart = new Date(this.now().getTime() - 24 * 3600_000).toISOString();
+      const store = this.deps.store;
+      if (store.userBuyIrrSince) {
+        const used = await store.userBuyIrrSince(input.userId, dayStart);
+        if (used + computed.grossIrr > EXPOSURE.perUserDailyBuyMaxIrr) {
+          throw new CoreError("trade_limit", "Daily buy limit reached");
+        }
+      }
+      if (store.platformNetBuyIrrSince) {
+        const hourAgo = new Date(this.now().getTime() - 3600_000).toISOString();
+        const net = await store.platformNetBuyIrrSince(hourAgo);
+        if (net + computed.grossIrr > EXPOSURE.platformHourlyNetBuyMaxIrr) {
+          await store
+            .setKillSwitch?.(`${input.asset}_BUY_ENABLED`, false, `AUTO_EXPOSURE: platform hourly net buy cap ${EXPOSURE.platformHourlyNetBuyMaxIrr} IRR (net ${net})`)
+            .catch(() => undefined);
+          throw new CoreError("kill_switch", "Platform hourly buy cap reached; trading paused", 403);
+        }
+      }
+    }
+
     const createdAt = this.now();
     const quote: Quote = {
       id: newId(),
@@ -896,6 +922,12 @@ export class FinancialCore {
         assertAssetSideEnabled(await this.effectiveKills(), pending.asset, pending.side);
       } catch {
         throw new CoreError("kill_switch", "Trading is disabled for this asset/side", 403);
+      }
+      // Re-validate the live server price at execution; reject if it moved from what the user saw.
+      const live = await this.deps.prices.getExecutable(pending.asset);
+      if (live.stale) throw new CoreError("price_stale", "Execution price is stale", 503);
+      if (pctDiff(live.irrPerGram, pending.referencePriceIrrPerGram) > GUARD.executeMaxMovePct) {
+        throw new CoreError("price_moved", "Price moved since quote; request a new quote", 409);
       }
     }
 

@@ -475,6 +475,30 @@ export class PostgresCoreStore implements CoreStore {
     return big(rows[0]?.q);
   }
 
+  async setKillSwitch(key: string, enabled: boolean, reason: string) {
+    await this.sql().query(
+      `insert into core_kill_switches(key, enabled, reason, updated_at) values ($1,$2,$3,now())
+       on conflict (key) do update set enabled=excluded.enabled, reason=excluded.reason, updated_at=now(), actor_id=null`,
+      [key, enabled, reason]
+    );
+  }
+
+  async userBuyIrrSince(userId: string, sinceIso: string) {
+    const { rows } = await this.sql().query(
+      `select coalesce(sum(gross_irr),0) as s from core_trades where user_id=$1 and side='BUY' and status='SETTLED' and created_at >= $2`,
+      [userId, sinceIso]
+    );
+    return big(rows[0]?.s);
+  }
+
+  async platformNetBuyIrrSince(sinceIso: string) {
+    const { rows } = await this.sql().query(
+      `select coalesce(sum(case when side='BUY' then gross_irr else -gross_irr end),0) as s from core_trades where status='SETTLED' and created_at >= $1`,
+      [sinceIso]
+    );
+    return big(rows[0]?.s);
+  }
+
   async listKillSwitches() {
     const { rows } = await this.sql().query(`select key, enabled from core_kill_switches`);
     const out: Record<string, boolean> = {};

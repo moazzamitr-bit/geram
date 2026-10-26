@@ -1,7 +1,8 @@
 /**
  * Fallback price source: Tehran goldsmiths union reference rates (https://www.estjt.ir/price/).
  * Server-side only. Polite: one fetch per ESTJT_CACHE_MS at most, shared across callers.
- * Prices on the page are in rial; 18k gold is per gram. No silver/copper on this page.
+ * Prices on the page are in TOMAN (verified 2026-10-26 incident: 18k shown as 26,118,500 = toman).
+ * We convert to rial here (x10) so every *Rial field is really rial. 18k gold is per gram. No silver/copper on this page.
  */
 
 export const ESTJT_URL = "https://www.estjt.ir/price/";
@@ -27,7 +28,7 @@ function cellText(html: string) {
 }
 function rial(text: string): bigint | null {
   const digits = toLatin(text).replace(/[٬,٫.\s]/g, "");
-  return /^\d{4,}$/.test(digits) ? BigInt(digits) : null;
+  return /^\d{4,}$/.test(digits) ? BigInt(digits) * 10n : null; // page is toman -> rial
 }
 
 /** Parses the union's reference table rows: first cell = label, second = current rate. */
@@ -50,7 +51,8 @@ export function parseEstjtHtml(html: string, now = new Date()): EstjtSnapshot {
   }
   const g18 = get("طلای ۱۸ عیار");
   return {
-    gold18Rial: g18 && g18 >= 1_000_000n ? g18 : null,
+    // Plausibility: 18k gold must be within 10M–80M toman/g (100M–800M rial).
+    gold18Rial: g18 && g18 >= 100_000_000n && g18 <= 800_000_000n ? g18 : null,
     gold24Rial: get("طلای ۲۴ عیار"),
     mazanehRial: get("مظنه تهران"),
     coins,
