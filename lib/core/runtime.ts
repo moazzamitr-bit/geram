@@ -1,7 +1,8 @@
 import { FinancialCore, feesFromCommercePercent } from "@/lib/core/engine";
 import { MemoryCoreStore, type CoreStore } from "@/lib/core/store";
 import { PostgresCoreStore } from "@/lib/core/pg-store";
-import { tgjuExecutableFeed, staticPriceFeed } from "@/lib/core/price";
+import { tgjuExecutableFeed, staticPriceFeed, withEstjtGoldFallback } from "@/lib/core/price";
+import { assertTgjuNotSimulatedDown, fetchEstjt } from "@/lib/market/estjt";
 import {
   getExecutionMode,
   getFeatureFlags,
@@ -19,6 +20,7 @@ const g = globalThis as unknown as {
 };
 
 async function fetchTgjuCurrent(): Promise<Record<string, unknown>> {
+  assertTgjuNotSimulatedDown();
   const urls = [
     "https://call1.tgju.org/ajax.json",
     "https://call5.tgju.org/ajax.json",
@@ -132,7 +134,7 @@ export function getFinancialCore(): FinancialCore {
   const store = getStore();
   const flags = getFeatureFlags(mode);
   const useStatic = process.env.GERAM_PRICE_FEED === "static" || process.env.VITEST === "true";
-  const prices = useStatic ? testPrices() : tgjuExecutableFeed(fetchTgjuCurrent);
+  const prices = useStatic ? testPrices() : withEstjtGoldFallback(tgjuExecutableFeed(fetchTgjuCurrent), fetchEstjt);
   const fees = DEFAULT_COMMERCE_SETTINGS.fees;
   g.__geramCore = new FinancialCore({
     store,

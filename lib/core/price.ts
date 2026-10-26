@@ -175,3 +175,45 @@ export function tomanPerGramToIrr(toman: number): Irr {
 }
 
 export type { PriceHealth };
+
+export type EstjtGold = { gold18Rial: bigint | null; fetchedAt: string };
+
+/**
+ * TGJU first; for GOLD, when TGJU fails or its quote is stale, price from the Tehran goldsmiths
+ * union (estjt). The quote's `source` records which feed priced it ("estjt:gold18").
+ */
+export function withEstjtGoldFallback(primary: PriceFeed, fetchEstjt: () => Promise<EstjtGold>): PriceFeed {
+  return {
+    async getExecutable(asset) {
+      if (asset !== "GOLD") return primary.getExecutable(asset);
+      let tgju: PriceQuote | null = null;
+      let tgjuErr: unknown = null;
+      try {
+        tgju = await primary.getExecutable(asset);
+        if (!tgju.stale) return tgju;
+      } catch (err) {
+        tgjuErr = err;
+      }
+      try {
+        const e = await fetchEstjt();
+        if (e.gold18Rial && e.gold18Rial >= 1_000_000n) {
+          return quote({
+            instrument: "IRAN_GOLD_18K_IRR_PER_GRAM",
+            asset,
+            irrPerGram: e.gold18Rial,
+            source: "estjt:gold18",
+            sourceMode: "TEMPORARY_PUBLIC",
+            permittedForProduction: false,
+            health: "LIVE",
+            stale: false,
+            observedAt: e.fetchedAt,
+          });
+        }
+      } catch {
+        // fall through to TGJU result/error
+      }
+      if (tgju) return tgju;
+      throw tgjuErr ?? new CoreError("price_unavailable", "market feed unreachable", 503);
+    },
+  };
+}

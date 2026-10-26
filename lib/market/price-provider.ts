@@ -4,6 +4,7 @@ import {
   observedAtIso,
   SPOT_STALE_AFTER_MS,
 } from "@/lib/market/freshness";
+import { assertTgjuNotSimulatedDown, fetchEstjt } from "@/lib/market/estjt";
 import {
   type InstrumentId,
   parseInstrumentId,
@@ -68,6 +69,7 @@ function pickRow(
 }
 
 async function fetchTgjuCurrent(): Promise<Record<string, unknown>> {
+  assertTgjuNotSimulatedDown();
   const now = Date.now();
   if (rawCurrentCache && rawCurrentCache.expiresAt > now) {
     return rawCurrentCache.data;
@@ -223,6 +225,31 @@ function buildQuote(
   return buildCopperQuote(current);
 }
 
+/** Tehran goldsmiths union 18k rate (fallback when TGJU fails or is stale). */
+export async function estjtGoldQuote(): Promise<MarketPriceQuote> {
+  const e = await fetchEstjt();
+  if (!e.gold18Rial) throw new Error("estjt 18k missing");
+  const priceRial = Number(e.gold18Rial);
+  return {
+    instrument: "gold18",
+    priceToman: rialToToman(priceRial),
+    priceRial,
+    highToman: null,
+    lowToman: null,
+    changePercent: null,
+    source: "اتحادیه طلا",
+    sourceKey: "estjt:gold18",
+    updatedAt: e.fetchedAt,
+    fetchedAt: new Date().toISOString(),
+    stale: false,
+  };
+}
+
+/** TGJU 18k only (no fallback), for the admin comparison card. */
+export async function tgjuGoldQuote(): Promise<MarketPriceQuote> {
+  return buildQuote("gold18", await fetchTgjuCurrent());
+}
+
 function fallbackQuote(instrument: InstrumentId): MarketPriceQuote {
   return {
     instrument,
@@ -250,9 +277,17 @@ export async function getLivePrice(
   try {
     const current = await fetchTgjuCurrent();
     const quote = buildQuote(instrument, current);
-    cache.set(instrument, { quote, expiresAt: now + CACHE_TTL_MS });
-    return quote;
+    const final = instrument === "gold18" && quote.stale ? ((await estjtGoldQuote().catch(() => null)) ?? quote) : quote;
+    cache.set(instrument, { quote: final, expiresAt: now + CACHE_TTL_MS });
+    return final;
   } catch (err) {
+    if (instrument === "gold18") {
+      const fb = await estjtGoldQuote().catch(() => null);
+      if (fb) {
+        cache.set(instrument, { quote: fb, expiresAt: now + CACHE_TTL_MS });
+        return fb;
+      }
+    }
     if (hit) {
       return {
         ...hit.quote,
