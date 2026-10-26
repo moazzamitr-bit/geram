@@ -13,7 +13,7 @@ import {
   notificationsNav,
   type AppNavItem,
 } from "@/lib/app/navigation";
-import { useDemoStore } from "@/lib/app/demo-store";
+import { useAppData } from "@/lib/app/app-data";
 import { useAuth } from "@/lib/auth/auth-context";
 import { cn } from "@/lib/utils";
 import { LogOut } from "lucide-react";
@@ -66,7 +66,7 @@ function SideLink({
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, hydrated, isAuthenticated, logout } = useAuth();
-  const store = useDemoStore();
+  const store = useAppData();
   const pathname = usePathname();
   const router = useRouter();
 

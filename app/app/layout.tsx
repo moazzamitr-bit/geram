@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/app/AppShell";
 import { ReferralCookieApply } from "@/components/app/ReferralCookieApply";
 import { VerificationGateProvider } from "@/components/app/VerificationGate";
-import { DemoStoreProvider } from "@/lib/app/demo-store";
+import { AppDataProvider } from "@/lib/app/app-data";
 import { AuthProvider } from "@/lib/auth/auth-context";
 import type { Metadata, Viewport } from "next";
 
@@ -35,12 +35,12 @@ export const metadata: Metadata = {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <DemoStoreProvider>
+      <AppDataProvider>
         <VerificationGateProvider>
           <ReferralCookieApply />
           <AppShell>{children}</AppShell>
         </VerificationGateProvider>
-      </DemoStoreProvider>
+      </AppDataProvider>
     </AuthProvider>
   );
 }

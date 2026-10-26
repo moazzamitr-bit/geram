@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { useVerificationGate, type VerificationStep } from "@/components/app/VerificationGate";
 import { GoldButton } from "@/components/ui/GoldButton";
 import { apiJson, faDate, faWeekdayDate, METAL_LABEL, ugLabel, upcomingDays } from "@/lib/app/format";
-import { useDemoStore } from "@/lib/app/demo-store";
+import { useAppData } from "@/lib/app/app-data";
 import { cn } from "@/lib/utils";
 import { CheckCircle2, MapPin, Package } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -44,7 +44,7 @@ function feeUg(weightUg: bigint, pct: number) {
 }
 
 export default function PhysicalWithdrawalPage() {
-  const store = useDemoStore();
+  const store = useAppData();
   const gate = useVerificationGate();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [products, setProducts] = useState<Product[]>([]);

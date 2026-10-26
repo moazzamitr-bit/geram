@@ -1,6 +1,6 @@
 "use client";
 
-import { useDemoStore } from "@/lib/app/demo-store";
+import { useAppData } from "@/lib/app/app-data";
 import { INSTRUMENTS, type InstrumentId } from "@/lib/market/instruments";
 import { tradePathForInstrument } from "@/lib/market/trade-routes";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ const DOT: Record<InstrumentId, string> = {
 
 /** Thin live strip: metal dot, price, and a colored percent chip. */
 export function PriceTicker({ className }: { className?: string }) {
-  const store = useDemoStore();
+  const store = useAppData();
 
   return (
     <div

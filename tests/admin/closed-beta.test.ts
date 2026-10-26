@@ -21,7 +21,6 @@ const HIDDEN = [
   "/admin/treasury",
   "/admin/inventory",
   "/admin/custody",
-  "/admin/goals",
   "/admin/alerts",
   "/admin/plus",
   "/admin/notifications",

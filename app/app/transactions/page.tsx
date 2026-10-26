@@ -4,7 +4,7 @@ import { AppCard } from "@/components/app/AppCard";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { StatusBadge } from "@/components/app/StatusBadge";
-import { mgToGramsLabel, useDemoStore, type TxType } from "@/lib/app/demo-store";
+import { mgToGramsLabel, useAppData, type TxType } from "@/lib/app/app-data";
 import { instrumentLabel, type InstrumentId } from "@/lib/market/instruments";
 import { formatToman } from "@/lib/utils";
 import { Receipt } from "lucide-react";
@@ -22,7 +22,7 @@ const filters: Array<"همه" | TxType> = [
 ];
 
 export default function TransactionsPage() {
-  const store = useDemoStore();
+  const store = useAppData();
   const [filter, setFilter] = useState<(typeof filters)[number]>("همه");
   const [q, setQ] = useState("");
 

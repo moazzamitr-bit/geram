@@ -67,7 +67,6 @@ export const desktopNavSections: AppNavSection[] = [
     label: "سایر",
     items: [
       { label: "بازار", href: "/app/market", icon: LineChart },
-      { label: "اهداف", href: "/app/goals", icon: Target },
       { label: "طرح پس‌انداز", href: "/app/savings", icon: PiggyBank },
       { label: "کارت هدیه", href: "/app/gift", icon: Gift },
       { label: "برداشت فیزیکی", href: "/app/delivery", icon: Package },

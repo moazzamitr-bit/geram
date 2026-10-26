@@ -45,7 +45,7 @@ describe("admin surfaces no longer read legacy transactions", () => {
     "lib/admin/ops.ts",
     "lib/admin/queries.ts",
     "lib/db/admin-queries.ts",
-    "lib/db/platform-sync.ts",
+    "lib/app/user-data.ts",
     "app/api/admin/export/route.ts",
   ];
 

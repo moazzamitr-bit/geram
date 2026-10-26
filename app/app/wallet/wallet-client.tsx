@@ -9,12 +9,12 @@ import { GoldButton } from "@/components/ui/GoldButton";
 import { AmountField } from "@/components/ui/AmountField";
 import { withdrawFee } from "@/lib/commerce/fees";
 import { useVerificationGate } from "@/components/app/VerificationGate";
-import { useDemoStore } from "@/lib/app/demo-store";
+import { useAppData } from "@/lib/app/app-data";
 import { formatToman } from "@/lib/utils";
 import { useState } from "react";
 
 export function WalletClient() {
-  const store = useDemoStore();
+  const store = useAppData();
   const gate = useVerificationGate();
   const [withdrawAmount, setWithdrawAmount] = useState(0);
   const [msg, setMsg] = useState("");

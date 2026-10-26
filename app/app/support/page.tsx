@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { GoldButton } from "@/components/ui/GoldButton";
-import { useDemoStore } from "@/lib/app/demo-store";
+import { useAppData } from "@/lib/app/app-data";
 import { Headphones } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,11 +23,13 @@ const categories = [
 ];
 
 export default function SupportPage() {
-  const store = useDemoStore();
+  const store = useAppData();
   const router = useRouter();
   const [category, setCategory] = useState(categories[0]);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
@@ -66,16 +68,40 @@ export default function SupportPage() {
         <GoldButton
           type="button"
           className="w-full"
-          onClick={() => {
-            if (!subject.trim() || !message.trim()) return;
-            const id = store.createTicket(category, subject, message);
-            router.push(`/app/support/${id}`);
+          disabled={busy}
+          onClick={async () => {
+            if (!subject.trim() || !message.trim()) {
+              setNote({ ok: false, text: "موضوع و متن پیام را وارد کنید." });
+              return;
+            }
+            setBusy(true);
+            const res = await store.createTicket(category, subject, message);
+            setBusy(false);
+            if (!res.ok || !res.id) {
+              setNote({ ok: false, text: res.error ?? "ثبت تیکت انجام نشد." });
+              return;
+            }
+            setNote({ ok: true, text: res.message ?? "تیکت ثبت شد." });
+            router.push(`/app/support/${res.id}`);
           }}
         >
-          ثبت تیکت
+          {busy ? "در حال ثبت…" : "ثبت تیکت"}
         </GoldButton>
+        {note && (
+          <p role="status" className={`text-[13px] ${note.ok ? "text-emerald-700" : "text-rose-700"}`}>
+            {note.text}
+          </p>
+        )}
       </AppCard>
 
+      {store.userDataError && (
+        <p role="alert" className="rounded-xl border border-rose-600/30 bg-rose-600/5 px-3 py-2 text-[13px] text-rose-700">
+          {store.userDataError}{" "}
+          <button type="button" className="underline" onClick={() => void store.refreshUserData()}>
+            تلاش دوباره
+          </button>
+        </p>
+      )}
       {store.tickets.length === 0 ? (
         <EmptyState title="تیکتی ندارید" description="سؤال یا مشکل خود را ثبت کنید." icon={Headphones} />
       ) : (
