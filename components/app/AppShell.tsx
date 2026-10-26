@@ -68,6 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, hydrated, isAuthenticated, logout } = useAuth();
   const store = useAppData();
   const pathname = usePathname();
+  useEffect(() => { try { sessionStorage.setItem("geram:inapp", "1"); } catch {} }, []);
   const router = useRouter();
 
   const unread = useMemo(
