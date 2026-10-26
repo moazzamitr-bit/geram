@@ -29,7 +29,10 @@ export async function getUserTransactions(userId: string, limit = 50) {
 export async function getUserBanks(userId: string) {
   const sb = await adminDb();
   if (!sb) return [];
-  const { data } = await sb.from("bank_accounts").select("*").eq("user_id", userId);
+  const { data } = await sb
+    .from("user_bank_cards")
+    .select("id, user_id, pan_masked, bank_name, iban, iban_bank_name, status, created_at")
+    .eq("user_id", userId);
   return data ?? [];
 }
 
@@ -70,8 +73,8 @@ export async function listBanks(limit = 200) {
   const sb = await adminDb();
   if (!sb) return [];
   const { data } = await sb
-    .from("bank_accounts")
-    .select("*, profiles(first_name,last_name,phone,email)")
+    .from("user_bank_cards")
+    .select("id, user_id, pan_masked, bank_name, iban, iban_bank_name, iban_owners, status, verified_at, created_at, profiles(first_name,last_name,phone,email)")
     .order("created_at", { ascending: false })
     .limit(limit);
   return data ?? [];
@@ -130,7 +133,7 @@ export async function searchOps(q: string) {
     sb.from("profiles").select("id, first_name, last_name, phone, email, role, kyc_status").or(`email.ilike.${like},phone.ilike.${like},first_name.ilike.${like},last_name.ilike.${like},id.eq.${term}`).limit(20),
     searchLedgerActivity(term),
     sb.from("support_tickets").select("id, subject, status, user_id").or(`subject.ilike.${like},id.eq.${term}`).limit(20),
-    sb.from("bank_accounts").select("id, iban, bank_name, user_id").ilike("iban", `%${term.slice(-4)}%`).limit(20),
+    sb.from("user_bank_cards").select("id, iban, bank_name, user_id").ilike("iban", `%${term.slice(-4)}%`).limit(20),
     sb.from("core_journals").select("id, reason, ref_type, ref_id, created_at").or(`id.eq.${term},ref_id.eq.${term}`).limit(20),
   ]);
   return {

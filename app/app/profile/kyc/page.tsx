@@ -17,7 +17,7 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 const fieldClass =
   "h-12 w-full rounded-xl border border-black/10 bg-[#F6F4F1] px-4 text-[15px] text-text outline-none transition focus:border-[#FFB800] focus:bg-white";
 
-type SavedCard = { id: string; panMasked: string; bankName: string };
+type SavedCard = { id: string; panMasked: string; bankName: string; iban?: string | null; ibanError?: string };
 
 function messageFor(code: string | undefined, fallback?: string) {
   if (fallback) return fallback;
@@ -158,7 +158,12 @@ function KycFlow() {
       const { res, data } = await post("/api/kyc/bank", { card: digits });
       if (!res.ok || !data.ok) return setError(messageFor(data.error as string, data.message as string));
       setCard("");
-      setInfo(`${data.card?.bankName ?? "کارت"} به نام شما ثبت شد.`);
+      const ibanNote = data.card?.iban
+        ? ` شبای ${data.card.iban} برای برداشت تومانی ثبت شد.`
+        : data.card?.ibanError
+          ? ` ${messageFor(data.card.ibanError as string, "")}`
+          : "";
+      setInfo(`${data.card?.bankName ?? "کارت"} به نام شما ثبت شد.${ibanNote}`);
       await gate.refresh();
     } catch {
       setError(KYC_MESSAGES.unavailable);
@@ -311,7 +316,12 @@ function KycFlow() {
           <ul className="mt-3 space-y-2">
             {cards.map((c) => (
               <li key={c.id} className="flex items-center justify-between rounded-xl bg-[#F6F4F1] px-3 py-2 text-[13px]">
-                <span>{c.bankName}</span>
+                <span>
+                  {c.bankName}
+                  <span dir="ltr" className="block font-mono text-[11px] text-muted-app">
+                    {c.iban ?? "شبا ثبت نشده؛ برای برداشت، کارت را دوباره وارد کنید"}
+                  </span>
+                </span>
                 <span dir="ltr" className="font-mono">{c.panMasked}</span>
               </li>
             ))}

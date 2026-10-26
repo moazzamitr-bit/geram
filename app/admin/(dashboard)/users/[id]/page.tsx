@@ -113,15 +113,14 @@ export default async function AdminUser360Page({
 
       <section className="mb-6">
         <h2 className="mb-3 font-bold">حساب‌های بانکی</h2>
-        <AdminTable headers={["بانک", "IBAN", "مالکیت", "ایجاد"]} empty={banks.length === 0}>
+        <AdminTable headers={["بانک", "کارت", "شبا", "وضعیت", "ایجاد"]} empty={banks.length === 0}>
           {banks.map((b) => (
             <tr key={b.id} className="border-b border-white/5">
-              <td className="px-4 py-3">{b.bank_name}</td>
+              <td className="px-4 py-3">{b.iban_bank_name ?? b.bank_name}</td>
+              <td className="px-4 py-3 font-mono" dir="ltr">{b.pan_masked}</td>
               <td className="px-4 py-3 font-mono" dir="ltr">{maskIban(b.iban)}</td>
               <td className="px-4 py-3">
-                <AdminBadge tone={b.verified ? "positive" : "warning"}>
-                  {b.verified ? "OWNERSHIP_VERIFIED" : "PENDING"}
-                </AdminBadge>
+                <AdminBadge tone={b.status === "VERIFIED" ? "positive" : "neutral"}>{b.status}</AdminBadge>
               </td>
               <td className="px-4 py-3 text-white/45">{new Date(b.created_at).toLocaleDateString("fa-IR")}</td>
             </tr>

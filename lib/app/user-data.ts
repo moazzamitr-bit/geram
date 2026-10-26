@@ -202,29 +202,19 @@ export async function replyTicket(userId: string, ticketId: string, body: Record
   await sb.from("support_tickets").update({ status: "OPEN", updated_at: new Date().toISOString() }).eq("id", ticketId);
 }
 
+/** Bank details come only from verified cards; the IBAN is Finnotech's card-to-iban result. */
 export async function listBankAccounts(userId: string) {
   const { data, error } = await db()
-    .from("bank_accounts")
-    .select("id, iban, bank_name, verified")
+    .from("user_bank_cards")
+    .select("id, iban, bank_name, iban_bank_name, pan_masked, status")
     .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-  fail(error, "bank accounts");
+    .order("created_at", { ascending: true });
+  fail(error, "bank cards");
   return (data ?? []).map((b) => ({
     id: b.id as string,
-    iban: b.iban as string,
-    bank: b.bank_name as string,
-    verified: Boolean(b.verified),
+    iban: (b.iban as string | null) ?? null,
+    bank: ((b.iban_bank_name as string | null) ?? (b.bank_name as string)) || "کارت بانکی",
+    panMasked: b.pan_masked as string,
+    verified: b.status === "VERIFIED",
   }));
-}
-
-export async function addBankAccount(userId: string, body: Record<string, unknown>) {
-  const iban = String(body.iban ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (!/^IR\d{24}$/.test(iban)) throw new CoreError("invalid_iban", "شبا باید IR و ۲۴ رقم باشد.", 400);
-  const bank = text(body.bank, 60, "نام بانک");
-  const sb = db();
-  const { data: dup } = await sb.from("bank_accounts").select("id").eq("user_id", userId).eq("iban", iban).maybeSingle();
-  if (dup) throw new CoreError("duplicate", "این شبا قبلاً ثبت شده است.", 409);
-  // Ownership is never self-asserted: verified stays false until a KYC check sets it.
-  const { error } = await sb.from("bank_accounts").insert({ user_id: userId, iban, bank_name: bank, verified: false });
-  fail(error, "bank insert");
 }

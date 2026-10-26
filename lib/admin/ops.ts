@@ -116,7 +116,7 @@ export async function loadDashboardOps() {
     sb.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["OPEN", "WAITING_USER"]),
     sb.from("profiles").select("id", { count: "exact", head: true }).eq("kyc_status", "PENDING"),
     sb.from("market_prices").select("price_toman, instrument, observed_at, source").order("observed_at", { ascending: false }).limit(12),
-    sb.from("bank_accounts").select("id, verified"),
+    sb.from("user_bank_cards").select("id, status"),
     sb.from("scheduled_purchases").select("id, status"),
     sb.from("price_alerts").select("id, status"),
     sb.from("core_quotes").select("id", { count: "exact", head: true }).eq("status", "EXPIRED"),

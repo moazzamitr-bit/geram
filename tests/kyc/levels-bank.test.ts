@@ -72,7 +72,7 @@ describe("addVerifiedCard", () => {
   it("saves masked + hashed card only on a Finnotech match", async () => {
     const { d, saved, events } = deps();
     const out = await addVerifiedCard(d, { userId: "u1", card: CARD, ip: "1.1.1.1" });
-    expect(out.card).toEqual({ panMasked: "6037 99•• •••• 7893", bankName: "بانک ملی", bankCode: "melli" });
+    expect(out.card).toEqual({ panMasked: "6037 99•• •••• 7893", bankName: "بانک ملی", bankCode: "melli", iban: null });
     expect(saved[0].panHash).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(saved)).not.toContain(CARD);
     expect(events).toEqual(["kyc.card_verified"]);
