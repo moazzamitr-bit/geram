@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { GoldButton } from "@/components/ui/GoldButton";
 
-type Product = { id: string; asset: string; kind: string; title: string; weight_ug: string; active: boolean; sort: number };
+type Product = { id: string; asset: string; kind: string; brand: string | null; title: string; weight_ug: string; fee_percent: number | null; active: boolean; sort: number };
 type Settings = {
   feePercent: number;
   branches: { id: string; name: string; address: string; hours: string }[];
@@ -72,7 +72,7 @@ export function PhysicalSettingsForm({ settings }: { settings: Settings }) {
 
 export function PhysicalProductsForm({ products }: { products: Product[] }) {
   const router = useRouter();
-  const blank = { id: "", asset: "GOLD", kind: "BAR", title: "", grams: "", active: true, sort: "0" };
+  const blank = { id: "", asset: "GOLD", kind: "BAR", brand: "", title: "", grams: "", feePercent: "", active: true, sort: "0" };
   const [form, setForm] = useState(blank);
   const [msg, setMsg] = useState("");
 
@@ -92,13 +92,13 @@ export function PhysicalProductsForm({ products }: { products: Product[] }) {
         {products.map((p) => (
           <li key={p.id} className="flex items-center justify-between rounded-lg bg-white/[0.03] px-3 py-2">
             <span>
-              {p.title} · {(Number(p.weight_ug) / 1e6).toLocaleString("fa-IR")} گرم · {p.asset} {p.active ? "" : "(غیرفعال)"}
+              {p.title} · {(Number(p.weight_ug) / 1e6).toLocaleString("fa-IR")} گرم · کارمزد {p.fee_percent == null ? "پیش‌فرض" : `${(p.fee_percent * 100).toLocaleString("fa-IR")}٪`} {p.active ? "" : "(غیرفعال)"}
             </span>
             <button
               type="button"
               className="text-gold"
               onClick={() =>
-                setForm({ id: p.id, asset: p.asset, kind: p.kind, title: p.title, grams: String(Number(p.weight_ug) / 1e6), active: p.active, sort: String(p.sort) })
+                setForm({ id: p.id, asset: p.asset, kind: p.kind, brand: p.brand ?? "", title: p.title, grams: String(Number(p.weight_ug) / 1e6), feePercent: p.fee_percent == null ? "" : String(+(p.fee_percent * 100).toFixed(2)), active: p.active, sort: String(p.sort) })
               }
             >
               ویرایش
@@ -106,15 +106,17 @@ export function PhysicalProductsForm({ products }: { products: Product[] }) {
           </li>
         ))}
       </ul>
-      <div className="grid gap-2 sm:grid-cols-6">
+      <div className="grid gap-2 sm:grid-cols-8">
         <input className={`${input} sm:col-span-2`} placeholder="عنوان" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
         <select className={input} value={form.asset} onChange={(e) => setForm({ ...form, asset: e.target.value })}>
           <option value="GOLD">طلا</option><option value="SILVER">نقره</option><option value="COPPER">مس</option>
         </select>
         <select className={input} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
-          <option value="BAR">شمش</option><option value="COIN">سکه</option>
+          <option value="BAR">شمش</option><option value="COIN">سکه</option><option value="GRANULE">ساچمه</option>
         </select>
         <input className={input} dir="ltr" placeholder="وزن (گرم)" value={form.grams} onChange={(e) => setForm({ ...form, grams: e.target.value })} />
+        <input className={input} placeholder="برند" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
+        <input className={input} dir="ltr" placeholder="کارمزد ٪" value={form.feePercent} onChange={(e) => setForm({ ...form, feePercent: e.target.value })} />
         <input className={input} dir="ltr" placeholder="ترتیب" value={form.sort} onChange={(e) => setForm({ ...form, sort: e.target.value })} />
       </div>
       <label className="flex items-center gap-2 text-[12px]">

@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { CheckCircle2, MapPin, Package } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type Product = { id: string; asset: string; kind: string; title: string; weight_ug: string };
+type Product = { id: string; asset: string; kind: string; brand?: string | null; title: string; weight_ug: string; fee_percent?: number | null };
 type Branch = { id: string; name: string; address: string; hours: string };
 type Settings = { feePercent: number; branches: Branch[]; slots: string[]; minLeadDays: number };
 type Req = {
@@ -77,7 +77,8 @@ export default function PhysicalWithdrawalPage() {
   const product = products.find((p) => p.id === productId);
   const days = useMemo(() => (settings ? upcomingDays(settings.minLeadDays) : []), [settings]);
   const weight = product ? BigInt(product.weight_ug) * BigInt(qty) : 0n;
-  const fee = settings && product ? feeUg(weight, settings.feePercent) : 0n;
+  const feePct = product ? (product.fee_percent ?? settings?.feePercent ?? 0) : 0;
+  const fee = settings && product ? feeUg(weight, feePct) : 0n;
   const balanceMg =
     product?.asset === "GOLD" ? store.goldMg : product?.asset === "SILVER" ? store.silverMg : product ? store.copperMg : 0;
   const enough = product ? BigInt(Math.floor(balanceMg)) * 1000n >= weight + fee : true;
@@ -119,7 +120,7 @@ export default function PhysicalWithdrawalPage() {
     <div className="mx-auto max-w-2xl space-y-5 pb-10">
       <PageHeader
         title="برداشت فیزیکی"
-        description={`سکه یا شمش را حضوری تحویل بگیرید. کارمزد خدمات ${((settings?.feePercent ?? 0.01) * 100).toLocaleString("fa-IR")}٪ وزن است.`}
+        description="شمش طلای ۱۸ عیار یا ساچمه نقره را حضوری در شعبه تحویل بگیرید. کارمزد ضرب و بسته‌بندی هر محصول کنار آن آمده است."
       />
 
       {done && (
@@ -161,6 +162,9 @@ export default function PhysicalWithdrawalPage() {
                   <p className="text-[13px] font-bold text-text">{p.title}</p>
                   <p className="mt-1 text-[12px] text-muted-app">
                     {METAL_LABEL[p.asset]} · {ugLabel(p.weight_ug)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-app">
+                    کارمزد {((p.fee_percent ?? settings?.feePercent ?? 0) * 100).toLocaleString("fa-IR")}٪
                   </p>
                 </button>
               ))}
@@ -240,7 +244,7 @@ export default function PhysicalWithdrawalPage() {
         {product && settings && (
           <div className="space-y-1.5 rounded-xl bg-[#F6F4F1] p-4 text-[13px]">
             <div className="flex justify-between"><span className="text-muted-app">وزن تحویلی</span><span>{ugLabel(weight)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-app">کارمزد خدمات ({(settings.feePercent * 100).toLocaleString("fa-IR")}٪)</span><span>{ugLabel(fee)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-app">کارمزد ضرب و بسته‌بندی ({(feePct * 100).toLocaleString("fa-IR")}٪)</span><span>{ugLabel(fee)}</span></div>
             <div className="flex justify-between font-bold"><span>کسر از موجودی {METAL_LABEL[product.asset]}</span><span>{ugLabel(weight + fee)}</span></div>
             <div className="flex justify-between text-[12px]"><span className="text-muted-app">موجودی فعلی</span><span>{ugLabel(BigInt(Math.floor(balanceMg)) * 1000n)}</span></div>
             {!enough && <p className="pt-1 text-[12px] text-rose-600">موجودی {METAL_LABEL[product.asset]} شما کافی نیست. اول خرید کنید.</p>}

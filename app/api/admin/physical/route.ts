@@ -38,11 +38,18 @@ export async function POST(request: Request) {
         if (!["GOLD", "SILVER", "COPPER"].includes(asset)) {
           return NextResponse.json({ ok: false, error: "invalid_asset" }, { status: 400 });
         }
+        const feeRaw = String(p.feePercent ?? "").trim();
+        const feePercent = feeRaw === "" ? null : Number(feeRaw) / 100;
+        if (feePercent !== null && (!Number.isFinite(feePercent) || feePercent < 0 || feePercent > 0.2)) {
+          return NextResponse.json({ ok: false, error: "invalid_fee", message: "کارمزد باید بین ۰ تا ۲۰ درصد باشد." }, { status: 400 });
+        }
         await upsertProduct({
           id: typeof p.id === "string" && p.id ? p.id : undefined,
           asset: asset as "GOLD",
-          kind: p.kind === "COIN" ? "COIN" : "BAR",
+          kind: p.kind === "COIN" ? "COIN" : p.kind === "GRANULE" ? "GRANULE" : "BAR",
+          brand: String(p.brand ?? "").trim() || null,
           title: String(p.title).trim(),
+          feePercent,
           weightUg: gramsToUg(Number(grams)),
           active: p.active !== false && p.active !== "false",
           sort: Number(p.sort ?? 0) || 0,
