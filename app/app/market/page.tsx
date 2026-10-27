@@ -77,7 +77,7 @@ export default function MarketPage() {
                 {p > 0 ? formatToman(p) : "—"}
               </p>
               {p > 0 && ps !== p && (
-                <p className="text-[11px] tabular-nums text-muted-app">خرید · فروش {formatToman(ps)}</p>
+                <p className="text-[11px] tabular-nums text-muted-app">فروش {formatToman(ps)}</p>
               )}
               <p
                 className={`mt-1 text-[12px] tabular-nums ${
