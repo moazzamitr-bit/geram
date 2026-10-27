@@ -1,5 +1,6 @@
 "use client";
 
+import { AssistantMarkdown } from "@/components/app/AssistantMarkdown";
 import { MessageCircle, Send, X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
@@ -103,10 +104,10 @@ export function AssistantWidget() {
                   className={
                     m.role === "user"
                       ? "mr-auto max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-bl-md bg-[#1C1917] px-3 py-2 text-[14px] leading-7 text-white"
-                      : "ml-auto max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-white px-3 py-2 text-[14px] leading-7 text-[#1C1917] shadow-sm"
+                      : "ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-white px-3 py-2 text-[14px] leading-7 text-[#1C1917] shadow-sm"
                   }
                 >
-                  {m.content}
+                  {m.role === "assistant" ? <AssistantMarkdown text={m.content} /> : m.content}
                 </div>
               ))}
               {busy ? <p className="text-[13px] text-[#57534E]">در حال پاسخ…</p> : null}
