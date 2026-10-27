@@ -30,7 +30,19 @@ export const GUARD = {
   /** Last-good memory window for the jump check. */
   jumpWindowMs: 30 * 60_000,
   crossMaxPct: envNum("GERAM_PRICE_CROSS_MAX_PCT", 2),
-  maxAgeMs: envNum("GERAM_PRICE_MAX_AGE_MS", 3 * 60_000),
+  /**
+   * Max age of the SOURCE's own timestamp, per metal. TGJU stamps a row only when the
+   * price changes: 18k ticks every few seconds, silver_999 every 20-60 min, the dollar
+   * leg hourly and global copper per session. A flat 3 min blocked silver/copper all day.
+   * Wrong prices are still caught by the band, 3% jump, gold cross-source and the 1%
+   * re-price at execution; the provider's own stale flag (2h spot / 36h copper) applies too.
+   */
+  maxAgeMsByAsset: {
+    GOLD: envNum("GERAM_PRICE_MAX_AGE_MS_GOLD", 30 * 60_000),
+    SILVER: envNum("GERAM_PRICE_MAX_AGE_MS_SILVER", 2 * 60 * 60_000),
+    COPPER: envNum("GERAM_PRICE_MAX_AGE_MS_COPPER", 36 * 60 * 60_000),
+    TEST_METAL: envNum("GERAM_PRICE_MAX_AGE_MS", 3 * 60_000),
+  } as Record<AssetCode, number>,
   executeMaxMovePct: envNum("GERAM_EXEC_MAX_MOVE_PCT", 1),
 };
 
@@ -121,7 +133,7 @@ export function withPriceGuard(feed: PriceFeed, opts: GuardOptions): PriceFeed &
       }
 
       const observed = Date.parse(q.observedAt);
-      if (q.stale || !Number.isFinite(observed) || t - observed > GUARD.maxAgeMs) {
+      if (q.stale || !Number.isFinite(observed) || t - observed > GUARD.maxAgeMsByAsset[asset]) {
         soft(asset, "price_stale", "stale");
       }
 

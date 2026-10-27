@@ -18,7 +18,7 @@ describe("trade failure copy", () => {
       "اعتبار قیمت تمام شد. قیمت جدید بگیرید."
     );
     expect(tradeFailureMessage("price_stale Execution price is stale", "دریافت قیمت ممکن نشد.")).toBe(
-      "قیمت بازار کهنه شده است. چند لحظه بعد دوباره قیمت بگیرید."
+      "قیمت لحظه‌ای این فلز الان در دسترس نیست. چند دقیقه دیگر دوباره امتحان کنید."
     );
     expect(tradeFailureMessage("price_unavailable market feed unreachable", "دریافت قیمت ممکن نشد.")).toBe(
       "دریافت قیمت از بازار ممکن نشد. کمی بعد دوباره تلاش کنید."
