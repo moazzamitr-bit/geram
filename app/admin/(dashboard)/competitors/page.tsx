@@ -1,6 +1,6 @@
 import { AdminBadge, AdminNotice, AdminPageHeader } from "@/components/admin/AdminUI";
 import { getLivePrice } from "@/lib/market/price-provider";
-import { getFinancialCore } from "@/lib/core/runtime";
+import { currentSettings } from "@/lib/pricing/policy";
 import {
   average,
   compare,
@@ -58,27 +58,24 @@ function Chart({ points }: { points: { t: number; geram: number | null; med: num
 export default async function CompetitorsPage() {
   await pollCompetitors().catch(() => undefined); // no-op if polled < 5 min ago
   const readings = getCompetitorReadings();
-  let ref: number | null = null;
-  let refStale = true;
-  let refAt: string | null = null;
+  let q: Awaited<ReturnType<typeof getLivePrice>> | null = null;
   try {
-    const q = await getLivePrice("gold18");
-    if (q.priceToman > 0) {
-      ref = q.priceToman;
-      refStale = q.stale;
-      refAt = q.updatedAt;
-    }
+    q = await getLivePrice("gold18");
+    if (!(q.priceToman > 0)) q = null;
   } catch {
-    /* shown below */
+    q = null;
   }
-  const core = getFinancialCore();
-  const fees = core.fees();
-  const spread = core.spread();
-  const buyFeeBps = Number(fees.buyFeeBps), sellFeeBps = Number(fees.sellFeeBps);
-  const ourBuy = ref ? effectivePerGram(ref, "buy", Number(spread.buySpreadBps), 0) : null;
-  const ourSell = ref ? effectivePerGram(ref, "sell", Number(spread.sellSpreadBps), 0) : null;
-  const ourBuyFee = ref ? effectivePerGram(ref, "buy", Number(spread.buySpreadBps), buyFeeBps) : null;
-  const ourSellFee = ref ? effectivePerGram(ref, "sell", Number(spread.sellSpreadBps), sellFeeBps) : null;
+  const refStale = q?.stale ?? true;
+  const refAt = q?.updatedAt ?? null;
+  // Same numbers users see (lib/pricing/policy): base ± spread; fee from the admin fee setting (free tier).
+  const fees = currentSettings().fees;
+  const buyFeeBps = Math.round(fees.buyFeePercentFree * 10_000), sellFeeBps = Math.round(fees.sellFeePercentFree * 10_000);
+  const pricing = currentSettings().pricing;
+  const ourBuy = q ? q.buyToman : null;
+  const ourSell = q ? q.sellToman : null;
+  const ourBuyFee = ourBuy ? effectivePerGram(ourBuy, "buy", 0, buyFeeBps) : null;
+  const ourSellFee = ourSell ? effectivePerGram(ourSell, "sell", 0, sellFeeBps) : null;
+  const ref = q?.priceToman ?? null;
 
   const live = readings.filter((r) => statusOf(r) === "ok") as (CompetitorReading & { buy: number; sell: number })[];
   const buys = live.map((r) => r.buy), sells = live.map((r) => r.sell);
@@ -100,7 +97,7 @@ export default async function CompetitorsPage() {
   const points = [...byTime.entries()]
     .filter(([, e]) => e.b.length)
     .map(([t, e]) => ({ t: Date.parse(t), geram: e.geram, med: median(e.b)! }));
-  if (ref) points.push({ t: Date.now(), geram: ourBuy, med: median(buys) ?? points.at(-1)?.med ?? ourBuy! });
+  if (ourBuy) points.push({ t: Date.now(), geram: ourBuy, med: median(buys) ?? points.at(-1)?.med ?? ourBuy! });
 
   const statusBadge = (r: CompetitorReading) => {
     const s = statusOf(r);
@@ -126,6 +123,9 @@ export default async function CompetitorsPage() {
           <p className="text-white/85">فروش: <b className="text-[17px] text-gold">{ourSell ? fa(ourSell) : "—"}</b></p>
           <p className="mt-1 text-[12px] text-white/65">
             با کارمزد: خرید {ourBuyFee ? fa(ourBuyFee) : "—"} · فروش {ourSellFee ? fa(ourSellFee) : "—"}
+          </p>
+          <p className="text-[12px] text-white/65">
+            پایه {ref ? fa(ref) : "—"} ({pricing.goldBase}) · اسپرد خرید {fa(pricing.goldBuySpreadPercent * 100, 2)}٪ · فروش {fa(pricing.goldSellSpreadPercent * 100, 2)}٪
           </p>
           <p className="text-[12px] text-white/65">{refStale ? "⚠ قیمت قدیمی" : "زنده"} · {tehran(refAt)} (تهران)</p>
         </div>

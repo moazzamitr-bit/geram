@@ -25,9 +25,10 @@ export async function loadCommerceSettings(): Promise<CommerceSettings> {
   return DEFAULT_COMMERCE_SETTINGS;
 }
 
-function mergeSettings(rows: { key: string; value: unknown }[]): CommerceSettings {
+export function mergeSettings(rows: { key: string; value: unknown }[]): CommerceSettings {
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]));
   return {
+    pricing: { ...DEFAULT_COMMERCE_SETTINGS.pricing, ...(map.pricing as object) },
     fees: { ...DEFAULT_COMMERCE_SETTINGS.fees, ...(map.fees as object) },
     plus: { ...DEFAULT_COMMERCE_SETTINGS.plus, ...(map.plus as object) },
     referral: {

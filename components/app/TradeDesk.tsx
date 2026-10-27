@@ -80,7 +80,7 @@ export function TradeDesk({
   const [range, setRange] = useState<ChartRange>("1d");
 
   const meta = INSTRUMENTS[instrument];
-  const price = store.getMarketPrice(instrument);
+  const price = store.getTradePrice(instrument, side === "buy" ? "BUY" : "SELL");
   const heldMg = store.getMetalMg(instrument);
   const plus = store.plusActive;
   const settings = store.commerceSettings;
@@ -360,7 +360,7 @@ export function TradeDesk({
           </div>
 
           <div className="mt-4 flex items-center justify-between text-[12px] text-muted-app">
-            <span>قیمت هر گرم</span>
+            <span>{side === "buy" ? "قیمت خرید هر گرم" : "قیمت فروش هر گرم"}</span>
             <span className="tabular-nums text-text">
               {price > 0 ? formatToman(price) : "در حال دریافت قیمت لایو..."}
             </span>

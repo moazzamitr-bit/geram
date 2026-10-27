@@ -113,6 +113,9 @@ type AppDataState = {
       source: string;
       updatedAt: string | null;
       stale: boolean;
+      /** Server-computed (lib/pricing/policy): what a user pays / receives per gram before fee. */
+      buyToman?: number;
+      sellToman?: number;
     }
   >;
   /** Verified cards (user_bank_cards) with the IBAN Finnotech returned for each. */
@@ -128,6 +131,8 @@ type AppDataState = {
   getMetalMg: (instrument: InstrumentId) => number;
   getAvgBuyPrice: (instrument: InstrumentId) => number;
   getMarketPrice: (instrument: InstrumentId) => number;
+  /** Per-gram price for a side (BUY = what the user pays, SELL = what they receive), before fee. */
+  getTradePrice: (instrument: InstrumentId, side: "BUY" | "SELL") => number;
   buyMetal: (
     instrument: InstrumentId,
     rial: number
@@ -261,6 +266,9 @@ const seed = {
       source: string;
       updatedAt: string | null;
       stale: boolean;
+      /** Server-computed (lib/pricing/policy): what a user pays / receives per gram before fee. */
+      buyToman?: number;
+      sellToman?: number;
     }
   >,
   bankAccounts: [] as { id: string; iban: string | null; bank: string; panMasked: string; verified: boolean; depositDefault?: boolean }[],
@@ -344,6 +352,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         quotes?: Array<{
           instrument?: string;
           priceToman?: number;
+          buyToman?: number;
+          sellToman?: number;
           source?: string;
           sourceKey?: string;
           updatedAt?: string;
@@ -376,6 +386,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             source: q.source ?? "بازار آزاد",
             updatedAt: q.updatedAt ?? new Date().toISOString(),
             stale: Boolean(q.stale),
+            buyToman: q.buyToman,
+            sellToman: q.sellToman,
           };
         }
         if (accepted === 0) return s;
@@ -429,6 +441,14 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const getMarketPrice = useCallback(
     (instrument: InstrumentId) => state.marketPrices[instrument] ?? 0,
     [state.marketPrices]
+  );
+  const getTradePrice = useCallback(
+    (instrument: InstrumentId, side: "BUY" | "SELL") => {
+      const q = state.marketQuotes[instrument];
+      const v = side === "BUY" ? q?.buyToman : q?.sellToman;
+      return v && v > 0 ? v : state.marketPrices[instrument] ?? 0;
+    },
+    [state.marketPrices, state.marketQuotes]
   );
 
   const refreshFinancial = useCallback(async () => {
@@ -702,6 +722,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       getMetalMg,
       getAvgBuyPrice,
       getMarketPrice,
+      getTradePrice,
       deposit,
       withdraw,
       refreshFinancial,
@@ -751,7 +772,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       userDataError,
       refreshMarketPrice,
     }),
-    [hydrated, state, userDataError, refreshUserData, buyMetal, sellMetal, requestQuote, executeQuote, buyGold, sellGold, getMetalMg, getAvgBuyPrice, getMarketPrice, deposit, withdraw, refreshMarketPrice, refreshFinancial]
+    [hydrated, state, userDataError, refreshUserData, buyMetal, sellMetal, requestQuote, executeQuote, buyGold, sellGold, getMetalMg, getAvgBuyPrice, getMarketPrice, getTradePrice, deposit, withdraw, refreshMarketPrice, refreshFinancial]
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

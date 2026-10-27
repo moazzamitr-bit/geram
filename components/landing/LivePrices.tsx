@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Row = { id: string; title: string; dot: string; price?: number; change?: number };
+type Row = { id: string; title: string; dot: string; price?: number; sell?: number; change?: number };
 
 const INITIAL: Row[] = [
   { id: "gold18", title: "طلای ۱۸ عیار", dot: "#E0A800" },
@@ -25,7 +25,7 @@ export function LivePrices({ variant = "cards" }: { variant?: "cards" | "list" }
             const res = await fetch(`/api/market/price?instrument=${r.id}`, { cache: "no-store" });
             const j = await res.json();
             if (!j.ok) return r;
-            return { ...r, price: j.priceToman as number, change: j.changePercent as number };
+            return { ...r, price: (j.buyToman ?? j.priceToman) as number, sell: (j.sellToman ?? j.priceToman) as number, change: j.changePercent as number };
           } catch {
             return r;
           }
@@ -56,6 +56,9 @@ export function LivePrices({ variant = "cards" }: { variant?: "cards" | "list" }
             <span className="text-left">
               <span className="text-lg font-bold text-text tabular-nums">{r.price ? fmt(r.price) : "…"}</span>
               <span className="mr-1 text-[12px] text-muted-app">تومان</span>
+              {r.sell && r.sell !== r.price ? (
+                <span className="block text-[12px] text-muted-app tabular-nums">خرید · فروش {fmt(r.sell)}</span>
+              ) : null}
             </span>
           </li>
         ))}
@@ -92,8 +95,11 @@ export function LivePrices({ variant = "cards" }: { variant?: "cards" | "list" }
           </div>
           <div className="mt-3 flex items-baseline gap-1">
             <span className="text-2xl font-extrabold text-text tabular-nums">{r.price ? fmt(r.price) : "…"}</span>
-            <span className="text-[12px] text-muted-app">تومان / گرم</span>
+            <span className="text-[12px] text-muted-app">{r.sell && r.sell !== r.price ? "تومان / گرم (خرید)" : "تومان / گرم"}</span>
           </div>
+          {r.sell && r.sell !== r.price ? (
+            <p className="mt-1 text-[12px] text-text-secondary tabular-nums">فروش {fmt(r.sell)} تومان</p>
+          ) : null}
         </div>
       ))}
     </div>

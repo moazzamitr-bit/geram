@@ -32,6 +32,8 @@ export default function MarketPage() {
   const [period, setPeriod] =
     useState<(typeof periods)[number]["range"]>("7d");
   const price = store.getMarketPrice(instrument);
+  const buyPrice = store.getTradePrice(instrument, "BUY");
+  const sellPrice = store.getTradePrice(instrument, "SELL");
   const quote = store.marketQuotes[instrument];
   const meta = INSTRUMENTS[instrument];
   const [alertPrice, setAlertPrice] = useState(price);
@@ -55,7 +57,8 @@ export default function MarketPage() {
       <div className="grid gap-3 sm:grid-cols-3">
         {INSTRUMENT_IDS.map((id) => {
           const m = INSTRUMENTS[id];
-          const p = store.getMarketPrice(id);
+          const p = store.getTradePrice(id, "BUY");
+          const ps = store.getTradePrice(id, "SELL");
           const q = store.marketQuotes[id];
           const active = id === instrument;
           return (
@@ -73,6 +76,9 @@ export default function MarketPage() {
               <p className="mt-1 text-[18px] font-extrabold tabular-nums text-text">
                 {p > 0 ? formatToman(p) : "—"}
               </p>
+              {p > 0 && ps !== p && (
+                <p className="text-[11px] tabular-nums text-muted-app">خرید · فروش {formatToman(ps)}</p>
+              )}
               <p
                 className={`mt-1 text-[12px] tabular-nums ${
                   (q.changePercent ?? 0) >= 0 ? "text-positive" : "text-negative"
@@ -93,15 +99,20 @@ export default function MarketPage() {
           <div>
             <p className="text-[13px] text-muted-app">{meta.title}</p>
             <p className="mt-2 text-[36px] font-extrabold text-text">
-              {price > 0 ? (
+              {buyPrice > 0 ? (
                 <AnimatedNumber
-                  value={price}
+                  value={buyPrice}
                   formatter={(n) => formatToman(Math.round(n))}
                 />
               ) : (
                 "—"
               )}
             </p>
+            {buyPrice > 0 && (
+              <p className="mt-1 text-[13px] tabular-nums text-text-secondary">
+                خرید {formatToman(buyPrice)} · فروش {formatToman(sellPrice)}
+              </p>
+            )}
             <p className="mt-1 text-[13px] tabular-nums text-positive">
               {quote.changePercent != null
                 ? `${quote.changePercent >= 0 ? "+" : ""}${quote.changePercent.toLocaleString("fa-IR", { maximumFractionDigits: 2 })}٪ تغییر`

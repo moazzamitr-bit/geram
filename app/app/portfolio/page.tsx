@@ -26,7 +26,7 @@ export default function PortfolioPage() {
     return INSTRUMENT_IDS.map((id) => {
       const pnl = unrealizedPnl({
         goldMg: store.getMetalMg(id),
-        marketPricePerGram: store.getMarketPrice(id),
+        marketPricePerGram: store.getTradePrice(id, "SELL"),
         avgBuyPricePerGram: store.getAvgBuyPrice(id),
         transactions: store.transactions,
         instrument: id,

@@ -11,6 +11,8 @@ import {
   postgresRequired,
 } from "@/lib/core/mode";
 import { DEFAULT_COMMERCE_SETTINGS } from "@/lib/commerce/types";
+import { currentSettings, ensurePricingFresh, spreadFor } from "@/lib/pricing/policy";
+import type { PriceFeed } from "@/lib/core/price";
 import { tomanToIrr } from "@/lib/core/money";
 import { CoreError } from "@/lib/core/types";
 
@@ -136,8 +138,8 @@ export function getFinancialCore(): FinancialCore {
   const flags = getFeatureFlags(mode);
   const useStatic = process.env.GERAM_PRICE_FEED === "static" || process.env.VITEST === "true";
   const primary = tgjuExecutableFeed(fetchTgjuCurrent);
-  const prices = useStatic
-    ? testPrices()
+  const guarded = useStatic
+    ? null
     : withPriceGuard(withEstjtGoldFallback(primary, fetchEstjt), {
         onHalt: async ({ asset, reason, values }) => {
           const msg = `AUTO_PRICE_GUARD ${reason}: ${JSON.stringify(values)}`.slice(0, 900);
@@ -156,23 +158,30 @@ export function getFinancialCore(): FinancialCore {
             : null;
         },
       });
+  // Refresh admin pricing settings (base row, spread) before every executable read; guards see the raw base.
+  const prices: PriceFeed = guarded
+    ? { getExecutable: async (asset) => (await ensurePricingFresh(), guarded.getExecutable(asset)) }
+    : testPrices();
   const fees = DEFAULT_COMMERCE_SETTINGS.fees;
+  const defaultFees = feesFromCommercePercent({
+    plus: false,
+    buyFeePercentFree: fees.buyFeePercentFree,
+    buyFeePercentPlus: fees.buyFeePercentPlus,
+    buyFeeMinTomanFree: fees.buyFeeMinTomanFree,
+    buyFeeMinTomanPlus: fees.buyFeeMinTomanPlus,
+    sellFeePercentFree: fees.sellFeePercentFree,
+    sellFeePercentPlus: fees.sellFeePercentPlus,
+    sellFeeMinTomanFree: fees.sellFeeMinTomanFree,
+    sellFeeMinTomanPlus: fees.sellFeeMinTomanPlus,
+  });
   g.__geramCore = new FinancialCore({
     store,
     prices,
     mode,
     flags,
-    fees: feesFromCommercePercent({
-      plus: false,
-      buyFeePercentFree: fees.buyFeePercentFree,
-      buyFeePercentPlus: fees.buyFeePercentPlus,
-      buyFeeMinTomanFree: fees.buyFeeMinTomanFree,
-      buyFeeMinTomanPlus: fees.buyFeeMinTomanPlus,
-      sellFeePercentFree: fees.sellFeePercentFree,
-      sellFeePercentPlus: fees.sellFeePercentPlus,
-      sellFeeMinTomanFree: fees.sellFeeMinTomanFree,
-      sellFeeMinTomanPlus: fees.sellFeeMinTomanPlus,
-    }),
+    // Live: the admin fee setting (free tier) — same numbers resolveUserFeeSnapshot uses per user.
+    fees: useStatic ? defaultFees : () => feesFromCommercePercent({ plus: false, ...currentSettings().fees }),
+    spread: useStatic ? undefined : (asset) => spreadFor(asset),
   });
   return g.__geramCore;
 }
