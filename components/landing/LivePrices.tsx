@@ -57,7 +57,7 @@ export function LivePrices({ variant = "cards" }: { variant?: "cards" | "list" }
               <span className="text-lg font-bold text-text tabular-nums">{r.price ? fmt(r.price) : "…"}</span>
               <span className="mr-1 text-[12px] text-muted-app">تومان</span>
               {r.sell && r.sell !== r.price ? (
-                <span className="block text-[12px] text-muted-app tabular-nums">خرید · فروش {fmt(r.sell)}</span>
+                <span className="block text-[12px] text-muted-app tabular-nums">فروش {fmt(r.sell)}</span>
               ) : null}
             </span>
           </li>
