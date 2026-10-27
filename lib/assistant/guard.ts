@@ -7,7 +7,8 @@
 export const ASSISTANT_DISCLAIMER =
   "این دستیار مشاور سرمایه‌گذاری نیست و توصیه خرید، فروش یا نگهداری نمی‌دهد. تصمیم معامله با خود شماست.";
 
-export type GuardVerdict = { ok: true } | { ok: false; reason: "advice" | "prediction" | "political" };
+export type GuardVerdict = { ok: true } | { ok: false; reason: GuardReason }
+export type GuardReason = "advice" | "prediction" | "political" | "allocation";
 
 /** Normalise Arabic letters, ZWNJ and digits so patterns match spelling variants. */
 export function normalizeFa(input: string): string {
@@ -42,6 +43,19 @@ const ADVICE_IN = [
   /\b(should i (buy|sell|hold)|buy or sell|good time to (buy|sell))/,
 ];
 
+/** Personal allocation / portfolio questions: how much of *my* money, what would you do in my place. */
+const ALLOCATION_IN = [
+  /جای من (بودی|بودید|باشی|باشید)/,
+  /(اگه|اگر) (تو|شما) (بودی|بودید)/,
+  /چند ?(درصد|٪|%).{0,40}(پول|سرمایه|دارایی|پس ?انداز|حقوق|درآمد|طلا|نقره|مس|سکه)/,
+  /(چقدر|چه مقدار|چه قدر|چند گرم|چند میلیون).{0,30}(طلا|نقره|مس|سکه).{0,15}(بخرم|بگیرم|داشته باشم|نگه دارم)/,
+  /(سبد|پرتفو|پورتفو|portfolio)/,
+  /(تقسیم|پخش|تخصیص|بچینم|بچینیم).{0,30}(پول|سرمایه|دارایی|پس ?انداز)/,
+  /(پول|سرمایه|دارایی|پس ?انداز).{0,30}(تقسیم|پخش|تخصیص)/,
+  /با [\d۰-۹٬,.]+ ?(میلیون|میلیارد|هزار|تومن|تومان).{0,40}(چی ?کار|چکار|چه کار|چیکار|چی بخرم|کجا)/,
+  /\b(how much of my|what would you do|asset allocation)/,
+];
+
 const PREDICTION_IN = [
   /پیش ?بینی/, /تارگت/, /هدف ?قیمت/, /سقف ?قیمت/, /کف ?قیمت/,
   /(گرون|گران|ارزون|ارزان) ?(تر )?(می ?شه|میشه|می ?شود|خواهد|میشن)/,
@@ -62,6 +76,15 @@ const ADVICE_OUT = [
   /\b(you should (buy|sell|hold)|i recommend (buying|selling))/,
 ];
 
+const ALLOCATION_OUT = [
+  /[\d۰-۹]+ ?(٪|%|درصد).{0,40}(پول|سرمایه|دارایی|سبد|پس ?انداز|درآمد)/,
+  /(پول|سرمایه|دارایی|سبد|پس ?انداز).{0,40}[\d۰-۹]+ ?(٪|%|درصد)/,
+  /(متمرکز نکنید|متنوع کنید|تنوع ببخشید|تنوع‌بخشی کنید|در یک دارایی)/,
+  /(بخشی|قسمتی|سهمی) (از|را).{0,20}(پول|سرمایه|دارایی|پس ?انداز).{0,40}(طلا|نقره|مس|سکه|کنار|نگه|بگذارید|اختصاص)/,
+  /(اختصاص دهید|تخصیص دهید|تقسیم کنید)/,
+  /(جای شما بودم|اگر من بودم)/,
+];
+
 const PREDICTION_OUT = [
   /پیش ?بینی (می ?کنم|میکنم|من)/,
   /(تارگت|هدف قیمتی|سقف قیمتی بعدی)/,
@@ -79,6 +102,7 @@ export function checkUserInput(raw: string): GuardVerdict {
   const t = normalizeFa(raw);
   if (hit(t, POLITICAL)) return { ok: false, reason: "political" };
   if (hit(t, PREDICTION_IN)) return { ok: false, reason: "prediction" };
+  if (hit(t, ALLOCATION_IN)) return { ok: false, reason: "allocation" };
   if (hit(t, ADVICE_IN)) return { ok: false, reason: "advice" };
   return { ok: true };
 }
@@ -87,11 +111,24 @@ export function checkModelOutput(raw: string): GuardVerdict {
   const t = normalizeFa(raw);
   if (hit(t, POLITICAL)) return { ok: false, reason: "political" };
   if (hit(t, PREDICTION_OUT)) return { ok: false, reason: "prediction" };
+  if (hit(t, ALLOCATION_OUT)) return { ok: false, reason: "allocation" };
   if (hit(t, ADVICE_OUT)) return { ok: false, reason: "advice" };
   return { ok: true };
 }
 
-export function refusalText(reason: "advice" | "prediction" | "political"): string {
+export function refusalText(reason: GuardReason): string {
+  if (reason === "allocation") {
+    return [
+      "متأسفم، درباره این‌که چه مقدار یا چند درصد از پول‌تان را به طلا، نقره یا هر دارایی دیگری اختصاص دهید نظر نمی‌دهم؛ این به شرایط شخصی شما بستگی دارد و " + ASSISTANT_DISCLAIMER,
+      "",
+      "اگر بخواهید، این مفاهیم آموزشی را توضیح می‌دهم:",
+      "- **خرید پله‌ای (DCA):** یعنی به‌جای خرید یکجا، مبلغ ثابتی را در فاصله‌های منظم خرید کنید تا میانگین قیمت خرید به نوسان یک روز وابسته نباشد.",
+      "- **پس‌انداز دوره‌ای:** کنار گذاشتن منظم مبلغی مشخص، مثلاً ماهانه.",
+      "- **کارمزد و اختلاف قیمت خرید و فروش:** هزینه‌ای که در هر معامله پرداخت می‌شود و در صفحه معامله پیش از تأیید نمایش داده می‌شود.",
+      "",
+      "برای تصمیم شخصی بهتر است با یک مشاور مالی دارای مجوز مشورت کنید.",
+    ].join("\n");
+  }
   if (reason === "political") {
     return "دستیار گرم وارد موضوعات و تحلیل‌های سیاسی نمی‌شود. اگر درباره قیمت لحظه‌ای، مفاهیم بازار طلا یا نحوه کار با گرم سؤال دارید، خوشحال می‌شوم کمک کنم.";
   }
