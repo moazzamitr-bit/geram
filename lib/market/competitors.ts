@@ -132,8 +132,16 @@ export type CompetitorReading = {
 };
 
 export async function readCompetitor(def: CompetitorDef, fetchImpl?: typeof fetch): Promise<BuySell> {
+  let body: unknown;
   try {
-    return validate(def.parse(await fetchBody(def, fetchImpl)));
+    try {
+      body = await fetchBody(def, fetchImpl);
+    } catch (e) {
+      // Some hosts publish several IPs and one may be unreachable: retry a network failure once.
+      if (e instanceof CompetitorError) throw e;
+      body = await fetchBody(def, fetchImpl);
+    }
+    return validate(def.parse(body));
   } catch (e) {
     if (e instanceof CompetitorError) throw e;
     const msg = e instanceof Error ? e.message : String(e);
