@@ -468,3 +468,11 @@ html:has(.geram-app) body {
   padding-bottom: env(safe-area-inset-bottom);
   transform: translateZ(0);
 }
+
+/* دستیار گرم: sits above the fixed mobile nav, bottom corner on desktop. */
+.geram-assistant-fab {
+  bottom: calc(76px + env(safe-area-inset-bottom));
+}
+@media (min-width: 1024px) {
+  .geram-assistant-fab { bottom: 24px; }
+}

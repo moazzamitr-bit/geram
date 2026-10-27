@@ -1,6 +1,7 @@
 "use client";
 
 import { PriceTicker } from "@/components/app/PriceTicker";
+import { AssistantWidget } from "@/components/app/AssistantWidget";
 import { PwaInstallBanner } from "@/components/app/PwaInstallBanner";
 import { AppShellSkeleton } from "@/components/app/Skeleton";
 import { BrandLogo } from "@/components/brand/BrandLogo";
@@ -223,6 +224,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>,
           document.body
         )}
+      <AssistantWidget />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
 import { AdminActionForm } from "@/components/admin/AdminActionForm";
 import { getKillSwitches, KILL_SWITCH_KEYS } from "@/lib/core/mode";
 import { probeTable } from "@/lib/admin/probe";
+import { providerConfigured } from "@/lib/assistant/provider";
 
 export default async function AdminSwitchesPage() {
   const env = getKillSwitches();
@@ -26,6 +27,18 @@ export default async function AdminSwitchesPage() {
       <AdminNotice title="OTP / step-up">
         تغییر نیازمند switches.write + دلیل + audit است. OTP پله‌ای ادمین remaining dependency است.
       </AdminNotice>
+      <div className="mb-6 rounded-2xl border border-white/10 bg-[#0F1724] p-4">
+        <p className="font-bold">AI_ASSISTANT_ENABLED — دستیار گرم</p>
+        <p className="mt-2 text-[13px] text-white/60">
+          پیش‌فرض خاموش. وضعیت: {byKey.AI_ASSISTANT_ENABLED?.enabled === true ? "روشن" : "خاموش"} · ارائه‌دهنده:{" "}
+          {providerConfigured() ? "تنظیم شده" : "تنظیم نشده (AI_ASSISTANT_BASE_URL / AI_ASSISTANT_API_KEY / AI_ASSISTANT_MODEL)"}
+        </p>
+        <p className="text-[12px] text-white/60">بدون ارائه‌دهنده، دکمه دستیار حتی با کلید روشن به کاربر نشان داده نمی‌شود.</p>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <AdminActionForm action="update" endpoint="/api/admin/kills" extra={{ key: "AI_ASSISTANT_ENABLED", enabled: "true" }} submitLabel="روشن" />
+          <AdminActionForm action="update" endpoint="/api/admin/kills" extra={{ key: "AI_ASSISTANT_ENABLED", enabled: "false" }} submitLabel="خاموش" danger />
+        </div>
+      </div>
       <div className="space-y-4">
         {KILL_SWITCH_KEYS.map((key) => {
           const row = byKey[key];
