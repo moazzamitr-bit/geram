@@ -58,7 +58,8 @@ export function UserLoginForm({
   initialTab?: "login" | "register";
   initialMethod?: Method;
 }) {
-  const { isAuthenticated, hydrated, user } = useAuth();
+  const { isAuthenticated, hydrated, user, logout } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
   const [method, setMethod] = useState<Method>(initialMethod);
   const [codeLength, setCodeLength] = useState(5);
   const [queryError, setQueryError] = useState(messageFor(initialError || null));
@@ -90,10 +91,10 @@ export function UserLoginForm({
     };
   }, []);
 
-  useEffect(() => {
-    if (!hydrated || !isAuthenticated || !user) return;
-    window.location.replace(user.onboardingDone ? "/app/dashboard" : "/auth/onboarding");
-  }, [hydrated, isAuthenticated, user]);
+  // Never navigate away on our own. A session left over from an earlier login
+  // (for example an admin session in the same browser) used to silently
+  // bounce the login page into the panel. Ask the person instead.
+  const signedIn = hydrated && isAuthenticated && user;
 
   return (
     <div className="geram-app min-h-svh bg-bg text-text">
@@ -111,7 +112,40 @@ export function UserLoginForm({
                 {queryError}
               </p>
             )}
-            {method === "otp" ? <OtpLogin codeLength={codeLength} /> : <PasswordLogin initialTab={initialTab} />}
+            {signedIn ? (
+              <div className="space-y-4" data-testid="already-signed-in">
+                <p className="text-[15px] leading-8 text-text">
+                  در این مرورگر از قبل با حساب
+                  {" "}
+                  <span dir="ltr" className="font-bold">{user.phone ? formatMaskedPhone(user.phone) : "دیگری"}</span>
+                  {" "}
+                  وارد شده‌اید.
+                </p>
+                <GoldButton
+                  type="button"
+                  className="w-full"
+                  onClick={() => window.location.assign(user.onboardingDone ? "/app/dashboard" : "/auth/onboarding")}
+                >
+                  ادامه با همین حساب
+                </GoldButton>
+                <button
+                  type="button"
+                  disabled={signingOut}
+                  className="h-12 w-full rounded-xl border border-black/10 text-[15px] font-bold text-text"
+                  onClick={async () => {
+                    setSigningOut(true);
+                    await logout();
+                    window.location.replace("/auth/login");
+                  }}
+                >
+                  {signingOut ? "در حال خروج…" : "خروج و ورود با حساب دیگر"}
+                </button>
+              </div>
+            ) : method === "otp" ? (
+              <OtpLogin codeLength={codeLength} />
+            ) : (
+              <PasswordLogin initialTab={initialTab} />
+            )}
           </div>
         </div>
         <aside
@@ -377,7 +411,7 @@ function formatCountdown(total: number) {
 }
 
 function OtpLogin({ codeLength }: { codeLength: number }) {
-  const { login, isAuthenticated, hydrated, user } = useAuth();
+  const { login } = useAuth();
   const [step, setStep] = useState<OtpStep>("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
@@ -405,11 +439,6 @@ function OtpLogin({ codeLength }: { codeLength: number }) {
     }
     window.location.assign("/auth/onboarding");
   };
-
-  useEffect(() => {
-    if (!hydrated || !isAuthenticated) return;
-    window.location.replace(user?.onboardingDone ? "/app/dashboard" : "/auth/onboarding");
-  }, [hydrated, isAuthenticated, user]);
 
   useEffect(() => {
     setLength(codeLength);
