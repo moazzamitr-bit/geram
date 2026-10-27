@@ -84,6 +84,7 @@ export const adminNavCatalog: AdminNavGroup[] = [
     label: "عملیات فلز",
     items: [
       { label: "بازار و قیمت", href: "/admin/market", icon: LineChart },
+      { label: "مقایسه با رقبا", href: "/admin/competitors", icon: Scale },
       { label: "خزانه‌داری", href: "/admin/treasury", icon: Warehouse },
       { label: "موجودی / لات", href: "/admin/inventory", icon: Package },
       { label: "تأمین", href: "/admin/procurement", icon: Truck },
