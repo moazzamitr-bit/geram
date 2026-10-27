@@ -219,11 +219,18 @@ export function TradeDesk({
         return;
       }
       setLoading(true);
-      const res = await store.requestQuote(
-        side === "buy"
-          ? { instrument, side: "BUY", toman: preview.toman }
-          : { instrument, side: "SELL", metalMg: preview.goldMg }
-      );
+      const req = () =>
+        store.requestQuote(
+          side === "buy"
+            ? { instrument, side: "BUY", toman: preview.toman }
+            : { instrument, side: "SELL", metalMg: preview.goldMg }
+        );
+      let res = await req();
+      // Transient price faults (stale tick, guard recovering) clear in seconds: retry silently.
+      for (let i = 0; i < 4 && !res.ok && isTransientPriceError(res.error); i++) {
+        await new Promise((r) => setTimeout(r, 1200));
+        res = await req();
+      }
       if (!res.ok || !res.quote) {
         if (isVerificationRequired(res.error)) {
           gate.openGate();
@@ -247,7 +254,10 @@ export function TradeDesk({
     setError("");
     try {
       if (!locked || lockedExpired) {
-        setError("اعتبار قیمت تمام شد. قیمت جدید بگیرید.");
+        // Expired lock: fetch a fresh quote silently; the user confirms the new price.
+        pending.current = false;
+        setLocked(null);
+        await onRequestQuote();
         return;
       }
       if (side === "buy" && !checked) {
@@ -569,4 +579,9 @@ function SideLink({
       {label}
     </Link>
   );
+}
+
+function isTransientPriceError(err: string | undefined) {
+  const e = (err ?? "").toLowerCase();
+  return e.includes("price_stale") || e.includes("price_recovering") || e.includes("price_guard") || e.includes("price_unavailable");
 }

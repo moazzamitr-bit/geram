@@ -14,8 +14,8 @@ export function tradeFailureMessage(raw: string | undefined, fallback: string): 
   if (lower.includes("insufficient_inventory") || lower.includes("not enough metal")) {
     return "موجودی فلز کافی نیست.";
   }
-  if (lower.includes("price_stale")) {
-    return "قیمت بازار کهنه شده است. چند لحظه بعد دوباره قیمت بگیرید.";
+  if (lower.includes("price_stale") || lower.includes("price_recovering") || lower.includes("price_guard")) {
+    return "قیمت لحظه‌ای این فلز الان در دسترس نیست. چند دقیقه دیگر دوباره امتحان کنید.";
   }
   if (lower.includes("price_unavailable")) {
     return "دریافت قیمت از بازار ممکن نشد. کمی بعد دوباره تلاش کنید.";

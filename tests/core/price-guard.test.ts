@@ -104,9 +104,12 @@ describe("price guard", () => {
   });
 
   it("rejects stale or old prices", async () => {
-    const old = new Date(Date.now() - 5 * 60_000).toISOString();
+    const old = new Date(Date.now() - 31 * 60_000).toISOString();
     const g = withPriceGuard(feedOf(() => ({ observedAt: old })), { onHalt });
     await expect(g.getExecutable("GOLD")).rejects.toMatchObject({ code: "price_stale" });
+    const silverHourOld = new Date(Date.now() - 50 * 60_000).toISOString();
+    const gs = withPriceGuard(feedOf(() => ({ observedAt: silverHourOld })), { onHalt: async () => {} });
+    await expect(gs.getExecutable("SILVER")).resolves.toBeTruthy();
     const g2 = withPriceGuard(feedOf(() => ({ stale: true })), { onHalt });
     await expect(g2.getExecutable("SILVER")).rejects.toMatchObject({ code: "price_stale" });
   });
