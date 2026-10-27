@@ -10,7 +10,8 @@ async function haltedSwitches() {
     const { data } = await createServiceClient()
       .from("core_kill_switches")
       .select("key, reason, updated_at")
-      .eq("enabled", false);
+      .eq("enabled", false)
+      .neq("key", "AI_ASSISTANT_ENABLED"); // feature flag, not a trading halt
     return (data ?? []) as { key: string; reason: string | null; updated_at: string }[];
   } catch {
     return [];

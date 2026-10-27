@@ -3,6 +3,7 @@ import { adminGate, readActionBody } from "@/lib/admin/auth";
 import { writeAudit } from "@/lib/admin/audit";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { KILL_SWITCH_KEYS } from "@/lib/core/mode";
+import { FEATURE_SWITCH_KEYS } from "@/lib/assistant/flag";
 
 export async function POST(request: Request) {
   const gate = await adminGate("switches.write");
@@ -13,7 +14,10 @@ export async function POST(request: Request) {
   const enabled = body.enabled === "true" || body.enabled === "1";
   const reason = (body.reason ?? "").trim();
 
-  if (!KILL_SWITCH_KEYS.includes(key as (typeof KILL_SWITCH_KEYS)[number]) || reason.length < 8) {
+  const known =
+    KILL_SWITCH_KEYS.includes(key as (typeof KILL_SWITCH_KEYS)[number]) ||
+    FEATURE_SWITCH_KEYS.includes(key as (typeof FEATURE_SWITCH_KEYS)[number]);
+  if (!known || reason.length < 8) {
     return NextResponse.json({ ok: false, error: "invalid_request" }, { status: 400 });
   }
 
