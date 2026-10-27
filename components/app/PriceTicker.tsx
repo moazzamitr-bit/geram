@@ -28,7 +28,8 @@ export function PriceTicker({ className }: { className?: string }) {
     >
       {ORDER.map((id) => {
         const meta = INSTRUMENTS[id];
-        const price = store.getMarketPrice(id);
+        const buy = store.getTradePrice(id, "BUY");
+        const sell = store.getTradePrice(id, "SELL");
         const change = store.marketQuotes[id]?.changePercent ?? null;
         const up = (change ?? 0) >= 0;
         return (
@@ -40,7 +41,11 @@ export function PriceTicker({ className }: { className?: string }) {
             <span className="h-2 w-2 rounded-full" style={{ background: DOT[id] }} />
             <span>{meta.label}</span>
             <span className="tabular-nums text-text">
-              {price > 0 ? `${price.toLocaleString("fa-IR")} تومان` : "—"}
+              {buy > 0
+                ? buy === sell
+                  ? `${buy.toLocaleString("fa-IR")} تومان`
+                  : `خرید ${buy.toLocaleString("fa-IR")} · فروش ${sell.toLocaleString("fa-IR")}`
+                : "—"}
             </span>
             {change != null && (
               <span

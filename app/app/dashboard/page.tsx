@@ -46,7 +46,7 @@ export default function DashboardPage() {
     return CARD_ORDER.map((id) => {
       const pnl = unrealizedPnl({
         goldMg: store.getMetalMg(id),
-        marketPricePerGram: store.getMarketPrice(id),
+        marketPricePerGram: store.getTradePrice(id, "SELL"),
         avgBuyPricePerGram: store.getAvgBuyPrice(id),
         transactions: store.transactions,
         instrument: id,
@@ -141,7 +141,7 @@ export default function DashboardPage() {
         {rows.map((row) => {
           const change = store.marketQuotes[row.id]?.changePercent ?? null;
           const up = (change ?? 0) >= 0;
-          const price = store.getMarketPrice(row.id);
+          const price = store.getTradePrice(row.id, "BUY");
           return (
             <Link
               key={row.id}

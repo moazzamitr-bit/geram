@@ -11,7 +11,9 @@ export function priceContext(quotes: MarketPriceQuote[]): string {
     const name = NAMES[q.instrument] ?? q.instrument;
     if (!isLiveDisplayQuote(q) || q.stale) return `- ${name}: قیمت معتبر لحظه‌ای در دسترس نیست.`;
     const ch = q.changePercent == null ? "" : `، تغییر روز ${q.changePercent.toLocaleString("fa-IR")}٪`;
-    return `- ${name}: ${Math.round(q.priceToman).toLocaleString("fa-IR")} تومان${ch} (به‌روزرسانی ${new Date(q.updatedAt).toLocaleTimeString("fa-IR", { timeZone: "Asia/Tehran" })})`;
+    const fa = (n: number) => Math.round(n).toLocaleString("fa-IR");
+    const px = q.buyToman !== q.sellToman ? `خرید ${fa(q.buyToman)} تومان، فروش ${fa(q.sellToman)} تومان` : `${fa(q.priceToman)} تومان`;
+    return `- ${name}: ${px}${ch} (به‌روزرسانی ${new Date(q.updatedAt).toLocaleTimeString("fa-IR", { timeZone: "Asia/Tehran" })})`;
   });
   return lines.join("\n");
 }

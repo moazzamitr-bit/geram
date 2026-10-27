@@ -1,3 +1,4 @@
+import { goldBaseKeys } from "@/lib/pricing/policy";
 import { ASSET_SPECS, type AssetCode } from "./assets";
 import { copperIrrPerGram, pickCopperObservation } from "./copper-price";
 import { isTimestampStale, observedAtIso, SPOT_STALE_AFTER_MS } from "@/lib/market/freshness";
@@ -76,7 +77,7 @@ export function tgjuExecutableFeed(fetchCurrent: () => Promise<Record<string, un
       }
 
       if (asset === "GOLD") {
-        const picked = pickRow(current, ["geram18", "geram18_buy", "tgju_gold_irg18"]);
+        const picked = pickRow(current, goldBaseKeys());
         const p = picked ? parseIntLoose(picked.row.p) : null;
         if (!p || p < 1_000_000n) {
           throw new CoreError("price_unavailable", "gold 18k price invalid", 503);

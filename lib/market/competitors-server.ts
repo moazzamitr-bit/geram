@@ -9,7 +9,7 @@ export const supabaseSnapshotSink: SnapshotSink = async (rows) => {
   // Our own display reference at the same moment, so the chart can show our line too.
   const ours = await getLivePrice("gold18").catch(() => null);
   const all = ours && ours.priceToman > 0 && !ours.stale
-    ? [...rows, { competitor: "geram", buy_toman: ours.priceToman, sell_toman: ours.priceToman, observed_at: rows[0].observed_at }]
+    ? [...rows, { competitor: "geram", buy_toman: ours.buyToman, sell_toman: ours.sellToman, observed_at: rows[0].observed_at }]
     : rows;
   const { error } = await db.from("competitor_price_snapshots").insert(all);
   if (error) throw new Error(error.message);

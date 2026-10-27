@@ -8,6 +8,7 @@ import {
   saveCommerceSettings,
 } from "@/lib/commerce/save-settings";
 import { DEFAULT_COMMERCE_SETTINGS } from "@/lib/commerce/types";
+import { setPricingSettings } from "@/lib/pricing/policy";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +31,9 @@ export async function PUT(request: Request) {
       return NextResponse.json({ ok: false, error: "reason_required" }, { status: 400 });
     }
     const previous = await loadCommerceSettings().catch(() => DEFAULT_COMMERCE_SETTINGS);
-    const parsed = parseCommerceSettings(mergeWithDefaults(body));
+    const parsed = parseCommerceSettings(mergeWithDefaults(body, previous));
     const settings = await saveCommerceSettings(parsed);
+    setPricingSettings(settings);
     await writeAudit({
       actorId: gate.ctx.userId,
       role: gate.ctx.role,

@@ -43,8 +43,10 @@ export type EngineDeps = {
   mode?: ExecutionMode;
   flags?: FeatureFlags;
   kills?: KillSwitches;
-  fees?: FeeSnapshot;
-  spread?: SpreadSnapshot;
+  /** Static snapshot (tests) or a getter (runtime: admin settings, refreshed without redeploy). */
+  fees?: FeeSnapshot | (() => FeeSnapshot);
+  /** Applied AFTER the guarded feed returns the raw base. Per asset (silver/copper: zero). */
+  spread?: SpreadSnapshot | ((asset: AssetCode) => SpreadSnapshot);
   safetyBufferUg?: Partial<Record<AssetCode, Microgram>>;
   seedInventoryUg?: Partial<Record<AssetCode, Microgram>>;
   seedCashIrr?: Irr;
@@ -152,11 +154,13 @@ export class FinancialCore {
   }
 
   fees(): FeeSnapshot {
-    return this.deps.fees ?? DEFAULT_FEE_SNAPSHOT;
+    const f = this.deps.fees;
+    return (typeof f === "function" ? f() : f) ?? DEFAULT_FEE_SNAPSHOT;
   }
 
-  spread(): SpreadSnapshot {
-    return this.deps.spread ?? DEFAULT_SPREAD_SNAPSHOT;
+  spread(asset: AssetCode): SpreadSnapshot {
+    const s = this.deps.spread;
+    return (typeof s === "function" ? s(asset) : s) ?? DEFAULT_SPREAD_SNAPSHOT;
   }
 
   /**
@@ -694,7 +698,7 @@ export class FinancialCore {
     if (price.health === "UNAVAILABLE" || price.health === "PARSE_ERROR" || price.source === "seed") {
       throw new CoreError("price_unavailable", "قیمت لحظه‌ای در دسترس نیست.", 503);
     }
-    const execution = applySpread(price.irrPerGram, input.side, this.spread());
+    const execution = applySpread(price.irrPerGram, input.side, this.spread(input.asset));
     const computed = computeQuote({
       side: input.side,
       inputMode: input.inputMode,
@@ -754,7 +758,7 @@ export class FinancialCore {
     }
 
     const fees = input.fees ?? this.fees();
-    const execution = applySpread(price.irrPerGram, input.side, this.spread());
+    const execution = applySpread(price.irrPerGram, input.side, this.spread(input.asset));
     const requestedIrr =
       input.inputMode === "RIAL_AMOUNT" ? (input.requestedIrr ?? null) : null;
     const requestedWeightUg =
@@ -830,8 +834,8 @@ export class FinancialCore {
         sellFeeMinIrr: fees.sellFeeMinIrr.toString(),
       }),
       spreadSnapshotJson: JSON.stringify({
-        buySpreadBps: this.spread().buySpreadBps.toString(),
-        sellSpreadBps: this.spread().sellSpreadBps.toString(),
+        buySpreadBps: this.spread(input.asset).buySpreadBps.toString(),
+        sellSpreadBps: this.spread(input.asset).sellSpreadBps.toString(),
       }),
       priceSourceSnapshotJson: JSON.stringify({
         instrument: price.instrument,

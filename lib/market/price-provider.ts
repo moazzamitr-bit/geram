@@ -1,3 +1,4 @@
+import { goldBaseKeys, sidePricesToman, ensurePricingFresh } from "@/lib/pricing/policy";
 import { pickCopperObservation } from "@/lib/core/copper-price";
 import {
   isTimestampStale,
@@ -9,6 +10,8 @@ import {
   type InstrumentId,
   parseInstrumentId,
 } from "@/lib/market/instruments";
+
+type RawMarketQuote = Omit<MarketPriceQuote, "buyToman" | "sellToman">;
 
 export type MarketPriceQuote = {
   instrument: InstrumentId;
@@ -24,10 +27,14 @@ export type MarketPriceQuote = {
   updatedAt: string;
   fetchedAt: string;
   stale: boolean;
+  /** What a user pays per gram to BUY = base + spread (fee extra). From lib/pricing/policy. */
+  buyToman: number;
+  /** What a user gets per gram on SELL = base − spread (fee extra). */
+  sellToman: number;
 };
 
 type CacheEntry = {
-  quote: MarketPriceQuote;
+  quote: RawMarketQuote;
   expiresAt: number;
 };
 
@@ -118,7 +125,7 @@ function quoteFromRialRow(input: {
   picked: { key: string; row: Record<string, unknown> };
   minRial: number;
   source: string;
-}): MarketPriceQuote {
+}): RawMarketQuote {
   const priceRial = parseFaNumber(input.picked.row.p);
   if (!priceRial || priceRial < input.minRial) {
     throw new Error(`TGJU ${input.instrument} price invalid`);
@@ -157,7 +164,7 @@ function usdToTomanPerGram(
   return Math.max(1, Math.round(toman));
 }
 
-function buildCopperQuote(current: Record<string, unknown>): MarketPriceQuote {
+function buildCopperQuote(current: Record<string, unknown>): RawMarketQuote {
   const copper = pickCopperObservation(current);
   const dollar = pickRow(current, [
     "price_dollar_rl",
@@ -195,14 +202,9 @@ function buildCopperQuote(current: Record<string, unknown>): MarketPriceQuote {
 function buildQuote(
   instrument: InstrumentId,
   current: Record<string, unknown>
-): MarketPriceQuote {
+): RawMarketQuote {
   if (instrument === "gold18") {
-    const picked = pickRow(current, [
-      "geram18",
-      "geram18_buy",
-      "tgju_gold_irg18",
-      "tgju_gold_irg18_buy",
-    ]);
+    const picked = pickRow(current, goldBaseKeys());
     if (!picked) throw new Error("TGJU 18k instrument missing");
     return quoteFromRialRow({
       instrument,
@@ -227,11 +229,16 @@ function buildQuote(
 }
 
 /** Tehran goldsmiths union 18k rate (fallback when TGJU fails or is stale). */
+/** Attach buy/sell from the single pricing policy. Applied on the way out so setting changes are instant. */
+export function withSides(q: RawMarketQuote): MarketPriceQuote {
+  return { ...q, ...sidePricesToman(q.instrument, q.priceToman) };
+}
+
 export async function estjtGoldQuote(): Promise<MarketPriceQuote> {
   const e = await fetchEstjt();
   if (!e.gold18Rial) throw new Error("estjt 18k missing");
   const priceRial = Number(e.gold18Rial);
-  return {
+  return withSides({
     instrument: "gold18",
     priceToman: rialToToman(priceRial),
     priceRial,
@@ -243,15 +250,15 @@ export async function estjtGoldQuote(): Promise<MarketPriceQuote> {
     updatedAt: e.fetchedAt,
     fetchedAt: new Date().toISOString(),
     stale: false,
-  };
+  });
 }
 
 /** TGJU 18k only (no fallback), for the admin comparison card. */
 export async function tgjuGoldQuote(): Promise<MarketPriceQuote> {
-  return buildQuote("gold18", await fetchTgjuCurrent());
+  return withSides(buildQuote("gold18", await fetchTgjuCurrent()));
 }
 
-function fallbackQuote(instrument: InstrumentId): MarketPriceQuote {
+function fallbackQuote(instrument: InstrumentId): RawMarketQuote {
   return {
     instrument,
     priceToman: 0,
@@ -270,6 +277,13 @@ function fallbackQuote(instrument: InstrumentId): MarketPriceQuote {
 export async function getLivePrice(
   instrumentInput: InstrumentId | string = "gold18"
 ): Promise<MarketPriceQuote> {
+  await ensurePricingFresh();
+  return withSides(await getLivePriceRaw(instrumentInput));
+}
+
+async function getLivePriceRaw(
+  instrumentInput: InstrumentId | string = "gold18"
+): Promise<RawMarketQuote> {
   const instrument = parseInstrumentId(String(instrumentInput));
   const now = Date.now();
   const hit = cache.get(instrument);

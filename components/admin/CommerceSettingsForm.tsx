@@ -54,6 +54,7 @@ function NumberInput({
 
 export function CommerceSettingsForm({ initial }: Props) {
   const router = useRouter();
+  const [pricing, setPricing] = useState(initial.pricing);
   const [fees, setFees] = useState(initial.fees);
   const [plus, setPlus] = useState(initial.plus);
   const [referral, setReferral] = useState(initial.referral);
@@ -88,7 +89,7 @@ export function CommerceSettingsForm({ initial }: Props) {
       const res = await fetch("/api/admin/commerce-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fees, plus, referral, limits, reason }),
+        body: JSON.stringify({ pricing, fees, plus, referral, limits, reason }),
       });
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (!res.ok || !data.ok) {
@@ -105,6 +106,7 @@ export function CommerceSettingsForm({ initial }: Props) {
   };
 
   const onReset = () => {
+    setPricing(initial.pricing);
     setFees(initial.fees);
     setPlus(initial.plus);
     setReferral(initial.referral);
@@ -116,6 +118,39 @@ export function CommerceSettingsForm({ initial }: Props) {
   return (
     <div className="space-y-5">
       <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5">
+        <h2 className="font-bold">قیمت‌گذاری طلا (پایه و اسپرد)</h2>
+        <p className="mt-1 text-[13px] text-white/45">
+          قیمت خرید = پایه × (۱ + اسپرد خرید)، قیمت فروش = پایه × (۱ − اسپرد فروش). کارمزد جداگانه اضافه می‌شود. حداکثر ۲٪ (<span dir="ltr">0.02</span>). نقره و مس بدون اسپرد.
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <Field label="قیمت پایه (TGJU)">
+            <select
+              value={pricing.goldBase}
+              onChange={(e) => setPricing((p) => ({ ...p, goldBase: e.target.value as typeof p.goldBase }))}
+              className="h-11 w-full rounded-xl border border-white/10 bg-[#070B12] px-3 text-white outline-none focus:border-gold"
+            >
+              <option value="tgju_gold_irg18">tgju_gold_irg18 — بازار (مرجع رقبا)</option>
+              <option value="geram18">geram18 — محاسبه از مثقال</option>
+            </select>
+          </Field>
+          <Field label="اسپرد خرید" hint="0.003 = ۰٫۳٪">
+            <NumberInput
+              value={pricing.goldBuySpreadPercent}
+              step="0.0001"
+              onChange={(n) => setPricing((p) => ({ ...p, goldBuySpreadPercent: n }))}
+            />
+          </Field>
+          <Field label="اسپرد فروش" hint="0.003 = ۰٫۳٪">
+            <NumberInput
+              value={pricing.goldSellSpreadPercent}
+              step="0.0001"
+              onChange={(n) => setPricing((p) => ({ ...p, goldSellSpreadPercent: n }))}
+            />
+          </Field>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-[#0F1724] p-5">
         <h2 className="font-bold">کارمزد معامله</h2>
         <p className="mt-1 text-[13px] text-white/45">
           درصد را به‌صورت اعشاری وارد کنید — مثلاً ۰٫۷٪ = <span dir="ltr">0.007</span>
@@ -124,7 +159,7 @@ export function CommerceSettingsForm({ initial }: Props) {
           <Field label="درصد کارمزد خرید — رایگان">
             <NumberInput
               value={fees.buyFeePercentFree}
-              step="0.001"
+              step="0.0001"
               onChange={(n) => setFee("buyFeePercentFree", n)}
             />
           </Field>
@@ -138,7 +173,7 @@ export function CommerceSettingsForm({ initial }: Props) {
           <Field label="درصد کارمزد خرید — پلاس">
             <NumberInput
               value={fees.buyFeePercentPlus}
-              step="0.001"
+              step="0.0001"
               onChange={(n) => setFee("buyFeePercentPlus", n)}
             />
           </Field>
@@ -152,7 +187,7 @@ export function CommerceSettingsForm({ initial }: Props) {
           <Field label="درصد کارمزد فروش — رایگان">
             <NumberInput
               value={fees.sellFeePercentFree}
-              step="0.001"
+              step="0.0001"
               onChange={(n) => setFee("sellFeePercentFree", n)}
             />
           </Field>
@@ -166,7 +201,7 @@ export function CommerceSettingsForm({ initial }: Props) {
           <Field label="درصد کارمزد فروش — پلاس">
             <NumberInput
               value={fees.sellFeePercentPlus}
-              step="0.001"
+              step="0.0001"
               onChange={(n) => setFee("sellFeePercentPlus", n)}
             />
           </Field>
