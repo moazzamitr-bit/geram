@@ -21,4 +21,11 @@ export async function register() {
   void warmHistory();
   setInterval(() => void refreshLivePrices(), 20_000).unref?.();
   setInterval(() => void warmHistory(), 4 * 60_000).unref?.();
+  // Informational competitor price monitor (admin only; never touches trading).
+  if (process.env.GERAM_COMPETITOR_MONITOR !== "off") {
+    const { pollCompetitors } = await import("@/lib/market/competitors-server");
+    const poll = () => void pollCompetitors().catch((e) => console.error("[competitors]", e));
+    setTimeout(poll, 15_000).unref?.();
+    setInterval(poll, 5 * 60_000).unref?.();
+  }
 }
