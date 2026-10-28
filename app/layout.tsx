@@ -16,8 +16,8 @@ export const metadata: Metadata = {
   applicationName: "گرم",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: [{ url: "/brand/favicon-32.png?v=2", sizes: "32x32", type: "image/png" }],
-    apple: [{ url: "/icons/apple-touch-icon.png?v=2", sizes: "180x180", type: "image/png" }],
+    icon: [{ url: "/brand/favicon-32.png?v=3", sizes: "32x32", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png?v=3", sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: {
     capable: true,
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
       "خرید و فروش آنلاین طلا، نقره و مس با قیمت لایو، کارمزد شفاف و بدون اجرت ساخت.",
     locale: "fa_IR",
     type: "website",
-    images: [{ url: "/brand/logo.png", width: 528, height: 525, alt: "گرم" }],
+    images: [{ url: "/brand/og.png?v=3", width: 1200, height: 630, alt: "گرم" }],
   },
 };
 
