@@ -36,6 +36,23 @@ def transparent_mark() -> Image.Image:
     return sq
 
 
+def logotype() -> dict[str, Image.Image]:
+    im = np.asarray(Image.open(SRC / "logotype-master.png").convert("L")).astype(np.float32)
+    bg = float(np.median(np.concatenate([im[:20].ravel(), im[-20:].ravel()])))
+    a = np.clip(((bg - im) / bg - 0.08) / 0.8, 0, 1)
+    bbox = Image.fromarray((a > 0.3).astype(np.uint8) * 255).getbbox()
+    x0, y0, x1, y1 = bbox
+    pad = 6
+    a = a[max(0, y0 - pad):y1 + pad, max(0, x0 - pad):x1 + pad]
+    out = {}
+    for name, rgb in (("dark", (0x16, 0x16, 0x16)), ("light", (0xFF, 0xFF, 0xFF))):
+        px = np.zeros(a.shape + (4,), dtype=np.uint8)
+        px[..., :3] = rgb
+        px[..., 3] = (a * 255).round().astype(np.uint8)
+        out[name] = Image.fromarray(px, "RGBA")
+    return out
+
+
 def on_cream(mark: Image.Image, size: int, scale: float, h: int | None = None) -> Image.Image:
     h = h or size
     c = Image.new("RGBA", (size, h), CREAM + (255,))
@@ -75,6 +92,12 @@ def main() -> None:
         e = int(w * 0.32)
         c.alpha_composite(mark.resize((e, e), Image.Resampling.LANCZOS), ((w - e) // 2, (h - e) // 2 - int(h * 0.04)))
         save(c, f"splash/apple-splash-{w}x{h}.png")
+    for variant, img in logotype().items():
+        for h in (32, 64, 96):
+            w = round(img.width * h / img.height)
+            r = img.resize((w, h), Image.Resampling.LANCZOS)
+            save(r, f"brand/logotype-{variant}-{h}.webp")
+        img.resize((round(img.width * 192 / img.height), 192), Image.Resampling.LANCZOS).save(PUB / "brand" / f"logotype-{variant}.png", optimize=True)
     # OG image: full lockup on cream, 1200x630.
     lock = Image.open(SRC / "lockup-master.png").convert("RGB")
     lock = lock.crop((180, 140, 1820, 1860))

@@ -105,7 +105,7 @@ export function UserLoginForm({
         <div dir="rtl" className="order-1 flex items-center justify-center lg:order-2">
           <div className="w-full max-w-[440px] rounded-[28px] border border-black/[0.06] bg-white p-6 shadow-[0_24px_70px_rgba(28,25,23,0.06)] md:p-8">
             <div className="mb-6 flex justify-center lg:justify-start">
-              <BrandLogo href="/" size="md" />
+              <BrandLogo href="/" size="md" showWordmark />
             </div>
             {queryError && (
               <p className="mb-4 text-[13px] text-negative" role="alert">
@@ -159,7 +159,7 @@ export function UserLoginForm({
                 "radial-gradient(circle at 30% 40%, rgba(255,184,0,0.28), transparent 46%)",
             }}
           />
-          <BrandLogo href="/" size="md" className="relative" />
+          <BrandLogo href="/" size="md" showWordmark className="relative" />
           <div className="relative max-w-sm">
             <p className="text-[28px] font-extrabold leading-10 text-text">
               طلا، نقره و مس در یک حساب

@@ -68,7 +68,7 @@ export function AdminLoginForm({ initialError = "" }: { initialError?: string })
   return (
     <div className="flex min-h-svh items-center justify-center bg-[#070B12] px-4">
       <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0F1724] p-7">
-        <BrandLogo href="/" size="md" />
+        <BrandLogo href="/" size="md" showWordmark />
         <h1 className="mt-6 text-[24px] font-extrabold text-white">ورود ادمین</h1>
         <p className="mt-2 text-[13px] leading-7 text-white/65">
           فقط حساب‌هایی با نقش admin در جدول profiles وارد می‌شوند.

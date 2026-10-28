@@ -60,7 +60,7 @@ export function AdminShell({
         )}
       >
         <div className="flex h-16 items-center justify-between px-5">
-          <BrandLogo href="/admin" size="sm" showWordmark wordmarkClassName="text-white" />
+          <BrandLogo href="/admin" size="sm" showWordmark tone="light" />
           <button
             type="button"
             className="lg:hidden"

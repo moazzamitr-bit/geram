@@ -57,7 +57,7 @@ export default function OnboardingPage() {
     <div className="flex min-h-svh flex-col bg-bg px-5 py-8">
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col">
         <div className="flex items-center justify-between">
-          <BrandLogo href="/" size="sm" />
+          <BrandLogo href="/" size="sm" showWordmark />
           <button
             type="button"
             onClick={finish}
