@@ -8,6 +8,9 @@ type BrandLogoProps = {
   /** Show the «گرم» wordmark beside the mark (app/admin chrome). */
   showWordmark?: boolean;
   wordmarkClassName?: string;
+  /** "light" = white logotype for dark backgrounds (admin sidebar). */
+  tone?: "dark" | "light";
+  logotypeHeight?: number;
   size?: "sm" | "md" | "lg";
 };
 
@@ -24,13 +27,15 @@ export function BrandLogo({
   size = "md",
   showWordmark = false,
   wordmarkClassName,
+  tone = "dark",
+  logotypeHeight,
 }: BrandLogoProps) {
   const px = sizes[size];
   const content = (
     <span className={cn("inline-flex items-center gap-2", className)}>
       <LogoMark size={px} className={markClassName} />
       {showWordmark ? (
-        <span className={cn("text-[20px] font-black leading-none tracking-tight", wordmarkClassName)}>گرم</span>
+        <Logotype height={logotypeHeight ?? Math.round(px * 0.86)} tone={tone} className={wordmarkClassName} />
       ) : null}
     </span>
   );
@@ -66,6 +71,35 @@ export function LogoMark({
       className={cn("shrink-0 object-contain", className)}
       style={{ width: size, height: size }}
       aria-hidden
+    />
+  );
+}
+
+/** Brand logotype image («گرم» + GERAM); width follows the 1.86:1 artwork. */
+export function Logotype({
+  height = 32,
+  tone = "dark",
+  className,
+}: {
+  height?: number;
+  tone?: "dark" | "light";
+  className?: string;
+}) {
+  const f = (h: number) => `/brand/logotype-${tone}-${h}.webp?v=3`;
+  const base = height <= 32 ? 32 : 64;
+  const srcSet = base === 32 ? `${f(32)} 1x, ${f(64)} 2x, ${f(96)} 3x` : `${f(64)} 1x, ${f(96)} 2x`;
+  const width = Math.round(height * 1.86);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={f(base)}
+      srcSet={srcSet}
+      alt="گرم"
+      width={width}
+      height={height}
+      decoding="async"
+      className={cn("block shrink-0 object-contain", className)}
+      style={{ width, height }}
     />
   );
 }

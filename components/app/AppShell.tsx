@@ -151,7 +151,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="lg:mr-[var(--sidebar-w)]">
         <header className="sticky top-0 z-20 flex min-h-12 items-center justify-between gap-3 bg-bg/90 px-4 py-2 backdrop-blur-md md:px-6">
-          <BrandLogo href="/app/dashboard" size="sm" showWordmark className="shrink-0 lg:hidden" markClassName="!h-8 !w-8" wordmarkClassName="text-[18px]" />
+          <BrandLogo href="/app/dashboard" size="sm" showWordmark className="shrink-0 lg:hidden" markClassName="!h-8 !w-8" logotypeHeight={28} />
           <PriceTicker className="min-w-0 flex-1" />
           <div className="flex shrink-0 items-center gap-1.5">
             <Link
