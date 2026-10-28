@@ -53,11 +53,11 @@ export function LogoMark({
 }) {
   // Pre-sized webp renditions of public/brand/logo.png (40/80/120 px); 1x + 2x/3x via srcSet.
   const base = size <= 40 ? 40 : size <= 80 ? 80 : 120;
-  const srcSet = base === 40 ? "/brand/logo-40.webp 1x, /brand/logo-80.webp 2x, /brand/logo-120.webp 3x" : "/brand/logo-80.webp 1x, /brand/logo-120.webp 2x";
+  const srcSet = base === 40 ? "/brand/logo-40.webp?v=3 1x, /brand/logo-80.webp?v=3 2x, /brand/logo-120.webp?v=3 3x" : "/brand/logo-80.webp?v=3 1x, /brand/logo-120.webp?v=3 2x";
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={`/brand/logo-${base}.webp`}
+      src={`/brand/logo-${base}.webp?v=3`}
       srcSet={srcSet}
       alt=""
       width={size}
