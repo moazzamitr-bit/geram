@@ -21,7 +21,7 @@ import { LogOut } from "lucide-react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 function isNavActive(pathname: string, href: string) {
   if (href === "/app/dashboard") {
@@ -72,6 +72,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   useEffect(() => { try { sessionStorage.setItem("geram:inapp", "1"); } catch {} }, []);
   const router = useRouter();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // The document never scrolls (see .geram-scroll in globals.css); reset the
+  // app scroller on route change like the browser would for the window.
+  useEffect(() => { scrollRef.current?.scrollTo(0, 0); }, [pathname]);
 
   const unread = useMemo(
     () => store.notifications.filter((n) => !n.read).length,
@@ -149,7 +153,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="lg:mr-[var(--sidebar-w)]">
+      <div ref={scrollRef} id="geram-scroll" className="geram-scroll">
         <header className="sticky top-0 z-20 flex min-h-12 items-center justify-between gap-3 bg-bg/90 px-4 py-2 backdrop-blur-md md:px-6">
           <BrandLogo href="/app/dashboard" size="sm" showWordmark className="shrink-0 lg:hidden" markClassName="!h-8 !w-8" logotypeHeight={28} />
           <PriceTicker className="min-w-0 flex-1" />
