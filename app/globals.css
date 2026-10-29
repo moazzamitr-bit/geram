@@ -476,3 +476,27 @@ html:has(.geram-app) body {
 @media (min-width: 1024px) {
   .geram-assistant-fab { bottom: 24px; }
 }
+
+/* iOS: the logged-in app scrolls inside its own container, never the document.
+   With document scrolling, Safari (floating/collapsing toolbar, rubber-band
+   overscroll, visual-viewport panning) drags position:fixed bars along while
+   scrolling. The document is locked; .geram-scroll fills the viewport, and the
+   bottom nav (portaled to <body>, outside the scroller) cannot move. */
+html:has(.geram-scroll),
+html:has(.geram-scroll) body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+/* absolute (not fixed): no stacking context, so sheets inside still beat the nav. */
+.geram-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+@media (min-width: 1024px) {
+  .geram-scroll { right: var(--sidebar-w); }
+}
