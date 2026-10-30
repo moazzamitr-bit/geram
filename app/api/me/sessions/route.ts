@@ -31,6 +31,7 @@ export async function GET() {
     lastActiveAt: r.refreshed_at ? new Date(r.refreshed_at + "Z").toISOString() : r.updated_at ?? r.created_at,
     current: r.id === me.sessionId,
   }));
+  sessions.sort((a, b) => Number(b.current) - Number(a.current));
   return Response.json({ ok: true, sessions });
 }
 
