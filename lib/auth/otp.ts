@@ -6,6 +6,7 @@ import {
   finnotechSmsSender,
 } from "@/lib/finnotech/config";
 import { safeFinnotechLog } from "@/lib/finnotech/client";
+import { maskMobile } from "@/lib/finnotech/redact";
 import {
   initiateMessagingOtp,
   messagingScopeMissing,
@@ -48,12 +49,30 @@ export type OtpMode = "sms" | "unavailable";
 
 export type SmsProvider = "finnotech" | "smsir" | "kavenegar";
 
+export function smsIrConfigured() {
+  return Boolean(process.env.SMSIR_API_KEY && process.env.SMSIR_TEMPLATE_ID);
+}
+
+export function kavenegarConfigured() {
+  return Boolean(process.env.KAVENEGAR_API_KEY && process.env.KAVENEGAR_OTP_TEMPLATE);
+}
+
+/** sms.ir, then Kavenegar — used when Finnotech is absent or messaging cannot run. */
+export function localSmsFallback(): "smsir" | "kavenegar" | null {
+  if (smsIrConfigured()) return "smsir";
+  if (kavenegarConfigured()) return "kavenegar";
+  return null;
+}
+
 /** Finnotech wins when configured. Otherwise sms.ir, then Kavenegar. */
 export function smsProvider(): SmsProvider | null {
   if (finnotechConfigured()) return "finnotech";
-  if (process.env.SMSIR_API_KEY && process.env.SMSIR_TEMPLATE_ID) return "smsir";
-  if (process.env.KAVENEGAR_API_KEY && process.env.KAVENEGAR_OTP_TEMPLATE) return "kavenegar";
-  return null;
+  return localSmsFallback();
+}
+
+function logOtpSendFailed(reason: string, phone: string, detail?: string) {
+  if (detail) console.error("otp_send_failed", reason, maskMobile(phone), detail);
+  else console.error("otp_send_failed", reason, maskMobile(phone));
 }
 
 /** In-memory cap on OTP sends: 8 per hour per IP and 5 per hour per phone. */
@@ -167,6 +186,21 @@ export async function requestOtp(phone: string, ip = "unknown"): Promise<Request
     return sendFinnotechOtp(db, phone, sentCount, windowStart, now);
   }
 
+  const local = localSmsFallback();
+  if (!local) return { ok: false, error: "unavailable" };
+  return storeAndSendLocalCode(db, phone, sentCount, windowStart, now, local);
+}
+
+type OtpDb = ReturnType<typeof createServiceClient>;
+
+async function storeAndSendLocalCode(
+  db: OtpDb,
+  phone: string,
+  sentCount: number,
+  windowStart: string,
+  now: number,
+  provider: "smsir" | "kavenegar"
+): Promise<RequestOtpResult> {
   const code = newLoginCode();
   const { error } = await db.from("auth_otp_codes").upsert({
     phone,
@@ -183,18 +217,76 @@ export async function requestOtp(phone: string, ip = "unknown"): Promise<Request
     console.error("otp_store", error.message);
     return { ok: false, error: "send_failed" };
   }
-
   try {
-    if (smsProvider() === "smsir") await sendSmsIr(phone, code);
+    if (provider === "smsir") await sendSmsIr(phone, code);
     else await sendKavenegar(phone, code);
   } catch (err) {
     console.error("otp_send", err instanceof Error ? err.message : err);
+    logOtpSendFailed(provider, phone);
     return { ok: false, error: "send_failed" };
   }
-  return { ok: true, mode, resendInSec: OTP_RESEND_SEC, codeLength: otpCodeLength() };
+  return { ok: true, mode: "sms", resendInSec: OTP_RESEND_SEC, codeLength: otpCodeLength() };
 }
 
-type OtpDb = ReturnType<typeof createServiceClient>;
+type FinnotextAttempt =
+  | { ok: true; mode: "sms"; resendInSec: number; codeLength: number }
+  | { ok: false; error: "send_failed"; scopeMissing: boolean };
+
+async function tryFinnotextOtp(
+  db: OtpDb,
+  phone: string,
+  sentCount: number,
+  windowStart: string,
+  now: number
+): Promise<FinnotextAttempt> {
+  const code = newLoginCode();
+  const { error } = await db.from("auth_otp_codes").upsert({
+    phone,
+    code_hash: hashCode(phone, code),
+    expires_at: new Date(now + OTP_TTL_MS).toISOString(),
+    attempts: 0,
+    sent_count: sentCount,
+    window_started_at: windowStart,
+    last_sent_at: new Date(now).toISOString(),
+    provider: "finnotech_finnotext",
+    provider_ref: null,
+  });
+  if (error) {
+    console.error("otp_store", error.message);
+    return { ok: false, error: "send_failed", scopeMissing: false };
+  }
+  try {
+    await sendFinnotextOtp(phone, code);
+  } catch (err) {
+    safeFinnotechLog("otp_finnotext", err);
+    logOtpSendFailed("finnotext_failed", phone);
+    return { ok: false, error: "send_failed", scopeMissing: messagingScopeMissing(err) };
+  }
+  return { ok: true, mode: "sms", resendInSec: OTP_RESEND_SEC, codeLength: otpCodeLength() };
+}
+
+/**
+ * After messaging cannot run (missing scope / token_rejected), try finnotext
+ * if a sender line is set, then sms.ir, then Kavenegar. Do not fall through
+ * after a non-scope finnotext error — that request may already have been sent.
+ */
+async function fallbackAfterMessagingScopeMiss(
+  db: OtpDb,
+  phone: string,
+  sentCount: number,
+  windowStart: string,
+  now: number
+): Promise<RequestOtpResult> {
+  if (finnotechSmsSender()) {
+    const sent = await tryFinnotextOtp(db, phone, sentCount, windowStart, now);
+    if (sent.ok) return sent;
+    if (!sent.scopeMissing) return { ok: false, error: "send_failed" };
+  }
+  const local = localSmsFallback();
+  if (local) return storeAndSendLocalCode(db, phone, sentCount, windowStart, now, local);
+  logOtpSendFailed("messaging_scope_missing", phone, "no_fallback_provider");
+  return { ok: false, error: "send_failed" };
+}
 
 async function sendFinnotechOtp(
   db: OtpDb,
@@ -225,35 +317,21 @@ async function sendFinnotechOtp(
       return { ok: true, mode: "sms", resendInSec: OTP_RESEND_SEC, codeLength: initiated.codeLength };
     } catch (err) {
       safeFinnotechLog("otp_finnotech", err);
-      if (!messagingScopeMissing(err) || !finnotechSmsSender()) {
-        return { ok: false, error: "send_failed" };
+      if (messagingScopeMissing(err)) {
+        return fallbackAfterMessagingScopeMiss(db, phone, sentCount, windowStart, now);
       }
+      logOtpSendFailed("messaging_failed", phone);
+      return { ok: false, error: "send_failed" };
     }
   }
 
-  const code = newLoginCode();
-  const { error } = await db.from("auth_otp_codes").upsert({
-    phone,
-    code_hash: hashCode(phone, code),
-    expires_at: new Date(now + OTP_TTL_MS).toISOString(),
-    attempts: 0,
-    sent_count: sentCount,
-    window_started_at: windowStart,
-    last_sent_at: new Date(now).toISOString(),
-    provider: "finnotech_finnotext",
-    provider_ref: null,
-  });
-  if (error) {
-    console.error("otp_store", error.message);
-    return { ok: false, error: "send_failed" };
+  const sent = await tryFinnotextOtp(db, phone, sentCount, windowStart, now);
+  if (sent.ok) return sent;
+  if (sent.scopeMissing) {
+    const local = localSmsFallback();
+    if (local) return storeAndSendLocalCode(db, phone, sentCount, windowStart, now, local);
   }
-  try {
-    await sendFinnotextOtp(phone, code);
-  } catch (err) {
-    safeFinnotechLog("otp_finnotext", err);
-    return { ok: false, error: "send_failed" };
-  }
-  return { ok: true, mode: "sms", resendInSec: OTP_RESEND_SEC, codeLength: otpCodeLength() };
+  return { ok: false, error: "send_failed" };
 }
 
 export type VerifyOtpResult =

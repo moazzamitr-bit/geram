@@ -342,12 +342,20 @@ describe("finnotech per-scope tokens", () => {
       })
     );
     const a = await getFinnotechAccessToken(FINNOTECH_SCOPE.shahkarSend, 1_000);
-    const b = await getFinnotechAccessToken(FINNOTECH_SCOPE.loginOtp, 1_000);
+    const b = await getFinnotechAccessToken(FINNOTECH_SCOPE.loginOtpInitiate, 1_000);
     const a2 = await getFinnotechAccessToken([...FINNOTECH_SCOPE.shahkarSend], 2_000);
     expect(a).not.toBe(b);
     expect(a2).toBe(a);
-    expect(minted).toEqual(["kyc:sms-shahkar-send:get", [...FINNOTECH_SCOPE.loginOtp].sort().join(",")]);
+    expect(minted).toEqual(["kyc:sms-shahkar-send:get", "messaging:otp-initiate:post"]);
     const all = Object.values(FINNOTECH_SCOPE).flat();
+    expect(FINNOTECH_SCOPE.loginOtpInitiate).toEqual(["messaging:otp-initiate:post"]);
+    expect(FINNOTECH_SCOPE.loginOtpVerify).toEqual(["messaging:otp-verify:post"]);
+    expect(FINNOTECH_SCOPE.loginOtpFinnotext).toEqual(["facility:finnotext-otp:post"]);
+    expect(all.filter((scope) => scope.includes("otp") || scope.includes("finnotext"))).toEqual([
+      "messaging:otp-initiate:post",
+      "messaging:otp-verify:post",
+      "facility:finnotext-otp:post",
+    ]);
     for (const banned of [
       "kyc:sms-shahkar-verification:post",
       "facility:sms-shahkar-verification:get",

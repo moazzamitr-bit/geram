@@ -1,8 +1,9 @@
 /**
  * Per-call scopes. Finnotech rejects the whole token request (400 "client has
  * no access to this scope") if any requested scope is not granted to the
- * client, so each call mints a token for only the scopes it needs. Every
- * scope below is granted to the geram client.
+ * client, so each call mints a token for only the scopes it needs. Login OTP
+ * scopes are split: bundling finnotext with messaging would fail the token
+ * (and the SMS send) when the finnotext line is not granted.
  */
 export const FINNOTECH_SCOPE = {
   shahkarSend: ["kyc:sms-shahkar-send:get"],
@@ -10,8 +11,12 @@ export const FINNOTECH_SCOPE = {
   identification: ["kyc:identification-inquiry:get"],
   cardOwner: ["kyc:card-owner-verification:post"],
   cardToIban: ["facility:card-to-iban:get"],
-  /** Login OTP: messaging initiate/verify, or finnotext delivery when a sender line is set. */
-  loginOtp: ["messaging:otp-initiate:post", "messaging:otp-verify:post", "facility:finnotext-otp:post"],
+  /** messaging:otp-initiate:post — Finnotech generates and sends the login code. */
+  loginOtpInitiate: ["messaging:otp-initiate:post"],
+  /** messaging:otp-verify:post — check the code Finnotech sent. */
+  loginOtpVerify: ["messaging:otp-verify:post"],
+  /** facility:finnotext-otp:post — only when we deliver the code ourselves. */
+  loginOtpFinnotext: ["facility:finnotext-otp:post"],
 } as const satisfies Record<string, readonly string[]>;
 
 export function finnotechBaseUrl() {

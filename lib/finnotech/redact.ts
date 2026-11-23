@@ -1,7 +1,7 @@
 import { maskNationalCode } from "@/lib/kyc/national-id";
 
 /** Last four digits only, same idea as a national code. */
-function maskMobile(raw: string): string {
+export function maskMobile(raw: string): string {
   let digits = raw.replace(/\D/g, "");
   if (digits.startsWith("0098")) digits = `0${digits.slice(4)}`;
   else if (digits.startsWith("98") && digits.length >= 12) digits = `0${digits.slice(2)}`;
