@@ -46,7 +46,7 @@ export async function initiateMessagingOtp(phone: string): Promise<MessagingOtp>
   const sent = await finnotechCall<MessagingInitiateResult>({
     method: "POST",
     path: `${clientPath("messaging")}/otp/initiate`,
-    scopes: FINNOTECH_SCOPE.loginOtp,
+    scopes: FINNOTECH_SCOPE.loginOtpInitiate,
     body: { identifier: phone, method: "sms", purpose: "login", ttl: 120 },
     idempotent: false,
   });
@@ -66,7 +66,7 @@ export async function verifyMessagingOtp(traceId: string, otp: string) {
   const checked = await finnotechCall<{ status?: string }>({
     method: "POST",
     path: `${clientPath("messaging")}/otp/verify`,
-    scopes: FINNOTECH_SCOPE.loginOtp,
+    scopes: FINNOTECH_SCOPE.loginOtpVerify,
     body: { traceId, otp },
     idempotent: false,
   });
@@ -83,7 +83,7 @@ export async function sendFinnotextOtp(phone: string, code: string) {
   await finnotechCall({
     method: "POST",
     path: `${clientPath("facility")}/finnotextOtp`,
-    scopes: FINNOTECH_SCOPE.loginOtp,
+    scopes: FINNOTECH_SCOPE.loginOtpFinnotext,
     body: {
       from,
       to: phone,
@@ -93,8 +93,17 @@ export async function sendFinnotextOtp(phone: string, code: string) {
   });
 }
 
+/**
+ * Messaging initiate/verify cannot run: the token was rejected, or Finnotech
+ * said this client has no access to the messaging OTP scope. Safe to fall
+ * back — nothing was sent. Do not treat an ordinary 400 (bad phone, etc.)
+ * as a scope miss; that could double-send via another provider.
+ */
 export function messagingScopeMissing(err: unknown) {
   if (!(err instanceof FinnotechError)) return false;
+  if (err.code === "token_rejected" || err.code === "no_scope") return true;
   if (err.httpStatus === 403 || err.httpStatus === 404) return true;
+  const blob = `${err.code}\n${err.providerMessage}\n${err.providerBody}`;
+  if (err.httpStatus === 400 && /client has no access to this scope/i.test(blob)) return true;
   return /scope|forbidden|not_found|unauthorized_scope/i.test(err.code);
 }
